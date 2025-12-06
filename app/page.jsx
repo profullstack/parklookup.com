@@ -12,8 +12,15 @@ export default function HomePage() {
   return (
     <div className="flex flex-col">
       {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-green-600 to-green-800 text-white">
-        <div className="absolute inset-0 bg-black/20" />
+      <section className="relative text-white">
+        <Image
+          src="/banner.jpeg"
+          alt="National Park landscape"
+          fill
+          priority
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-br from-green-600/80 to-green-800/80" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
