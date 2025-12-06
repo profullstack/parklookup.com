@@ -7,7 +7,7 @@ import dynamic from 'next/dynamic';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
-const ParkMap = dynamic(() => import('@/components/parks/ParkMap').then((mod) => mod.ParkMap), {
+const ParksMap = dynamic(() => import('@/components/parks/ParkMap').then((mod) => mod.ParksMap), {
   ssr: false,
   loading: () => (
     <div className="h-64 bg-gray-200 rounded-lg animate-pulse flex items-center justify-center">
@@ -156,9 +156,8 @@ export default function StatePage() {
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Park Locations</h2>
             <div className="h-80 rounded-lg overflow-hidden shadow-sm">
-              <ParkMap
+              <ParksMap
                 parks={allParksForMap}
-                center={[state.latitude || 39.8283, state.longitude || -98.5795]}
                 zoom={6}
               />
             </div>
