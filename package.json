@@ -16,7 +16,12 @@
     "test:coverage": "vitest run --coverage",
     "test:ui": "vitest --ui",
     "pre-commit": "pnpm build && pnpm test",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "import:nps": "node scripts/import-nps.js",
+    "import:wikidata": "node scripts/import-wikidata.js",
+    "import:link": "node scripts/link-parks.js",
+    "import:link-states": "node scripts/link-parks-to-states.js",
+    "import:all": "node scripts/import-all.js"
   },
   "engines": {
     "node": ">=20.0.0",

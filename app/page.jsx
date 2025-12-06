@@ -5,6 +5,7 @@
 
 import Link from 'next/link';
 import SearchBar from '@/components/parks/SearchBar';
+import { StatesList, StatesGrid } from '@/components/states/StatesList';
 
 export default function HomePage() {
   return (
@@ -138,6 +139,13 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* States Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <StatesList limit={12} />
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="py-16 bg-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
@@ -190,13 +198,13 @@ export default function HomePage() {
                   </Link>
                 </li>
                 <li>
-                  <Link href="/map" className="hover:text-white transition-colors">
-                    Map View
+                  <Link href="/states" className="hover:text-white transition-colors">
+                    Browse by State
                   </Link>
                 </li>
                 <li>
-                  <Link href="/parks?state=CA" className="hover:text-white transition-colors">
-                    California Parks
+                  <Link href="/search" className="hover:text-white transition-colors">
+                    Search Parks
                   </Link>
                 </li>
               </ul>
