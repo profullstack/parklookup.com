@@ -20,26 +20,29 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
   };
 
   useEffect(() => {
-    if (user && parkId) {
-      checkFavoriteStatus();
-    }
-  }, [user, parkId]);
+    const checkFavoriteStatus = async () => {
+      // Only check if we have user, session with token, and parkId
+      if (!user || !session?.access_token || !parkId) {
+        return;
+      }
 
-  const checkFavoriteStatus = async () => {
-    try {
-      const headers = {};
-      if (session?.access_token) {
-        headers.Authorization = `Bearer ${session.access_token}`;
+      try {
+        const response = await fetch(`/api/favorites?parkId=${parkId}`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setIsFavorite(data.favorites?.some((f) => f.nps_park_id === parkId));
+        }
+      } catch (error) {
+        console.error('Error checking favorite status:', error);
       }
-      const response = await fetch(`/api/favorites?parkId=${parkId}`, { headers });
-      if (response.ok) {
-        const data = await response.json();
-        setIsFavorite(data.favorites?.some((f) => f.nps_park_id === parkId));
-      }
-    } catch (error) {
-      console.error('Error checking favorite status:', error);
-    }
-  };
+    };
+
+    checkFavoriteStatus();
+  }, [user, session, parkId]);
 
   const toggleFavorite = async (e) => {
     e.preventDefault();
