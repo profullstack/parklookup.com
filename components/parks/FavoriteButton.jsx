@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +27,11 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
 
   const checkFavoriteStatus = async () => {
     try {
-      const response = await fetch(`/api/favorites?parkId=${parkId}`);
+      const headers = {};
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+      const response = await fetch(`/api/favorites?parkId=${parkId}`, { headers });
       if (response.ok) {
         const data = await response.json();
         setIsFavorite(data.favorites?.some((f) => f.nps_park_id === parkId));
@@ -50,10 +54,16 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
     setLoading(true);
 
     try {
+      const authHeaders = {};
+      if (session?.access_token) {
+        authHeaders.Authorization = `Bearer ${session.access_token}`;
+      }
+
       if (isFavorite) {
         // Remove from favorites
         const response = await fetch(`/api/favorites/${parkId}`, {
           method: 'DELETE',
+          headers: authHeaders,
         });
         if (response.ok) {
           setIsFavorite(false);
@@ -62,7 +72,7 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
         // Add to favorites
         const response = await fetch('/api/favorites', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
           body: JSON.stringify({ parkId }),
         });
         if (response.ok) {
