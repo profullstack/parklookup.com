@@ -392,14 +392,19 @@ export default function ParkDetailPage() {
           <div>
             {activities.length > 0 ? (
               <div className="flex flex-wrap gap-2">
-                {activities.map((activity, index) => (
-                  <span
-                    key={index}
-                    className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm"
-                  >
-                    {activity.name || activity}
-                  </span>
-                ))}
+                {activities.map((activity, index) => {
+                  const activityName = activity.name || activity;
+                  const activitySlug = activityName.toLowerCase().replace(/\s+/g, '-');
+                  return (
+                    <Link
+                      key={index}
+                      href={`/activities/${encodeURIComponent(activitySlug)}`}
+                      className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                    >
+                      {activityName}
+                    </Link>
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-lg">
