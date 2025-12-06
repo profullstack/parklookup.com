@@ -17,8 +17,12 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { fetchAllParks, transformParkData } from '../lib/api/nps.js';
+import { loadEnv } from './lib/load-env.js';
 
-// Load environment variables
+// Load environment variables from .env file
+loadEnv();
+
+// Get environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const NPS_API_KEY = process.env.NPS_API_KEY;

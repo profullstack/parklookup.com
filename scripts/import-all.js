@@ -62,6 +62,7 @@ const main = async () => {
   console.log('  1. National Park Service API');
   console.log('  2. Wikidata SPARQL endpoint');
   console.log('  3. Link parks together');
+  console.log('  4. Link parks to states');
   console.log('='.repeat(60));
 
   const startTime = Date.now();
@@ -75,6 +76,9 @@ const main = async () => {
 
     // Step 3: Link parks
     await runScript(join(__dirname, 'link-parks.js'), 'Park Linking');
+
+    // Step 4: Link parks to states
+    await runScript(join(__dirname, 'link-parks-to-states.js'), 'Park-State Linking');
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
