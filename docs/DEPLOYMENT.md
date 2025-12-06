@@ -1,6 +1,6 @@
 # Deployment Guide
 
-This document describes how to deploy ParkLookup.com using Supabase Cloud and Railway.
+This document describes how to deploy ParkLookup.com using Supabase Cloud and Railway with Railpack.
 
 ## Overview
 
@@ -16,22 +16,33 @@ graph LR
     end
     
     subgraph Production
+        RAILPACK[Railpack Builder]
         RAILWAY[Railway]
         SUPABASE[Supabase Cloud]
     end
     
     LOCAL --> GH
     GH --> ACTIONS
-    ACTIONS --> RAILWAY
+    ACTIONS --> RAILPACK
+    RAILPACK --> RAILWAY
     ACTIONS --> SUPABASE
 ```
+
+## Tech Stack
+
+- **Runtime**: Node.js 20+
+- **Package Manager**: pnpm
+- **Build Tool**: Railpack (Railway's optimized builder)
+- **Testing**: Vitest
+- **Framework**: Next.js 14+
 
 ## Prerequisites
 
 - GitHub account
 - Supabase account (free tier available)
 - Railway account (free tier available)
-- Node.js 18+ installed locally
+- Node.js 20+ installed locally
+- pnpm installed (`npm install -g pnpm`)
 - Supabase CLI installed
 
 ## Supabase Setup
@@ -59,8 +70,8 @@ After project creation, go to Settings > API:
 #### Run Migrations
 
 ```bash
-# Install Supabase CLI
-npm install -g supabase
+# Install Supabase CLI globally
+pnpm add -g supabase
 
 # Login to Supabase
 supabase login
@@ -153,7 +164,16 @@ SELECT cron.schedule(
 );
 ```
 
-## Railway Setup
+## Railway Setup with Railpack
+
+### What is Railpack?
+
+Railpack is Railway's optimized build system that automatically detects your project type and creates efficient, cached builds. It provides:
+
+- **Automatic detection** of Node.js, pnpm, and Next.js
+- **Layer caching** for faster subsequent builds
+- **Optimized Docker images** for production
+- **Zero configuration** for most projects
 
 ### 1. Create Project
 
@@ -163,7 +183,44 @@ SELECT cron.schedule(
 4. Connect your GitHub account
 5. Select the `parklookup.com` repository
 
-### 2. Configure Environment Variables
+### 2. Configure Railpack
+
+Railway automatically uses Railpack when it detects a supported project. For Next.js with pnpm, create a `railpack.json` in your project root:
+
+```json
+{
+  "$schema": "https://railpack.io/schema.json",
+  "builder": "nodejs",
+  "runtime": "nodejs",
+  "packageManager": "pnpm",
+  "nodeVersion": "20",
+  "buildCommand": "pnpm run build",
+  "startCommand": "pnpm start",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "cacheDirectories": [
+    "node_modules",
+    ".next/cache"
+  ]
+}
+```
+
+Alternatively, you can use a `railway.toml` file:
+
+```toml
+[build]
+builder = "railpack"
+
+[build.railpack]
+packageManager = "pnpm"
+nodeVersion = "20"
+
+[deploy]
+startCommand = "pnpm start"
+healthcheckPath = "/api/health"
+healthcheckTimeout = 30
+```
+
+### 3. Configure Environment Variables
 
 In Railway Dashboard > Variables:
 
@@ -180,14 +237,6 @@ NPS_API_KEY=your_nps_api_key
 NEXT_PUBLIC_APP_URL=https://your-app.railway.app
 NODE_ENV=production
 ```
-
-### 3. Configure Build Settings
-
-Railway auto-detects Next.js, but verify:
-
-- **Build Command**: `npm run build`
-- **Start Command**: `npm start`
-- **Install Command**: `npm install`
 
 ### 4. Configure Domain
 
@@ -230,23 +279,28 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Install pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+      
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          cache: 'pnpm'
       
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
       
       - name: Run linter
-        run: npm run lint
+        run: pnpm lint
       
       - name: Run tests
-        run: npm test
+        run: pnpm test
       
       - name: Build
-        run: npm run build
+        run: pnpm build
 
   deploy-supabase:
     needs: test
@@ -275,7 +329,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-  # Railway deploys automatically via GitHub integration
+  # Railway deploys automatically via GitHub integration using Railpack
 ```
 
 ### GitHub Secrets
@@ -289,11 +343,82 @@ Configure in GitHub > Settings > Secrets:
 | `SUPABASE_ACCESS_TOKEN` | Supabase CLI access token |
 | `SUPABASE_PROJECT_REF` | Supabase project reference |
 
+## Project Configuration Files
+
+### package.json
+
+```json
+{
+  "name": "parklookup",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ext .js,.jsx",
+    "lint:fix": "eslint . --ext .js,.jsx --fix",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
+    "format": "prettier --write ."
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@9.14.2"
+}
+```
+
+### vitest.config.js
+
+```javascript
+import { defineConfig } from 'vitest/config'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./test/setup.js'],
+    include: ['**/*.{test,spec}.{js,jsx}'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html'],
+      exclude: [
+        'node_modules/',
+        'test/',
+        '**/*.config.js'
+      ]
+    }
+  },
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './'),
+    }
+  }
+})
+```
+
+### .npmrc (for pnpm)
+
+```ini
+engine-strict=true
+auto-install-peers=true
+shamefully-hoist=true
+```
+
 ## Environment Configuration
 
 ### Development (.env.local)
 
 ```env
+# Server Configuration
+PORT=8080
+
 # Supabase
 NEXT_PUBLIC_SUPABASE_URL=http://localhost:54321
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_local_anon_key
@@ -303,7 +428,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_local_service_role_key
 NPS_API_KEY=your_nps_api_key
 
 # App
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=http://localhost:8080
 ```
 
 ### Production
@@ -333,6 +458,7 @@ curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/import-nps-parks \
 - Memory usage
 - Request count
 - Response times
+- Build times (Railpack optimizations)
 
 ### Supabase Dashboard
 
@@ -344,7 +470,7 @@ curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/import-nps-parks \
 ### Recommended Monitoring Tools
 
 - **Sentry**: Error tracking
-- **Vercel Analytics**: Web vitals (if using Vercel)
+- **Railway Observability**: Built-in metrics
 - **LogRocket**: Session replay
 
 ## Scaling
@@ -354,6 +480,7 @@ curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/import-nps-parks \
 - Upgrade to Pro plan for more resources
 - Configure auto-scaling in settings
 - Add more replicas if needed
+- Railpack caching improves build times
 
 ### Supabase
 
@@ -365,11 +492,24 @@ curl -X POST https://YOUR_PROJECT.supabase.co/functions/v1/import-nps-parks \
 
 ### Common Issues
 
-#### Build Fails on Railway
+#### Build Fails on Railway with Railpack
 
 1. Check build logs in Railway dashboard
-2. Verify environment variables are set
-3. Ensure `package.json` scripts are correct
+2. Verify `pnpm-lock.yaml` is committed
+3. Ensure `engines` field in package.json matches Node version
+4. Check `railpack.json` or `railway.toml` configuration
+
+#### pnpm Install Fails
+
+1. Ensure `pnpm-lock.yaml` is up to date
+2. Run `pnpm install --frozen-lockfile` locally to verify
+3. Check for peer dependency issues
+
+#### Vitest Tests Fail
+
+1. Check test environment configuration
+2. Verify `jsdom` environment for React components
+3. Check for missing test setup files
 
 #### Database Connection Issues
 
@@ -394,6 +534,12 @@ supabase functions logs import-nps-parks
 
 # Test database connection
 supabase db ping
+
+# Run tests locally
+pnpm test
+
+# Check pnpm store
+pnpm store status
 ```
 
 ## Rollback Procedures
@@ -422,6 +568,7 @@ supabase db reset --linked
 - [ ] CORS configured correctly
 - [ ] Rate limiting enabled
 - [ ] SSL/TLS enabled (automatic on Railway/Supabase)
+- [ ] pnpm-lock.yaml committed for reproducible builds
 
 ## Cost Optimization
 
@@ -430,6 +577,7 @@ supabase db reset --linked
 - 500 hours/month execution
 - 100 GB bandwidth
 - Sleeps after inactivity
+- Railpack caching reduces build minutes
 
 ### Supabase Free Tier
 
@@ -444,6 +592,7 @@ supabase db reset --linked
 2. Optimize images before upload
 3. Use CDN for static assets
 4. Monitor usage in dashboards
+5. Leverage Railpack caching for faster builds
 
 ## Related Documentation
 

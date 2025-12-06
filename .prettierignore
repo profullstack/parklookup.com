@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+.next/
+out/
+build/
+coverage/
+
+# Generated files
+public/sw.js
+public/workbox-*.js
+pnpm-lock.yaml
+
+# Misc
+*.md
