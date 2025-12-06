@@ -289,9 +289,41 @@ export default function ParkDetailPage() {
                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
                   Weather
                 </h2>
-                <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
+                <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
                   {park.weather_info}
                 </p>
+                {/* 10-Day Forecast from weather.gov */}
+                {hasCoordinates && (
+                  <div className="mt-4">
+                    <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">
+                      10-Day Forecast
+                    </h3>
+                    <a
+                      href={`https://forecast.weather.gov/MapClick.php?lat=${park.latitude}&lon=${park.longitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block"
+                    >
+                      <img
+                        src={`https://forecast.weather.gov/meteograms/Ede/TimeSeries/Meteogram.php?lat=${park.latitude}&lon=${park.longitude}&unit=0&lg=en&in498=1`}
+                        alt={`10-day weather forecast for ${park.full_name}`}
+                        className="w-full max-w-2xl rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
+                        loading="lazy"
+                      />
+                    </a>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Click for detailed forecast from{' '}
+                      <a
+                        href={`https://forecast.weather.gov/MapClick.php?lat=${park.latitude}&lon=${park.longitude}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-green-600 hover:underline"
+                      >
+                        weather.gov
+                      </a>
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
