@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ParkCard } from '@/components/parks/ParkCard';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import { useAuth } from '@/hooks/useAuth';
 
 /**
  * Favorites page - displays user's saved parks
@@ -13,35 +14,47 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 export default function FavoritesPage() {
   const router = useRouter();
   const { trackPageView } = useAnalytics();
+  const { user, session, loading: authLoading, isAuthenticated } = useAuth();
 
   const [favorites, setFavorites] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [user, setUser] = useState(null);
 
   // Track page view
   useEffect(() => {
     trackPageView('favorites');
   }, [trackPageView]);
 
-  // Check authentication and fetch favorites
+  // Handle authentication redirect
   useEffect(() => {
-    const checkAuthAndFetchFavorites = async () => {
+    // Wait for auth to finish loading
+    if (authLoading) return;
+
+    // Redirect to sign in if not authenticated
+    if (!isAuthenticated) {
+      router.push('/signin?redirect=/favorites');
+    }
+  }, [authLoading, isAuthenticated, router]);
+
+  // Fetch favorites when authenticated
+  useEffect(() => {
+    const fetchFavorites = async () => {
+      // Wait for auth to finish loading
+      if (authLoading) return;
+
+      // Don't fetch if not authenticated
+      if (!isAuthenticated || !session?.access_token) {
+        setLoading(false);
+        return;
+      }
+
       try {
-        // Check if user is authenticated
-        const sessionRes = await fetch('/api/auth/session');
-        const sessionData = await sessionRes.json();
-
-        if (!sessionData.user) {
-          // Redirect to sign in if not authenticated
-          router.push('/signin?redirect=/favorites');
-          return;
-        }
-
-        setUser(sessionData.user);
-
-        // Fetch favorites
-        const favoritesRes = await fetch('/api/favorites');
+        // Fetch favorites with authorization header
+        const favoritesRes = await fetch('/api/favorites', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
 
         if (!favoritesRes.ok) {
           throw new Error('Failed to fetch favorites');
@@ -56,14 +69,17 @@ export default function FavoritesPage() {
       }
     };
 
-    checkAuthAndFetchFavorites();
-  }, [router]);
+    fetchFavorites();
+  }, [authLoading, isAuthenticated, session]);
 
   // Handle removing a favorite
   const handleRemoveFavorite = async (parkId) => {
     try {
       const response = await fetch(`/api/favorites/${parkId}`, {
         method: 'DELETE',
+        headers: session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {},
       });
 
       if (!response.ok) {
@@ -77,8 +93,8 @@ export default function FavoritesPage() {
     }
   };
 
-  // Loading state
-  if (loading) {
+  // Loading state (show while auth is loading or favorites are loading)
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
         <div className="max-w-6xl mx-auto">
