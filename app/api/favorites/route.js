@@ -86,7 +86,14 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Failed to fetch favorites' }, { status: 500 });
     }
 
-    return NextResponse.json({ favorites });
+    // Transform the response to use 'park' instead of 'nps_parks' for frontend compatibility
+    const transformedFavorites = (favorites || []).map((fav) => ({
+      ...fav,
+      park: fav.nps_parks,
+      park_id: fav.nps_park_id,
+    }));
+
+    return NextResponse.json({ favorites: transformedFavorites });
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
