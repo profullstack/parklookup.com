@@ -48,7 +48,7 @@ export async function GET(request) {
     const visitedOnly = searchParams.get('visited') === 'true';
 
     let query = supabase
-      .from('user_favorites')
+      .from('favorites')
       .select(
         `
         id,
@@ -113,7 +113,7 @@ export async function POST(request) {
     }
 
     const { data: favorite, error } = await supabase
-      .from('user_favorites')
+      .from('favorites')
       .insert({
         user_id: user.id,
         nps_park_id: parkId,

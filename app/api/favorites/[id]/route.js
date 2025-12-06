@@ -48,7 +48,7 @@ export async function GET(request, { params }) {
     const supabase = createServerClient({ useServiceRole: true });
 
     const { data: favorite, error } = await supabase
-      .from('user_favorites')
+      .from('favorites')
       .select(
         `
         id,
@@ -118,7 +118,7 @@ export async function PATCH(request, { params }) {
     }
 
     const { data: favorite, error } = await supabase
-      .from('user_favorites')
+      .from('favorites')
       .update(updates)
       .eq('id', id)
       .eq('user_id', user.id)
@@ -155,7 +155,7 @@ export async function DELETE(request, { params }) {
     const supabase = createServerClient({ useServiceRole: true });
 
     const { error } = await supabase
-      .from('user_favorites')
+      .from('favorites')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);
