@@ -4,6 +4,7 @@
  */
 
 import Link from 'next/link';
+import Image from 'next/image';
 import SearchBar from '@/components/parks/SearchBar';
 import { StatesList, StatesGrid } from '@/components/states/StatesList';
 
@@ -167,25 +168,19 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <svg
-                  className="w-8 h-8 text-green-500"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                  />
-                </svg>
+              <div className="flex items-center gap-3 mb-4">
+                <Image
+                  src="/logo.notext.svg"
+                  alt="ParkLookup"
+                  width={40}
+                  height={40}
+                  className="h-10 w-10"
+                />
                 <span className="text-xl font-bold text-white">ParkLookup</span>
               </div>
               <p className="text-sm">
-                Discover and explore America&apos;s national parks. Data sourced from the National
-                Park Service and Wikidata.
+                Discover and explore America&apos;s national and state parks. Data sourced from the
+                National Park Service and Wikidata.
               </p>
             </div>
 
