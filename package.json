@@ -24,11 +24,14 @@
   },
   "packageManager": "pnpm@9.14.2",
   "dependencies": {
+    "@react-leaflet/core": "2.1.0",
     "@supabase/supabase-js": "^2.39.0",
+    "leaflet": "^1.9.4",
     "next": "^14.0.4",
     "next-pwa": "^5.6.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1"
   },
   "devDependencies": {
     "@testing-library/react": "^14.1.2",
