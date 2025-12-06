@@ -1,0 +1,52 @@
+@startuml architecture
+skinparam backgroundColor #FEFEFE
+skinparam componentStyle rectangle
+
+title ParkLookup.com - System Architecture
+
+package "Client Layer" {
+    component "Next.js PWA" as PWA
+    component "Service Worker" as SW
+    component "IndexedDB Cache" as IDB
+    
+    PWA --> SW : registers
+    SW --> IDB : caches data
+}
+
+package "Railway Cloud" {
+    component "Next.js Server" as NEXT
+    component "API Routes" as API
+    
+    NEXT --> API : handles
+}
+
+package "Supabase Cloud" {
+    component "Supabase Auth" as AUTH
+    database "PostgreSQL" as DB
+    component "Edge Functions" as EDGE
+    component "Storage" as STORAGE
+}
+
+package "External APIs" {
+    component "NPS API" as NPS
+    component "Wikidata SPARQL" as WIKI
+}
+
+PWA --> NEXT : HTTPS requests
+NEXT --> AUTH : authentication
+NEXT --> DB : data queries
+EDGE --> NPS : fetch parks
+EDGE --> WIKI : fetch metadata
+EDGE --> DB : upsert data
+
+note right of PWA
+  Mobile-first PWA
+  with offline support
+end note
+
+note right of EDGE
+  Scheduled imports
+  via pg_cron
+end note
+
+@enduml

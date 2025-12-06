@@ -1,0 +1,63 @@
+@startuml data-flow
+skinparam backgroundColor #FEFEFE
+
+title ParkLookup.com - Data Import Flow
+
+participant "pg_cron Scheduler" as CRON
+participant "import-nps-parks" as NPS_FN
+participant "import-wikidata-parks" as WIKI_FN
+participant "link-parks" as LINK_FN
+participant "NPS API" as NPS_API
+participant "Wikidata SPARQL" as WIKI_API
+database "PostgreSQL" as DB
+
+== Daily Import Schedule ==
+
+note over CRON: 2:00 AM UTC
+CRON -> NPS_FN: Trigger import
+
+loop Paginate 50 records per batch
+    NPS_FN -> NPS_API: GET /parks?limit=50&start=N
+    NPS_API --> NPS_FN: Park data JSON
+    NPS_FN -> DB: UPSERT nps_parks
+    DB --> NPS_FN: Success
+end
+
+NPS_FN --> CRON: Import complete
+
+note over CRON: 3:00 AM UTC
+CRON -> WIKI_FN: Trigger import
+
+loop Paginate 50 records per batch
+    WIKI_FN -> WIKI_API: SPARQL query OFFSET N
+    WIKI_API --> WIKI_FN: Park metadata JSON
+    WIKI_FN -> DB: UPSERT wikidata_parks
+    DB --> WIKI_FN: Success
+end
+
+WIKI_FN --> CRON: Import complete
+
+note over CRON: 4:00 AM UTC
+CRON -> LINK_FN: Trigger linking
+
+LINK_FN -> DB: SELECT FROM nps_parks
+DB --> LINK_FN: NPS parks list
+
+LINK_FN -> DB: SELECT FROM wikidata_parks
+DB --> LINK_FN: Wikidata parks list
+
+LINK_FN -> LINK_FN: Calculate name similarity scores
+
+loop For each match above 0.8 confidence
+    LINK_FN -> DB: UPSERT park_links
+    DB --> LINK_FN: Success
+end
+
+LINK_FN --> CRON: Linking complete
+
+note over DB
+  Data is now ready
+  for user queries
+end note
+
+@enduml

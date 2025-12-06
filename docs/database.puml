@@ -1,0 +1,103 @@
+@startuml database
+skinparam backgroundColor #FEFEFE
+skinparam linetype ortho
+
+title ParkLookup.com - Database Schema
+
+entity "nps_parks" as nps {
+    *id : UUID <<PK>>
+    --
+    *park_code : VARCHAR(10) <<UK>>
+    *full_name : VARCHAR(255)
+    description : TEXT
+    states : VARCHAR(50)
+    designation : VARCHAR(100)
+    latitude : DECIMAL(10,8)
+    longitude : DECIMAL(11,8)
+    url : TEXT
+    weather_info : TEXT
+    images : JSONB
+    activities : JSONB
+    topics : JSONB
+    contacts : JSONB
+    entrance_fees : JSONB
+    operating_hours : JSONB
+    addresses : JSONB
+    created_at : TIMESTAMPTZ
+    updated_at : TIMESTAMPTZ
+}
+
+entity "wikidata_parks" as wiki {
+    *id : UUID <<PK>>
+    --
+    *wikidata_id : VARCHAR(20) <<UK>>
+    *label : VARCHAR(255)
+    image_url : TEXT
+    state : VARCHAR(100)
+    latitude : DECIMAL(10,8)
+    longitude : DECIMAL(11,8)
+    website : TEXT
+    area : DECIMAL(20,6)
+    area_unit : VARCHAR(50)
+    elevation : DECIMAL(10,2)
+    elevation_unit : VARCHAR(50)
+    inception : DATE
+    managing_org : VARCHAR(255)
+    commons_category : VARCHAR(255)
+    created_at : TIMESTAMPTZ
+    updated_at : TIMESTAMPTZ
+}
+
+entity "park_links" as links {
+    *id : UUID <<PK>>
+    --
+    *nps_park_id : UUID <<FK>>
+    *wikidata_park_id : UUID <<FK>>
+    confidence_score : DECIMAL(3,2)
+    match_method : VARCHAR(50)
+    created_at : TIMESTAMPTZ
+}
+
+entity "user_favorites" as favs {
+    *id : UUID <<PK>>
+    --
+    *user_id : UUID <<FK>>
+    *nps_park_id : UUID <<FK>>
+    created_at : TIMESTAMPTZ
+}
+
+entity "auth.users" as users {
+    *id : UUID <<PK>>
+    --
+    email : VARCHAR(255)
+    created_at : TIMESTAMPTZ
+}
+
+nps ||--o| links
+wiki ||--o| links
+nps ||--o{ favs
+users ||--o{ favs
+
+note bottom of nps
+  Primary data source
+  from NPS API
+end note
+
+note bottom of wiki
+  Supplementary data
+  from Wikidata SPARQL
+end note
+
+note bottom of links
+  Links parks between
+  data sources with
+  confidence scoring
+end note
+
+note bottom of favs
+  Protected by RLS
+  Users can only access
+  their own favorites
+end note
+
+@enduml

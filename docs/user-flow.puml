@@ -1,0 +1,118 @@
+@startuml user-flow
+skinparam backgroundColor #FEFEFE
+
+title ParkLookup.com - User Interaction Flow
+
+actor User
+participant "PWA Client" as PWA
+participant "Service Worker" as SW
+participant "IndexedDB" as IDB
+participant "Next.js Server" as NEXT
+participant "Supabase Auth" as AUTH
+database "PostgreSQL" as DB
+
+== Browse Parks Online ==
+
+User -> PWA: Open app
+PWA -> SW: Check cache
+SW -> IDB: Get cached parks
+IDB --> SW: Cached data if any
+SW --> PWA: Return cached data
+
+PWA -> NEXT: GET /api/parks
+NEXT -> DB: SELECT from parks_with_wikidata
+DB --> NEXT: Park list
+NEXT --> PWA: JSON response
+
+PWA -> SW: Cache response
+SW -> IDB: Store parks
+PWA -> User: Display park list
+
+== Browse Parks Offline ==
+
+User -> PWA: Open app offline
+PWA -> SW: Check cache
+SW -> IDB: Get cached parks
+IDB --> SW: Cached data
+SW --> PWA: Return cached data
+PWA -> User: Display cached parks
+
+note over PWA
+  Shows offline banner
+  Limited functionality
+end note
+
+== Search Parks ==
+
+User -> PWA: Enter search query
+PWA -> NEXT: GET /api/parks?search=query
+NEXT -> DB: Full-text search
+DB --> NEXT: Matching parks
+NEXT --> PWA: Search results
+PWA -> User: Display results
+
+== View Park Details ==
+
+User -> PWA: Click on park
+PWA -> NEXT: GET /api/parks/id
+NEXT -> DB: SELECT park with wikidata
+DB --> NEXT: Park details
+NEXT --> PWA: JSON response
+PWA -> User: Display park details
+
+== Authentication ==
+
+User -> PWA: Click Login
+PWA -> AUTH: Redirect to auth
+AUTH -> User: Show login form
+User -> AUTH: Enter credentials
+AUTH -> AUTH: Validate
+AUTH --> PWA: Return JWT token
+PWA -> PWA: Store token
+
+== Toggle Favorite Online ==
+
+User -> PWA: Click favorite button
+PWA -> PWA: Optimistic UI update
+PWA -> NEXT: POST /api/favorites
+NEXT -> AUTH: Validate JWT
+AUTH --> NEXT: User verified
+NEXT -> DB: Call toggle_favorite
+DB --> NEXT: New favorite status
+NEXT --> PWA: Confirm status
+PWA -> User: Update UI
+
+== Toggle Favorite Offline ==
+
+User -> PWA: Click favorite button
+PWA -> PWA: Optimistic UI update
+PWA -> IDB: Store pending action
+IDB --> PWA: Stored
+
+PWA -> SW: Register sync
+SW -> SW: Queue background sync
+
+note over SW
+  When online again
+end note
+
+SW -> NEXT: POST /api/favorites
+NEXT -> DB: Sync favorite
+DB --> NEXT: Success
+NEXT --> SW: Confirmed
+SW -> IDB: Remove pending action
+
+== Install PWA ==
+
+User -> PWA: Use app
+PWA -> User: Show install prompt
+User -> PWA: Click install
+PWA -> PWA: Trigger install
+PWA -> User: App installed
+
+note over User
+  App now available
+  on home screen
+end note
+
+@enduml
