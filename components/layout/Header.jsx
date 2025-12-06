@@ -28,7 +28,7 @@ export default function Header() {
           <div className="flex items-center">
             <Link href="/" className="flex items-center">
               <Image
-                src="/logo.svg"
+                src="/logo.white.svg"
                 alt="ParkLookup"
                 width={180}
                 height={40}
