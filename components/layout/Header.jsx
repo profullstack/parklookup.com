@@ -46,16 +46,16 @@ export default function Header() {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <Link
-              href="/parks"
+              href="/search"
               className="text-gray-600 hover:text-green-600 font-medium transition-colors"
             >
               Explore Parks
             </Link>
             <Link
-              href="/map"
+              href="/states"
               className="text-gray-600 hover:text-green-600 font-medium transition-colors"
             >
-              Map
+              States
             </Link>
             {user && (
               <Link
@@ -73,24 +73,21 @@ export default function Header() {
               <div className="w-8 h-8 animate-pulse bg-gray-200 rounded-full" />
             ) : user ? (
               <div className="flex items-center space-x-4">
-                <Link
-                  href="/profile"
-                  className="text-gray-600 hover:text-green-600 font-medium transition-colors"
-                >
-                  Profile
-                </Link>
+                <span className="text-gray-600 text-sm">
+                  {user.email?.split('@')[0]}
+                </span>
                 <Button variant="outline" size="sm" onClick={handleSignOut}>
                   Sign Out
                 </Button>
               </div>
             ) : (
               <>
-                <Link href="/auth/signin">
+                <Link href="/signin">
                   <Button variant="ghost" size="sm">
                     Sign In
                   </Button>
                 </Link>
-                <Link href="/auth/signup">
+                <Link href="/signup">
                   <Button size="sm">Sign Up</Button>
                 </Link>
               </>
@@ -129,18 +126,18 @@ export default function Header() {
           <div className="md:hidden py-4 border-t border-gray-100">
             <div className="flex flex-col space-y-4">
               <Link
-                href="/parks"
+                href="/search"
                 className="text-gray-600 hover:text-green-600 font-medium"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Explore Parks
               </Link>
               <Link
-                href="/map"
+                href="/states"
                 className="text-gray-600 hover:text-green-600 font-medium"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Map
+                States
               </Link>
               {user && (
                 <Link
@@ -154,13 +151,9 @@ export default function Header() {
               <hr className="border-gray-100" />
               {user ? (
                 <>
-                  <Link
-                    href="/profile"
-                    className="text-gray-600 hover:text-green-600 font-medium"
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    Profile
-                  </Link>
+                  <span className="text-gray-600 text-sm">
+                    {user.email?.split('@')[0]}
+                  </span>
                   <button
                     onClick={() => {
                       handleSignOut();
@@ -174,14 +167,14 @@ export default function Header() {
               ) : (
                 <>
                   <Link
-                    href="/auth/signin"
+                    href="/signin"
                     className="text-gray-600 hover:text-green-600 font-medium"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Sign In
                   </Link>
                   <Link
-                    href="/auth/signup"
+                    href="/signup"
                     className="text-green-600 font-medium"
                     onClick={() => setMobileMenuOpen(false)}
                   >
