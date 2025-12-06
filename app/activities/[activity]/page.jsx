@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import ParkCard from '@/components/parks/ParkCard';
+import { createServerClient } from '@/lib/supabase/client';
 
 /**
  * Converts an activity name to a URL-friendly slug
@@ -23,23 +24,72 @@ function slugToDisplayName(slug) {
 }
 
 /**
- * Fetches parks by activity from the API
- * @param {string} activity - Activity slug
- * @returns {Promise<Object>} Parks data
+ * Fetches parks by activity directly from the database
+ * @param {string} activitySlug - Activity slug (e.g., "wildlife-watching")
+ * @returns {Promise<Object>} Parks data with activity name and filtered parks
  */
-async function getParksByActivity(activity) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-
+async function getParksByActivity(activitySlug) {
   try {
-    const response = await fetch(`${baseUrl}/api/activities/${encodeURIComponent(activity)}`, {
-      cache: 'no-store',
-    });
+    const supabase = createServerClient();
 
-    if (!response.ok) {
+    // Fetch all parks with activities
+    const { data: allParks, error } = await supabase
+      .from('parks_combined')
+      .select(
+        `
+        id,
+        park_code,
+        full_name,
+        description,
+        states,
+        latitude,
+        longitude,
+        designation,
+        url,
+        images,
+        activities,
+        wikidata_id,
+        wikidata_image
+      `
+      )
+      .not('activities', 'is', null)
+      .order('full_name', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching parks:', error);
       return null;
     }
 
-    return response.json();
+    // Filter parks that have the matching activity (by converting activity names to slugs)
+    const filteredParks = (allParks || []).filter(park => {
+      if (!park.activities || !Array.isArray(park.activities)) {
+        return false;
+      }
+      
+      return park.activities.some(act => {
+        if (!act || !act.name) return false;
+        const actSlug = activityToSlug(act.name);
+        return actSlug === activitySlug;
+      });
+    });
+
+    // Get the display name from the first matching park's activity
+    let displayName = slugToDisplayName(activitySlug);
+    
+    if (filteredParks.length > 0 && filteredParks[0].activities) {
+      const matchingActivity = filteredParks[0].activities.find(act =>
+        act && act.name && activityToSlug(act.name) === activitySlug
+      );
+      if (matchingActivity) {
+        displayName = matchingActivity.name;
+      }
+    }
+
+    return {
+      activity: displayName,
+      parks: filteredParks,
+      count: filteredParks.length,
+    };
   } catch (error) {
     console.error('Error fetching parks by activity:', error);
     return null;
