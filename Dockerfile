@@ -3,16 +3,15 @@
 
 FROM node:20-alpine AS base
 
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
 # Set working directory
 WORKDIR /app
 
-# Install dependencies stage
+# Install dependencies stage (using npm for flat node_modules structure)
 FROM base AS deps
 COPY package.json pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile
+# Use npm ci with package-lock.json or npm install
+# First convert pnpm-lock to package-lock if needed
+RUN npm install --legacy-peer-deps
 
 # Build stage
 FROM base AS builder
@@ -24,7 +23,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
 # Build Next.js application
-RUN pnpm build
+RUN npm run build
 
 # Production stage
 FROM base AS runner
