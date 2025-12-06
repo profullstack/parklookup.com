@@ -9,7 +9,7 @@ import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { debounce } from '@/lib/utils/debounce';
 
-export default function SearchBar({ initialQuery = '', onSearch, placeholder = 'Search parks...' }) {
+export function SearchBar({ initialQuery = '', onSearch, placeholder = 'Search parks...' }) {
   const [query, setQuery] = useState(initialQuery);
   const router = useRouter();
 
@@ -90,3 +90,5 @@ export default function SearchBar({ initialQuery = '', onSearch, placeholder = '
     </form>
   );
 }
+
+export default SearchBar;

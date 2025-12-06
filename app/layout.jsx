@@ -1,27 +1,25 @@
-'use client';
-
 import Script from 'next/script';
 import './globals.css';
-import { AuthProvider } from '@/hooks/useAuth';
-import Header from '@/components/layout/Header';
-import { OfflineBanner } from '@/components/ui/OfflineBanner';
-import { InstallPrompt } from '@/components/ui/InstallPrompt';
+import { Providers } from '@/components/Providers';
+
+export const metadata = {
+  title: 'ParkLookup - Discover National Parks',
+  description:
+    'Discover and explore U.S. National Parks. Search, save favorites, and plan your next adventure.',
+  keywords: 'national parks, state parks, hiking, camping, outdoors, nature, travel',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: '#16a34a',
+};
 
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <title>ParkLookup - Discover National Parks</title>
-        <meta
-          name="description"
-          content="Discover and explore U.S. National Parks. Search, save favorites, and plan your next adventure."
-        />
-        <meta
-          name="keywords"
-          content="national parks, state parks, hiking, camping, outdoors, nature, travel"
-        />
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5" />
-        <meta name="theme-color" content="#16a34a" />
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/icons/icon-32x32.png" sizes="32x32" type="image/png" />
         <link rel="icon" href="/icons/icon-16x16.png" sizes="16x16" type="image/png" />
@@ -30,16 +28,7 @@ export default function RootLayout({ children }) {
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
       </head>
       <body className="min-h-screen bg-gray-50 dark:bg-gray-900 font-sans antialiased">
-        <AuthProvider>
-          <div className="relative flex min-h-screen flex-col">
-            <Header />
-            <main className="flex-1">{children}</main>
-          </div>
-          
-          {/* PWA Components */}
-          <OfflineBanner />
-          <InstallPrompt />
-        </AuthProvider>
+        <Providers>{children}</Providers>
 
         {/* Datafast Analytics */}
         <Script

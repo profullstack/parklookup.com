@@ -8,7 +8,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
-export default function FavoriteButton({ parkId, parkCode, size = 'md' }) {
+export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
   const { user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -104,3 +104,5 @@ export default function FavoriteButton({ parkId, parkCode, size = 'md' }) {
     </button>
   );
 }
+
+export default FavoriteButton;

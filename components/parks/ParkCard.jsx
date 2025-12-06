@@ -9,7 +9,7 @@ import Link from 'next/link';
 import Card, { CardImage, CardContent, CardTitle, CardDescription, CardFooter } from '../ui/Card';
 import FavoriteButton from './FavoriteButton';
 
-export default function ParkCard({ park, showFavorite = true }) {
+export function ParkCard({ park, showFavorite = true }) {
   const imageUrl = park.images?.[0]?.url || park.wikidata_image || null;
   const states = park.states?.split(',').join(', ') || '';
 
@@ -50,3 +50,5 @@ export default function ParkCard({ park, showFavorite = true }) {
     </Card>
   );
 }
+
+export default ParkCard;
