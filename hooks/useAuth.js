@@ -10,20 +10,73 @@ import { useState, useEffect, createContext, useContext, useCallback } from 'rea
 
 const AuthContext = createContext(null);
 
+// Storage key for auth token
+const AUTH_TOKEN_KEY = 'parklookup_auth_token';
+
+/**
+ * Get stored token from localStorage
+ */
+const getStoredToken = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Store token in localStorage
+ */
+const storeToken = (token) => {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token) {
+      localStorage.setItem(AUTH_TOKEN_KEY, token);
+    } else {
+      localStorage.removeItem(AUTH_TOKEN_KEY);
+    }
+  } catch (error) {
+    console.error('Failed to store token:', error);
+  }
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [session, setSession] = useState(null);
   const [loading, setLoading] = useState(true);
 
   /**
-   * Fetch current session from server
+   * Fetch current session from server using stored token
    */
   const fetchSession = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/session');
+      const token = getStoredToken();
+      
+      // If no token stored, we're not authenticated
+      if (!token) {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      const response = await fetch('/api/auth/session', {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       const data = await response.json();
-      setSession(data.session);
-      setUser(data.user);
+      
+      if (data.user && data.session) {
+        setSession(data.session);
+        setUser(data.user);
+      } else {
+        // Token is invalid, clear it
+        storeToken(null);
+        setSession(null);
+        setUser(null);
+      }
     } catch (error) {
       console.error('Failed to fetch session:', error);
       setSession(null);
@@ -61,6 +114,11 @@ export function AuthProvider({ children }) {
         return { data: null, error: { message: data.error } };
       }
 
+      // Store the access token for persistence
+      if (data.session?.access_token) {
+        storeToken(data.session.access_token);
+      }
+
       setUser(data.user);
       setSession(data.session);
       return { data, error: null };
@@ -88,6 +146,10 @@ export function AuthProvider({ children }) {
 
       // User might need to confirm email, so don't set session yet
       if (data.session) {
+        // Store the access token for persistence
+        if (data.session.access_token) {
+          storeToken(data.session.access_token);
+        }
         setUser(data.user);
         setSession(data.session);
       }
@@ -103,18 +165,23 @@ export function AuthProvider({ children }) {
    */
   const signOut = async () => {
     try {
+      const token = getStoredToken();
       const response = await fetch('/api/auth/signout', {
         method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
 
       const data = await response.json();
+
+      // Always clear local state and token, even if server request fails
+      storeToken(null);
+      setUser(null);
+      setSession(null);
 
       if (!response.ok) {
         return { error: { message: data.error } };
       }
 
-      setUser(null);
-      setSession(null);
       return { error: null };
     } catch (error) {
       return { error: { message: error.message } };

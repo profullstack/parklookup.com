@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
 /**
@@ -11,6 +12,7 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 function SignInContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { signIn } = useAuth();
   const { trackPageView, trackSignIn } = useAnalytics();
 
   const [email, setEmail] = useState('');
@@ -30,18 +32,11 @@ function SignInContent() {
     setError(null);
 
     try {
-      const response = await fetch('/api/auth/signin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      // Use the useAuth hook's signIn method to properly store the token
+      const { data, error: signInError } = await signIn({ email, password });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to sign in');
+      if (signInError) {
+        throw new Error(signInError.message || 'Failed to sign in');
       }
 
       // Track successful sign in

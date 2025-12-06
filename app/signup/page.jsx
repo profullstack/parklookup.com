@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/hooks/useAuth';
 import { useAnalytics } from '@/hooks/useAnalytics';
 
 /**
@@ -11,6 +12,7 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 function SignUpContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { signUp } = useAuth();
   const { trackPageView, trackSignUp } = useAnalytics();
 
   const [email, setEmail] = useState('');
@@ -54,24 +56,17 @@ function SignUpContent() {
     }
 
     try {
-      const response = await fetch('/api/auth/signup', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      // Use the useAuth hook's signUp method to properly store the token
+      const { data, error: signUpError } = await signUp({ email, password });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create account');
+      if (signUpError) {
+        throw new Error(signUpError.message || 'Failed to create account');
       }
 
       // Track successful sign up
       trackSignUp(data.user);
 
-      // Show success message
+      // Show success message (email confirmation may be required)
       setSuccess(true);
     } catch (err) {
       setError(err.message);
