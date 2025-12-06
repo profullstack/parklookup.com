@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createAnonClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/client';
 
 /**
  * GET /api/activities/[activity]
@@ -26,12 +26,12 @@ export async function GET(request, { params }) {
       .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
       .join(' ');
 
-    const supabase = createAnonClient();
+    const supabase = createServerClient();
 
-    // Query parks where the activities JSONB array contains an object with matching name
-    // The activities field is a JSONB array like: [{"id": "...", "name": "Hiking"}, ...]
+    // Query parks where the activities JSONB array contains the activity name
+    // Use ilike on the cast to text for case-insensitive matching
     const { data: parks, error } = await supabase
-      .from('nps_parks')
+      .from('parks_combined')
       .select(
         `
         id,
@@ -44,18 +44,20 @@ export async function GET(request, { params }) {
         designation,
         url,
         images,
-        activities
+        activities,
+        wikidata_id,
+        wikidata_image
       `
       )
-      .filter('activities', 'cs', JSON.stringify([{ name: capitalizedActivity }]))
+      .ilike('activities::text', `%"name":"${capitalizedActivity}"%`)
       .order('full_name', { ascending: true });
 
     if (error) {
-      // If the containment search fails, try a text-based search as fallback
-      console.warn('Containment search failed, trying text search:', error.message);
+      // If the ilike search fails, try a simpler text search as fallback
+      console.warn('JSONB ilike search failed, trying simple text search:', error.message);
 
       const { data: fallbackParks, error: fallbackError } = await supabase
-        .from('nps_parks')
+        .from('parks_combined')
         .select(
           `
           id,
@@ -68,10 +70,12 @@ export async function GET(request, { params }) {
           designation,
           url,
           images,
-          activities
+          activities,
+          wikidata_id,
+          wikidata_image
         `
         )
-        .textSearch('activities', capitalizedActivity)
+        .ilike('activities::text', `%${capitalizedActivity}%`)
         .order('full_name', { ascending: true });
 
       if (fallbackError) {
