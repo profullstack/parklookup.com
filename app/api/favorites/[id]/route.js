@@ -9,25 +9,46 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/client';
 
 /**
+ * Helper to get user from authorization header
+ */
+async function getUserFromToken(request) {
+  const authHeader = request.headers.get('authorization');
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { user: null, error: 'No authorization token provided' };
+  }
+
+  const token = authHeader.substring(7);
+  const supabase = createServerClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    return { user: null, error: 'Invalid or expired token' };
+  }
+
+  return { user, error: null };
+}
+
+/**
  * GET handler for fetching a single favorite
  */
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
-    const supabase = createServerClient();
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const { id } = await params;
+    const { user, error: authError } = await getUserFromToken(request);
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createServerClient({ useServiceRole: true });
+
     const { data: favorite, error } = await supabase
-      .from('favorites')
+      .from('user_favorites')
       .select(
         `
         id,
@@ -75,19 +96,14 @@ export async function GET(request, { params }) {
  */
 export async function PATCH(request, { params }) {
   try {
-    const { id } = params;
-    const supabase = createServerClient();
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const { id } = await params;
+    const { user, error: authError } = await getUserFromToken(request);
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createServerClient({ useServiceRole: true });
     const body = await request.json();
     const { notes, visited, visitedAt } = body;
 
@@ -102,7 +118,7 @@ export async function PATCH(request, { params }) {
     }
 
     const { data: favorite, error } = await supabase
-      .from('favorites')
+      .from('user_favorites')
       .update(updates)
       .eq('id', id)
       .eq('user_id', user.id)
@@ -129,21 +145,17 @@ export async function PATCH(request, { params }) {
  */
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params;
-    const supabase = createServerClient();
-
-    // Get current user
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
+    const { id } = await params;
+    const { user, error: authError } = await getUserFromToken(request);
 
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const supabase = createServerClient({ useServiceRole: true });
+
     const { error } = await supabase
-      .from('favorites')
+      .from('user_favorites')
       .delete()
       .eq('id', id)
       .eq('user_id', user.id);

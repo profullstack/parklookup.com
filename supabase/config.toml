@@ -57,5 +57,13 @@ enabled = false
 port = 54327
 vector_port = 54328
 
-[functions]
-verify_jwt = true
+# Edge Functions configuration
+# Each function can have its own settings
+[functions.import-nps]
+verify_jwt = false
+
+[functions.import-wikidata]
+verify_jwt = false
+
+[functions.link-parks]
+verify_jwt = false

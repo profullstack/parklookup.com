@@ -47,7 +47,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-neutral-200 dark:border-neutral-800;
   }
 
   body {
@@ -177,7 +177,8 @@
 /* PWA standalone mode adjustments */
 @media (display-mode: standalone) {
   body {
-    @apply safe-top safe-bottom;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

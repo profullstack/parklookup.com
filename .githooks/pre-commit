@@ -1,0 +1,23 @@
+#!/bin/sh
+# Pre-commit hook for ParkLookup.com
+# Runs build and tests before allowing commit
+
+echo "🔍 Running pre-commit checks..."
+echo ""
+
+# Run the pre-commit script
+pnpm pre-commit
+
+# Capture the exit code
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    echo ""
+    echo "❌ Pre-commit checks failed!"
+    echo "Please fix the issues above before committing."
+    exit 1
+fi
+
+echo ""
+echo "✅ Pre-commit checks passed!"
+exit 0

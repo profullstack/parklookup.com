@@ -1,311 +1,405 @@
 /**
  * Tests for Favorites Functionality
  * Using Vitest for testing
+ * Tests the client-side API wrapper that calls server-side routes
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock Supabase client
-const mockSupabase = {
-  from: vi.fn(() => ({
-    select: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        order: vi.fn(() =>
-          Promise.resolve({
-            data: [
-              {
-                id: 'fav-1',
-                user_id: 'user-123',
-                nps_park_id: 'park-1',
-                notes: 'Beautiful park',
-                visited: true,
-                visited_at: '2024-01-15',
-                nps_parks: {
-                  park_code: 'yell',
-                  full_name: 'Yellowstone National Park',
-                },
-              },
-            ],
-            error: null,
-          })
-        ),
-        single: vi.fn(() =>
-          Promise.resolve({
-            data: {
-              id: 'fav-1',
-              user_id: 'user-123',
-              nps_park_id: 'park-1',
-            },
-            error: null,
-          })
-        ),
-      })),
-    })),
-    insert: vi.fn(() => ({
-      select: vi.fn(() => ({
-        single: vi.fn(() =>
-          Promise.resolve({
-            data: {
-              id: 'fav-new',
-              user_id: 'user-123',
-              nps_park_id: 'park-2',
-            },
-            error: null,
-          })
-        ),
-      })),
-    })),
-    update: vi.fn(() => ({
-      eq: vi.fn(() => ({
-        select: vi.fn(() => ({
-          single: vi.fn(() =>
-            Promise.resolve({
-              data: { id: 'fav-1', notes: 'Updated notes' },
-              error: null,
-            })
-          ),
-        })),
-      })),
-    })),
-    delete: vi.fn(() => ({
-      eq: vi.fn(() =>
-        Promise.resolve({
-          error: null,
-        })
-      ),
-    })),
-  })),
-  auth: {
-    getUser: vi.fn(() =>
-      Promise.resolve({
-        data: { user: { id: 'user-123' } },
-        error: null,
-      })
-    ),
-  },
-};
+// Mock window.location for URL construction
+const mockOrigin = 'http://localhost:3000';
+vi.stubGlobal('window', { location: { origin: mockOrigin } });
 
-vi.mock('@/lib/supabase/client', () => ({
-  createBrowserClient: vi.fn(() => mockSupabase),
-  createServerClient: vi.fn(() => mockSupabase),
-}));
+// Mock fetch globally
+const mockFetch = vi.fn();
+vi.stubGlobal('fetch', mockFetch);
 
 describe('Favorites', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
+  afterEach(() => {
+    vi.resetAllMocks();
+  });
+
   describe('getFavorites', () => {
     it('should return user favorites with park details', async () => {
-      const { getFavorites } = await import('@/lib/favorites/favorites.js');
+      const mockFavorites = [
+        {
+          id: 'fav-1',
+          user_id: 'user-123',
+          nps_park_id: 'park-1',
+          notes: 'Beautiful park',
+          visited: true,
+          visited_at: '2024-01-15',
+          nps_parks: {
+            park_code: 'yell',
+            full_name: 'Yellowstone National Park',
+          },
+        },
+      ];
 
-      const result = await getFavorites('user-123');
-
-      expect(result.favorites).toBeDefined();
-      expect(Array.isArray(result.favorites)).toBe(true);
-      expect(result.favorites[0]).toHaveProperty('nps_parks');
-    });
-
-    it('should return empty array for user with no favorites', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            order: vi.fn(() =>
-              Promise.resolve({
-                data: [],
-                error: null,
-              })
-            ),
-          })),
-        })),
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorites: mockFavorites }),
       });
 
       const { getFavorites } = await import('@/lib/favorites/favorites.js');
+      const result = await getFavorites('test-token');
 
-      const result = await getFavorites('user-456');
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${mockOrigin}/api/favorites`,
+        expect.objectContaining({
+          headers: { Authorization: 'Bearer test-token' },
+        })
+      );
+      expect(result.favorites).toEqual(mockFavorites);
+      expect(result.error).toBeNull();
+    });
+
+    it('should return empty array for user with no favorites', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorites: [] }),
+      });
+
+      const { getFavorites } = await import('@/lib/favorites/favorites.js');
+      const result = await getFavorites('test-token');
 
       expect(result.favorites).toEqual([]);
+      expect(result.error).toBeNull();
+    });
+
+    it('should handle API errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Unauthorized' }),
+      });
+
+      const { getFavorites } = await import('@/lib/favorites/favorites.js');
+      const result = await getFavorites('invalid-token');
+
+      expect(result.favorites).toEqual([]);
+      expect(result.error).toEqual({ message: 'Unauthorized' });
+    });
+
+    it('should support visitedOnly filter', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorites: [] }),
+      });
+
+      const { getFavorites } = await import('@/lib/favorites/favorites.js');
+      await getFavorites('test-token', { visitedOnly: true });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        `${mockOrigin}/api/favorites?visited=true`,
+        expect.any(Object)
+      );
+    });
+
+    it('should handle network errors', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      const { getFavorites } = await import('@/lib/favorites/favorites.js');
+      const result = await getFavorites('test-token');
+
+      expect(result.favorites).toEqual([]);
+      expect(result.error).toEqual({ message: 'Network error' });
     });
   });
 
   describe('addFavorite', () => {
     it('should add a park to favorites', async () => {
-      const { addFavorite } = await import('@/lib/favorites/favorites.js');
+      const mockFavorite = {
+        id: 'fav-new',
+        user_id: 'user-123',
+        nps_park_id: 'park-2',
+      };
 
-      const result = await addFavorite({
-        userId: 'user-123',
-        parkId: 'park-2',
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
       });
 
-      expect(result.favorite).toBeDefined();
+      const { addFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await addFavorite('test-token', { parkId: 'park-2' });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/favorites',
+        expect.objectContaining({
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+          body: JSON.stringify({ parkId: 'park-2', notes: null }),
+        })
+      );
+      expect(result.favorite).toEqual(mockFavorite);
       expect(result.error).toBeNull();
     });
 
     it('should add favorite with notes', async () => {
-      const { addFavorite } = await import('@/lib/favorites/favorites.js');
+      const mockFavorite = {
+        id: 'fav-new',
+        user_id: 'user-123',
+        nps_park_id: 'park-2',
+        notes: 'Want to visit next summer',
+      };
 
-      const result = await addFavorite({
-        userId: 'user-123',
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
+      });
+
+      const { addFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await addFavorite('test-token', {
         parkId: 'park-2',
         notes: 'Want to visit next summer',
       });
 
-      expect(result.favorite).toBeDefined();
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/favorites',
+        expect.objectContaining({
+          body: JSON.stringify({ parkId: 'park-2', notes: 'Want to visit next summer' }),
+        })
+      );
+      expect(result.favorite).toEqual(mockFavorite);
     });
 
     it('should return error if park already favorited', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn(() =>
-              Promise.resolve({
-                data: null,
-                error: { code: '23505', message: 'Duplicate key' },
-              })
-            ),
-          })),
-        })),
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Park already in favorites' }),
       });
 
       const { addFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await addFavorite('test-token', { parkId: 'park-1' });
 
-      const result = await addFavorite({
-        userId: 'user-123',
-        parkId: 'park-1',
-      });
+      expect(result.favorite).toBeNull();
+      expect(result.error).toEqual({ message: 'Park already in favorites' });
+    });
 
-      expect(result.error).toBeDefined();
+    it('should handle network errors', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      const { addFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await addFavorite('test-token', { parkId: 'park-2' });
+
+      expect(result.favorite).toBeNull();
+      expect(result.error).toEqual({ message: 'Network error' });
     });
   });
 
   describe('removeFavorite', () => {
-    it('should remove a park from favorites', async () => {
-      const { removeFavorite } = await import('@/lib/favorites/favorites.js');
-
-      const result = await removeFavorite({
-        userId: 'user-123',
-        parkId: 'park-1',
+    it('should remove a favorite by ID', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
       });
 
+      const { removeFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await removeFavorite('test-token', 'fav-1');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/favorites/fav-1',
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: { Authorization: 'Bearer test-token' },
+        })
+      );
       expect(result.error).toBeNull();
+    });
+
+    it('should return error if favorite not found', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Favorite not found' }),
+      });
+
+      const { removeFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await removeFavorite('test-token', 'fav-999');
+
+      expect(result.error).toEqual({ message: 'Favorite not found' });
+    });
+
+    it('should handle network errors', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      const { removeFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await removeFavorite('test-token', 'fav-1');
+
+      expect(result.error).toEqual({ message: 'Network error' });
     });
   });
 
   describe('updateFavorite', () => {
     it('should update favorite notes', async () => {
-      const { updateFavorite } = await import('@/lib/favorites/favorites.js');
+      const mockFavorite = { id: 'fav-1', notes: 'Updated notes' };
 
-      const result = await updateFavorite({
-        favoriteId: 'fav-1',
-        notes: 'Updated notes',
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
       });
 
-      expect(result.favorite).toBeDefined();
+      const { updateFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await updateFavorite('test-token', 'fav-1', { notes: 'Updated notes' });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/favorites/fav-1',
+        expect.objectContaining({
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-token',
+          },
+          body: expect.stringContaining('Updated notes'),
+        })
+      );
+      expect(result.favorite).toEqual(mockFavorite);
       expect(result.error).toBeNull();
     });
 
     it('should mark favorite as visited', async () => {
-      const { updateFavorite } = await import('@/lib/favorites/favorites.js');
+      const visitedAt = '2024-01-15T00:00:00.000Z';
+      const mockFavorite = { id: 'fav-1', visited: true, visited_at: visitedAt };
 
-      const result = await updateFavorite({
-        favoriteId: 'fav-1',
-        visited: true,
-        visitedAt: new Date().toISOString(),
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
       });
 
+      const { updateFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await updateFavorite('test-token', 'fav-1', {
+        visited: true,
+        visitedAt,
+      });
+
+      expect(result.favorite).toEqual(mockFavorite);
+      expect(result.error).toBeNull();
+    });
+
+    it('should handle API errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        json: () => Promise.resolve({ error: 'Favorite not found' }),
+      });
+
+      const { updateFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await updateFavorite('test-token', 'fav-999', { notes: 'test' });
+
+      expect(result.favorite).toBeNull();
+      expect(result.error).toEqual({ message: 'Favorite not found' });
+    });
+
+    it('should handle network errors', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      const { updateFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await updateFavorite('test-token', 'fav-1', { notes: 'test' });
+
+      expect(result.favorite).toBeNull();
+      expect(result.error).toEqual({ message: 'Network error' });
+    });
+  });
+
+  describe('toggleFavorite', () => {
+    it('should add favorite when not currently favorited', async () => {
+      const mockFavorite = { id: 'fav-new', nps_park_id: 'park-1' };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
+      });
+
+      const { toggleFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await toggleFavorite('test-token', 'park-1');
+
+      expect(result.isFavorite).toBe(true);
+      expect(result.favorite).toEqual(mockFavorite);
+      expect(result.error).toBeNull();
+    });
+
+    it('should remove favorite when currently favorited', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ success: true }),
+      });
+
+      const { toggleFavorite } = await import('@/lib/favorites/favorites.js');
+      const result = await toggleFavorite('test-token', 'park-1', 'fav-1');
+
+      expect(result.isFavorite).toBe(false);
       expect(result.error).toBeNull();
     });
   });
 
-  describe('isFavorite', () => {
-    it('should return true if park is favorited', async () => {
-      const { isFavorite } = await import('@/lib/favorites/favorites.js');
+  describe('markAsVisited', () => {
+    it('should mark a favorite as visited', async () => {
+      const mockFavorite = { id: 'fav-1', visited: true };
 
-      const result = await isFavorite({
-        userId: 'user-123',
-        parkId: 'park-1',
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
       });
 
-      expect(result.isFavorite).toBe(true);
+      const { markAsVisited } = await import('@/lib/favorites/favorites.js');
+      const result = await markAsVisited('test-token', 'fav-1');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/favorites/fav-1',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: expect.stringContaining('"visited":true'),
+        })
+      );
+      expect(result.favorite).toEqual(mockFavorite);
     });
 
-    it('should return false if park is not favorited', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              single: vi.fn(() =>
-                Promise.resolve({
-                  data: null,
-                  error: { code: 'PGRST116' },
-                })
-              ),
-            })),
-          })),
-        })),
+    it('should accept custom visit date', async () => {
+      const visitedAt = '2024-06-15T00:00:00.000Z';
+      const mockFavorite = { id: 'fav-1', visited: true, visited_at: visitedAt };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
       });
 
-      const { isFavorite } = await import('@/lib/favorites/favorites.js');
+      const { markAsVisited } = await import('@/lib/favorites/favorites.js');
+      const result = await markAsVisited('test-token', 'fav-1', visitedAt);
 
-      const result = await isFavorite({
-        userId: 'user-123',
-        parkId: 'park-999',
-      });
-
-      expect(result.isFavorite).toBe(false);
-    });
-  });
-
-  describe('getFavoriteCount', () => {
-    it('should return the count of user favorites', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          eq: vi.fn(() =>
-            Promise.resolve({
-              count: 5,
-              error: null,
-            })
-          ),
-        })),
-      });
-
-      const { getFavoriteCount } = await import('@/lib/favorites/favorites.js');
-
-      const result = await getFavoriteCount('user-123');
-
-      expect(result.count).toBe(5);
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/favorites/fav-1',
+        expect.objectContaining({
+          body: expect.stringContaining(visitedAt),
+        })
+      );
+      expect(result.favorite).toEqual(mockFavorite);
     });
   });
 
-  describe('getVisitedParks', () => {
-    it('should return only visited parks', async () => {
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(() => ({
-              order: vi.fn(() =>
-                Promise.resolve({
-                  data: [
-                    {
-                      id: 'fav-1',
-                      visited: true,
-                      visited_at: '2024-01-15',
-                    },
-                  ],
-                  error: null,
-                })
-              ),
-            })),
-          })),
-        })),
+  describe('markAsNotVisited', () => {
+    it('should mark a favorite as not visited', async () => {
+      const mockFavorite = { id: 'fav-1', visited: false, visited_at: null };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ favorite: mockFavorite }),
       });
 
-      const { getVisitedParks } = await import('@/lib/favorites/favorites.js');
+      const { markAsNotVisited } = await import('@/lib/favorites/favorites.js');
+      const result = await markAsNotVisited('test-token', 'fav-1');
 
-      const result = await getVisitedParks('user-123');
-
-      expect(result.parks).toBeDefined();
-      expect(result.parks.every((p) => p.visited)).toBe(true);
+      expect(mockFetch).toHaveBeenCalledWith(
+        '/api/favorites/fav-1',
+        expect.objectContaining({
+          method: 'PATCH',
+          body: expect.stringContaining('"visited":false'),
+        })
+      );
+      expect(result.favorite).toEqual(mockFavorite);
     });
   });
 });
@@ -313,7 +407,7 @@ describe('Favorites', () => {
 describe('Favorites API Routes', () => {
   describe('GET /api/favorites', () => {
     it('should return user favorites', async () => {
-      // Test placeholder
+      // Test placeholder - actual API route tests would use supertest or similar
       expect(true).toBe(true);
     });
 
