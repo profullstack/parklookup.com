@@ -19,6 +19,12 @@ export async function GET(request, { params }) {
 
     // Decode the activity slug (e.g., "hiking" or "rock-climbing")
     const decodedActivity = decodeURIComponent(activity).replace(/-/g, ' ');
+    
+    // Capitalize each word for proper matching (e.g., "craft demonstrations" -> "Craft Demonstrations")
+    const capitalizedActivity = decodedActivity
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
 
     const supabase = createAnonClient();
 
@@ -41,7 +47,7 @@ export async function GET(request, { params }) {
         activities
       `
       )
-      .filter('activities', 'cs', JSON.stringify([{ name: decodedActivity }]))
+      .filter('activities', 'cs', JSON.stringify([{ name: capitalizedActivity }]))
       .order('full_name', { ascending: true });
 
     if (error) {
@@ -65,7 +71,7 @@ export async function GET(request, { params }) {
           activities
         `
         )
-        .textSearch('activities', decodedActivity)
+        .textSearch('activities', capitalizedActivity)
         .order('full_name', { ascending: true });
 
       if (fallbackError) {
@@ -74,14 +80,14 @@ export async function GET(request, { params }) {
       }
 
       return NextResponse.json({
-        activity: decodedActivity,
+        activity: capitalizedActivity,
         parks: fallbackParks || [],
         count: fallbackParks?.length || 0,
       });
     }
 
     return NextResponse.json({
-      activity: decodedActivity,
+      activity: capitalizedActivity,
       parks: parks || [],
       count: parks?.length || 0,
     });

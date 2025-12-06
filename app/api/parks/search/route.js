@@ -14,19 +14,17 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
 
     const q = searchParams.get('q');
+    const state = searchParams.get('state');
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100);
-    const offset = (page - 1) * limit;
-
-    if (!q || q.trim().length === 0) {
-      return NextResponse.json({ error: 'Search query is required' }, { status: 400 });
-    }
+    const offsetParam = searchParams.get('offset');
+    const offset = offsetParam ? parseInt(offsetParam, 10) : (page - 1) * limit;
 
     const supabase = createServerClient();
 
-    // Use full-text search on the nps_parks table
-    const { data: parks, error, count } = await supabase
-      .from('nps_parks')
+    // Build query based on parameters
+    let query = supabase
+      .from('parks_combined')
       .select(
         `
         id,
@@ -38,67 +36,44 @@ export async function GET(request) {
         longitude,
         designation,
         url,
-        images
+        images,
+        wikidata_id,
+        wikidata_image,
+        link_confidence
       `,
         { count: 'exact' }
-      )
-      .textSearch('full_name', q, {
-        type: 'websearch',
-        config: 'english',
-      })
+      );
+
+    // Apply search filter if query provided
+    if (q && q.trim().length > 0) {
+      query = query.or(`full_name.ilike.%${q}%,description.ilike.%${q}%`);
+    }
+
+    // Apply state filter if provided
+    if (state && state.trim().length > 0) {
+      query = query.ilike('states', `%${state}%`);
+    }
+
+    const { data: parks, error, count } = await query
       .order('full_name')
       .range(offset, offset + limit - 1);
 
     if (error) {
-      // Fallback to ilike search if full-text search fails
-      const { data: fallbackParks, error: fallbackError, count: fallbackCount } = await supabase
-        .from('nps_parks')
-        .select(
-          `
-          id,
-          park_code,
-          full_name,
-          description,
-          states,
-          latitude,
-          longitude,
-          designation,
-          url,
-          images
-        `,
-          { count: 'exact' }
-        )
-        .or(`full_name.ilike.%${q}%,description.ilike.%${q}%`)
-        .order('full_name')
-        .range(offset, offset + limit - 1);
-
-      if (fallbackError) {
-        console.error('Database error:', fallbackError);
-        return NextResponse.json({ error: 'Failed to search parks' }, { status: 500 });
-      }
-
-      return NextResponse.json({
-        parks: fallbackParks,
-        query: q,
-        pagination: {
-          page,
-          limit,
-          total: fallbackCount,
-          totalPages: Math.ceil(fallbackCount / limit),
-          hasMore: offset + limit < fallbackCount,
-        },
-      });
+      console.error('Database error:', error);
+      return NextResponse.json({ error: 'Failed to search parks' }, { status: 500 });
     }
 
     return NextResponse.json({
-      parks,
+      parks: parks || [],
+      total: count || 0,
       query: q,
+      state,
       pagination: {
         page,
         limit,
-        total: count,
-        totalPages: Math.ceil(count / limit),
-        hasMore: offset + limit < count,
+        total: count || 0,
+        totalPages: Math.ceil((count || 0) / limit),
+        hasMore: offset + limit < (count || 0),
       },
     });
   } catch (error) {
