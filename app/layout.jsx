@@ -1,5 +1,6 @@
 'use client';
 
+import Script from 'next/script';
 import './globals.css';
 import { AuthProvider } from '@/hooks/useAuth';
 import Header from '@/components/layout/Header';
@@ -33,6 +34,15 @@ export default function RootLayout({ children }) {
             <main className="flex-1">{children}</main>
           </div>
         </AuthProvider>
+
+        {/* Datafast Analytics */}
+        <Script
+          defer
+          data-website-id="dfid_jJ7c5wg2xj1mHLaEFvESv"
+          data-domain="parklookup.com"
+          src="https://datafa.st/js/script.js"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );
