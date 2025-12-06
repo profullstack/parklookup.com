@@ -206,22 +206,40 @@ describe('Parks Search API', () => {
       expect(data).toHaveProperty('parks');
     });
 
-    it('should return 400 if no query provided', async () => {
+    it('should return all parks if no query provided', async () => {
       const { GET } = await import('@/app/api/parks/search/route.js');
 
       const request = new Request('http://localhost:8080/api/parks/search');
       const response = await GET(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(200);
+      expect(data).toHaveProperty('parks');
+      expect(data).toHaveProperty('total');
     });
 
-    it('should return 400 if query is empty', async () => {
+    it('should return all parks if query is empty', async () => {
       const { GET } = await import('@/app/api/parks/search/route.js');
 
       const request = new Request('http://localhost:8080/api/parks/search?q=');
       const response = await GET(request);
+      const data = await response.json();
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(200);
+      expect(data).toHaveProperty('parks');
+      expect(data).toHaveProperty('total');
+    });
+
+    it('should support state filtering', async () => {
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search?state=CA');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toHaveProperty('parks');
+      expect(data.state).toBe('CA');
     });
   });
 });
