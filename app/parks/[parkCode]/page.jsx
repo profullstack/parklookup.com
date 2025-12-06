@@ -7,6 +7,7 @@ import Image from 'next/image';
 import dynamic from 'next/dynamic';
 import { FavoriteButton } from '@/components/parks/FavoriteButton';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import WeatherForecast from '@/components/weather/WeatherForecast';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -284,48 +285,26 @@ export default function ParkDetailPage() {
             </div>
 
             {/* Weather */}
-            {park.weather_info && (
-              <div>
-                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                  Weather
-                </h2>
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                Weather
+              </h2>
+              {park.weather_info && (
                 <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
                   {park.weather_info}
                 </p>
-                {/* 10-Day Forecast from weather.gov */}
-                {hasCoordinates && (
-                  <div className="mt-4">
-                    <h3 className="text-lg font-medium text-gray-800 dark:text-gray-200 mb-3">
-                      10-Day Forecast
-                    </h3>
-                    <a
-                      href={`https://forecast.weather.gov/MapClick.php?lat=${park.latitude}&lon=${park.longitude}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block"
-                    >
-                      <img
-                        src={`https://forecast.weather.gov/meteograms/Ede/TimeSeries/Meteogram.php?lat=${park.latitude}&lon=${park.longitude}&unit=0&lg=en&in498=1`}
-                        alt={`10-day weather forecast for ${park.full_name}`}
-                        className="w-full max-w-2xl rounded-lg shadow-md border border-gray-200 dark:border-gray-700"
-                        loading="lazy"
-                      />
-                    </a>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                      Click for detailed forecast from{' '}
-                      <a
-                        href={`https://forecast.weather.gov/MapClick.php?lat=${park.latitude}&lon=${park.longitude}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-green-600 hover:underline"
-                      >
-                        weather.gov
-                      </a>
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
+              )}
+              {/* 7-Day Forecast from NWS API */}
+              {hasCoordinates && (
+                <div className="mt-4">
+                  <WeatherForecast
+                    latitude={parseFloat(park.latitude)}
+                    longitude={parseFloat(park.longitude)}
+                    parkName={park.full_name}
+                  />
+                </div>
+              )}
+            </div>
 
             {/* External Links */}
             <div className="flex flex-wrap gap-3">

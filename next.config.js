@@ -40,13 +40,13 @@ const withPWA = withPWAInit({
       },
     },
     {
-      urlPattern: /^https:\/\/forecast\.weather\.gov\/.*/i,
+      urlPattern: /^https:\/\/api\.weather\.gov\/.*/i,
       handler: 'NetworkFirst',
       options: {
-        cacheName: 'weather-gov-cache',
+        cacheName: 'nws-api-cache',
         expiration: {
-          maxEntries: 50,
-          maxAgeSeconds: 60 * 60, // 1 hour - weather data should be fresh
+          maxEntries: 100,
+          maxAgeSeconds: 60 * 30, // 30 minutes - weather data should be fresh
         },
       },
     },
