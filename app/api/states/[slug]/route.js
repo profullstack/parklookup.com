@@ -87,27 +87,23 @@ export async function GET(request, { params }) {
 
     // If table doesn't exist or other error, try fallback
     if (stateError) {
-      // Check if it's a "table doesn't exist" error or "not found" error
-      if (stateError.code === 'PGRST116' || stateError.code === '42P01' || stateError.message?.includes('does not exist')) {
-        // Try to find state in fallback data
-        const fallbackState = US_STATES.find(s => s.slug === slug);
-        if (fallbackState) {
-          return NextResponse.json({
-            state: {
-              id: `fallback-${fallbackState.code}`,
-              ...fallbackState,
-              park_count: 0,
-            },
-            parks: [],
-            stateParks: [],
-            totalParks: 0,
-            fallback: true,
-          });
-        }
-        return NextResponse.json({ error: 'State not found' }, { status: 404 });
+      console.error('Database error fetching state:', stateError.code, stateError.message);
+      // Try to find state in fallback data for any error
+      const fallbackState = US_STATES.find(s => s.slug === slug);
+      if (fallbackState) {
+        return NextResponse.json({
+          state: {
+            id: `fallback-${fallbackState.code}`,
+            ...fallbackState,
+            park_count: 0,
+          },
+          parks: [],
+          stateParks: [],
+          totalParks: 0,
+          fallback: true,
+        });
       }
-      console.error('Database error:', stateError);
-      return NextResponse.json({ error: 'Failed to fetch state' }, { status: 500 });
+      return NextResponse.json({ error: 'State not found' }, { status: 404 });
     }
 
     // Get parks for this state
