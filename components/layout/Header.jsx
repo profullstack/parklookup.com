@@ -30,9 +30,9 @@ export default function Header() {
               <Image
                 src="/logo.white.svg"
                 alt="ParkLookup"
-                width={180}
-                height={40}
-                className="h-10 w-auto"
+                width={225}
+                height={50}
+                className="h-[50px] w-auto"
                 priority
               />
             </Link>
