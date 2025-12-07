@@ -61,13 +61,12 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 const VALUESERP_BASE_URL = 'https://api.valueserp.com/search';
 
-const PLACE_CATEGORIES = ['dining', 'entertainment', 'bars', 'lodging', 'shopping', 'attractions'];
+const PLACE_CATEGORIES = ['dining', 'entertainment', 'bars', 'shopping', 'attractions'];
 
 const CATEGORY_QUERIES = {
   dining: 'restaurants',
   entertainment: 'entertainment',
   bars: 'bars nightlife',
-  lodging: 'hotels motels',
   shopping: 'shopping',
   attractions: 'tourist attractions things to do',
 };
