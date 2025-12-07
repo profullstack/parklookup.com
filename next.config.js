@@ -51,6 +51,17 @@ const withPWA = withPWAInit({
       },
     },
     {
+      urlPattern: /^https:\/\/m\.media-amazon\.com\/.*/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'amazon-images-cache',
+        expiration: {
+          maxEntries: 200,
+          maxAgeSeconds: 60 * 60 * 24 * 7, // 7 days
+        },
+      },
+    },
+    {
       urlPattern: /\.(?:png|jpg|jpeg|svg|gif|webp|ico)$/i,
       handler: 'CacheFirst',
       options: {
@@ -94,6 +105,16 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'commons.wikimedia.org',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'm.media-amazon.com',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'images-na.ssl-images-amazon.com',
         pathname: '/**',
       },
     ],
