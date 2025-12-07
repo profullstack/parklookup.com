@@ -56,8 +56,9 @@ export async function GET(request) {
       // Fallback to simple distance calculation if RPC not available
       console.warn('RPC not available, using fallback:', error.message);
 
+      // Fallback: query all_parks view to include both NPS and state parks
       const { data: allParks, error: fallbackError } = await supabase
-        .from('nps_parks')
+        .from('all_parks')
         .select(
           `
           id,
@@ -69,7 +70,8 @@ export async function GET(request) {
           longitude,
           designation,
           url,
-          images
+          images,
+          source
         `
         )
         .not('latitude', 'is', null)

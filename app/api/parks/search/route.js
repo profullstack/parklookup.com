@@ -26,8 +26,9 @@ export async function GET(request) {
     const supabase = createServerClient();
 
     // Build query based on parameters
+    // Use all_parks view to include both NPS and state parks
     let query = supabase
-      .from('parks_combined')
+      .from('all_parks')
       .select(
         `
         id,
@@ -42,7 +43,8 @@ export async function GET(request) {
         images,
         wikidata_id,
         wikidata_image,
-        link_confidence
+        link_confidence,
+        source
       `,
         { count: 'exact' }
       );

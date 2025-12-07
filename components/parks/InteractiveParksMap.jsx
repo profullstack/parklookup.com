@@ -1,11 +1,30 @@
 'use client';
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// Custom park marker icon
+// State park marker icon (different color for state parks)
+const StateParkIcon = L.divIcon({
+  className: 'custom-state-park-marker',
+  html: `
+    <div style="
+      background-color: #7c3aed;
+      width: 24px;
+      height: 24px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    "></div>
+  `,
+  iconSize: [24, 24],
+  iconAnchor: [12, 24],
+  popupAnchor: [0, -24],
+});
+
+// Custom park marker icon (National Parks)
 const ParkIcon = L.divIcon({
   className: 'custom-park-marker',
   html: `
@@ -85,6 +104,49 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 /**
+ * Custom hook to fetch address for a park
+ */
+function useAddressLookup() {
+  const [addressCache, setAddressCache] = useState({});
+  const [loadingAddresses, setLoadingAddresses] = useState({});
+
+  const fetchAddress = useCallback(async (parkId, lat, lng) => {
+    // Return cached address if available
+    if (addressCache[parkId]) {
+      return addressCache[parkId];
+    }
+
+    // Don't fetch if already loading
+    if (loadingAddresses[parkId]) {
+      return null;
+    }
+
+    setLoadingAddresses((prev) => ({ ...prev, [parkId]: true }));
+
+    try {
+      const response = await fetch(`/api/geocode?lat=${lat}&lng=${lng}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch address');
+      }
+      const data = await response.json();
+
+      const address = data.found ? data.shortAddress || data.formattedAddress : null;
+
+      setAddressCache((prev) => ({ ...prev, [parkId]: address }));
+      return address;
+    } catch (error) {
+      console.error('Error fetching address:', error);
+      setAddressCache((prev) => ({ ...prev, [parkId]: null }));
+      return null;
+    } finally {
+      setLoadingAddresses((prev) => ({ ...prev, [parkId]: false }));
+    }
+  }, [addressCache, loadingAddresses]);
+
+  return { addressCache, loadingAddresses, fetchAddress };
+}
+
+/**
  * InteractiveParksMap component - displays parks on a map with user location support
  * @param {Object} props
  * @param {Array} props.parks - Array of park objects
@@ -93,6 +155,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
  */
 export default function InteractiveParksMap({ parks = [], userLocation = null, loading = false }) {
   const mapRef = useRef(null);
+  const { addressCache, loadingAddresses, fetchAddress } = useAddressLookup();
 
   // Default center (US center)
   const defaultCenter = [39.8283, -98.5795];
@@ -184,44 +247,40 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
 
         {/* Park markers */}
         {displayParks.map((park) => {
+          const parkId = park.id || park.park_code;
+          const lat = parseFloat(park.latitude);
+          const lng = parseFloat(park.longitude);
+          const isStatePark = park.source === 'wikidata' || park.designation === 'State Park';
+
           const distance = userLocation
             ? calculateDistance(
                 userLocation.lat,
                 userLocation.lng,
-                parseFloat(park.latitude),
-                parseFloat(park.longitude)
+                lat,
+                lng
               ).toFixed(1)
             : null;
 
           return (
             <Marker
-              key={park.id || park.park_code}
-              position={[parseFloat(park.latitude), parseFloat(park.longitude)]}
-              icon={ParkIcon}
+              key={parkId}
+              position={[lat, lng]}
+              icon={isStatePark ? StateParkIcon : ParkIcon}
+              eventHandlers={{
+                popupopen: () => {
+                  // Fetch address when popup opens
+                  fetchAddress(parkId, lat, lng);
+                },
+              }}
             >
               <Popup>
-                <div className="text-center min-w-[150px]">
-                  <strong className="text-green-700">{park.full_name || park.name}</strong>
-                  {park.states && (
-                    <>
-                      <br />
-                      <span className="text-sm text-gray-600">{park.states}</span>
-                    </>
-                  )}
-                  {distance && (
-                    <>
-                      <br />
-                      <span className="text-sm text-blue-600">{distance} miles away</span>
-                    </>
-                  )}
-                  <br />
-                  <a
-                    href={`/parks/${park.park_code}`}
-                    className="text-sm text-green-600 hover:underline font-medium"
-                  >
-                    View Details →
-                  </a>
-                </div>
+                <ParkPopupContent
+                  park={park}
+                  distance={distance}
+                  address={addressCache[parkId]}
+                  isLoading={loadingAddresses[parkId]}
+                  isStatePark={isStatePark}
+                />
               </Popup>
             </Marker>
           );
@@ -237,6 +296,65 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Park popup content component
+ */
+function ParkPopupContent({ park, distance, address, isLoading, isStatePark }) {
+  const colorClass = isStatePark ? 'text-purple-700' : 'text-green-700';
+  const linkColorClass = isStatePark ? 'text-purple-600' : 'text-green-600';
+
+  return (
+    <div className="text-center min-w-[180px]">
+      <strong className={colorClass}>{park.full_name || park.name}</strong>
+
+      {/* Park type badge */}
+      {isStatePark && (
+        <>
+          <br />
+          <span className="inline-block px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full mt-1">
+            State Park
+          </span>
+        </>
+      )}
+
+      {/* Address */}
+      {isLoading ? (
+        <>
+          <br />
+          <span className="text-xs text-gray-400 italic">Loading address...</span>
+        </>
+      ) : address ? (
+        <>
+          <br />
+          <span className="text-sm text-gray-600">📍 {address}</span>
+        </>
+      ) : park.states ? (
+        <>
+          <br />
+          <span className="text-sm text-gray-600">{park.states}</span>
+        </>
+      ) : null}
+
+      {/* Distance */}
+      {distance && (
+        <>
+          <br />
+          <span className="text-sm text-blue-600">{distance} miles away</span>
+        </>
+      )}
+
+      {/* View details link */}
+      <br />
+      <a
+        href={`/parks/${park.park_code}`}
+        className={`text-sm ${linkColorClass} hover:underline font-medium`}
+      >
+        View Details →
+      </a>
     </div>
   );
 }

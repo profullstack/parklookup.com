@@ -22,7 +22,7 @@ const createChainableMock = (finalResult) => {
   return chainable;
 };
 
-// Default mock data
+// Default mock data - includes both NPS and Wikidata parks
 const mockParksData = {
   data: [
     {
@@ -33,10 +33,52 @@ const mockParksData = {
       states: 'WY,MT,ID',
       latitude: 44.428,
       longitude: -110.5885,
+      source: 'nps',
     },
   ],
   error: null,
   count: 1,
+};
+
+// Mock data with both NPS and state parks
+const mockAllParksData = {
+  data: [
+    {
+      id: '1',
+      park_code: 'yell',
+      full_name: 'Yellowstone National Park',
+      description: 'First national park',
+      states: 'WY,MT,ID',
+      latitude: 44.428,
+      longitude: -110.5885,
+      designation: 'National Park',
+      source: 'nps',
+    },
+    {
+      id: '2',
+      park_code: 'Q123456',
+      full_name: 'New Brighton State Beach',
+      description: null,
+      states: 'California',
+      latitude: 36.9783,
+      longitude: -121.9386,
+      designation: 'State Park',
+      source: 'wikidata',
+    },
+    {
+      id: '3',
+      park_code: 'Q789012',
+      full_name: 'Seacliff State Beach',
+      description: null,
+      states: 'California',
+      latitude: 36.9722,
+      longitude: -121.9156,
+      designation: 'State Park',
+      source: 'wikidata',
+    },
+  ],
+  error: null,
+  count: 3,
 };
 
 const mockSingleParkData = {
@@ -131,6 +173,61 @@ describe('Parks API Route', () => {
       const response = await GET(request);
 
       expect(response.status).toBe(500);
+    });
+
+    it('should query all_parks view to include both NPS and state parks', async () => {
+      vi.resetModules();
+      const fromMock = vi.fn(() => createChainableMock(mockAllParksData));
+      mockSupabaseClient = {
+        from: fromMock,
+      };
+
+      const { GET } = await import('@/app/api/parks/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks');
+      await GET(request);
+
+      // Verify it queries the all_parks view
+      expect(fromMock).toHaveBeenCalledWith('all_parks');
+    });
+
+    it('should return parks with source field indicating origin', async () => {
+      vi.resetModules();
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(mockAllParksData)),
+      };
+
+      const { GET } = await import('@/app/api/parks/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.parks).toHaveLength(3);
+      // Check that source field is present
+      expect(data.parks[0]).toHaveProperty('source');
+      expect(data.parks[0].source).toBe('nps');
+      expect(data.parks[1].source).toBe('wikidata');
+    });
+
+    it('should include state parks from wikidata source', async () => {
+      vi.resetModules();
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(mockAllParksData)),
+      };
+
+      const { GET } = await import('@/app/api/parks/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Find state parks in results
+      const stateParks = data.parks.filter((p) => p.source === 'wikidata');
+      expect(stateParks.length).toBeGreaterThan(0);
+      expect(stateParks[0].designation).toBe('State Park');
     });
   });
 
@@ -241,6 +338,78 @@ describe('Parks Search API', () => {
       expect(data).toHaveProperty('parks');
       expect(data.state).toBe('CA');
     });
+
+    it('should query all_parks view for search', async () => {
+      vi.resetModules();
+      const fromMock = vi.fn(() => createChainableMock(mockAllParksData));
+      mockSupabaseClient = {
+        from: fromMock,
+      };
+
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search?q=beach');
+      await GET(request);
+
+      // Verify it queries the all_parks view
+      expect(fromMock).toHaveBeenCalledWith('all_parks');
+    });
+
+    it('should find state parks by name', async () => {
+      vi.resetModules();
+      // Mock data for state beach search
+      const stateBeachData = {
+        data: [
+          {
+            id: '2',
+            park_code: 'Q123456',
+            full_name: 'New Brighton State Beach',
+            description: null,
+            states: 'California',
+            latitude: 36.9783,
+            longitude: -121.9386,
+            designation: 'State Park',
+            source: 'wikidata',
+          },
+        ],
+        error: null,
+        count: 1,
+      };
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(stateBeachData)),
+      };
+
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search?q=newbrighton');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.parks).toHaveLength(1);
+      expect(data.parks[0].full_name).toBe('New Brighton State Beach');
+      expect(data.parks[0].source).toBe('wikidata');
+    });
+
+    it('should return source field in search results', async () => {
+      vi.resetModules();
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(mockAllParksData)),
+      };
+
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // All parks should have source field
+      data.parks.forEach((park) => {
+        expect(park).toHaveProperty('source');
+        expect(['nps', 'wikidata']).toContain(park.source);
+      });
+    });
   });
 });
 
@@ -348,6 +517,7 @@ describe('Parks Nearby API', () => {
                   full_name: 'Yosemite National Park',
                   latitude: 37.8651,
                   longitude: -119.5383,
+                  source: 'nps',
                 },
               ],
               error: null,
@@ -374,6 +544,105 @@ describe('Parks Nearby API', () => {
       const response = await GET(request);
 
       expect(response.status).toBe(200);
+    });
+
+    it('should use all_parks view in fallback query', async () => {
+      vi.resetModules();
+
+      const fallbackChainable = {
+        select: vi.fn(() => fallbackChainable),
+        from: vi.fn(() => fallbackChainable),
+        not: vi.fn(() => ({
+          not: vi.fn(() =>
+            Promise.resolve({
+              data: [
+                {
+                  id: '1',
+                  park_code: 'yose',
+                  full_name: 'Yosemite National Park',
+                  latitude: 37.8651,
+                  longitude: -119.5383,
+                  source: 'nps',
+                },
+                {
+                  id: '2',
+                  park_code: 'Q123456',
+                  full_name: 'New Brighton State Beach',
+                  latitude: 36.9783,
+                  longitude: -121.9386,
+                  source: 'wikidata',
+                },
+              ],
+              error: null,
+            })
+          ),
+        })),
+      };
+
+      const fromMock = vi.fn(() => fallbackChainable);
+      mockSupabaseClient = {
+        from: fromMock,
+        rpc: vi.fn(() =>
+          Promise.resolve({
+            data: null,
+            error: { message: 'RPC not available' },
+          })
+        ),
+      };
+
+      const { GET } = await import('@/app/api/parks/nearby/route.js');
+
+      const request = new Request(
+        'http://localhost:8080/api/parks/nearby?lat=37.8651&lng=-119.5383'
+      );
+      await GET(request);
+
+      // Verify it queries the all_parks view in fallback
+      expect(fromMock).toHaveBeenCalledWith('all_parks');
+    });
+
+    it('should include state parks in nearby results via RPC', async () => {
+      vi.resetModules();
+
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(mockParksData)),
+        rpc: vi.fn(() =>
+          Promise.resolve({
+            data: [
+              {
+                id: '1',
+                park_code: 'yose',
+                full_name: 'Yosemite National Park',
+                distance_km: 50,
+                source: 'nps',
+              },
+              {
+                id: '2',
+                park_code: 'Q123456',
+                full_name: 'New Brighton State Beach',
+                distance_km: 25,
+                source: 'wikidata',
+              },
+            ],
+            error: null,
+          })
+        ),
+      };
+
+      const { GET } = await import('@/app/api/parks/nearby/route.js');
+
+      const request = new Request(
+        'http://localhost:8080/api/parks/nearby?lat=37.8651&lng=-119.5383'
+      );
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.parks).toHaveLength(2);
+      // Check that both NPS and state parks are included
+      const sources = data.parks.map((p) => p.source);
+      expect(sources).toContain('nps');
+      expect(sources).toContain('wikidata');
     });
   });
 });

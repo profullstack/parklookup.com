@@ -209,6 +209,10 @@ export default function MapPage() {
               <div className="w-4 h-4 bg-green-600 rounded-full"></div>
               <span className="text-gray-600 dark:text-gray-400">National Park</span>
             </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 bg-purple-600 rounded-full"></div>
+              <span className="text-gray-600 dark:text-gray-400">State Park</span>
+            </div>
             {userLocation && (
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-blue-600 rounded-full"></div>
@@ -216,6 +220,9 @@ export default function MapPage() {
               </div>
             )}
           </div>
+          <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+            Click on a park marker to see its address and details.
+          </p>
         </div>
       </div>
     </div>
