@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 import { FavoriteButton } from '@/components/parks/FavoriteButton';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import WeatherForecast from '@/components/weather/WeatherForecast';
+import { ProductCarousel } from '@/components/products/ProductCard';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -29,6 +30,8 @@ export default function ParkDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(true);
 
   // Track page view
   useEffect(() => {
@@ -64,6 +67,26 @@ export default function ParkDetailPage() {
       fetchPark();
     }
   }, [parkCode, trackParkView]);
+
+  // Fetch recommended products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        setProductsLoading(true);
+        const response = await fetch('/api/products?limit=5&random=true');
+        if (response.ok) {
+          const data = await response.json();
+          setProducts(data.products || []);
+        }
+      } catch (err) {
+        console.error('Failed to fetch products:', err);
+      } finally {
+        setProductsLoading(false);
+      }
+    };
+
+    fetchProducts();
+  }, []);
 
   // Loading state
   if (loading) {
@@ -282,6 +305,15 @@ export default function ParkDetailPage() {
                   </p>
                 </div>
               )}
+            </div>
+
+            {/* Recommended Gear */}
+            <div>
+              <ProductCarousel
+                products={products}
+                loading={productsLoading}
+                title="Gear Up for Your Visit"
+              />
             </div>
 
             {/* Weather */}
