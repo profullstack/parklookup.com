@@ -6,6 +6,9 @@
  * This script fetches camping gear and outdoor products from the Rainforest API
  * (Amazon Product Data) and imports them into the Supabase database.
  *
+ * Product titles and descriptions are rewritten using OpenAI to avoid
+ * duplicate content penalties in search engine results.
+ *
  * Usage:
  *   node scripts/import-products.js [options]
  *
@@ -15,15 +18,18 @@
  *   --details             Fetch detailed product information (slower, more API calls)
  *   --max <number>        Maximum products per search term (default: 10)
  *   --delay <ms>          Delay between API calls in milliseconds (default: 2000)
+ *   --no-rewrite          Skip AI rewriting of titles and descriptions
  *
  * Environment variables required:
  *   - SUPABASE_URL: Your Supabase project URL
  *   - SUPABASE_SERVICE_ROLE_KEY: Your Supabase service role key
  *   - RAINFOREST_API_KEY: Your Rainforest API key
  *   - AMAZON_TAG: Your Amazon affiliate tag
+ *   - OPENAI_API_KEY: Your OpenAI API key (for content rewriting)
  */
 
 import { createClient } from '@supabase/supabase-js';
+import OpenAI from 'openai';
 import {
   searchProducts,
   getProductDetails,
@@ -43,6 +49,7 @@ const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABAS
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const RAINFOREST_API_KEY = process.env.RAINFOREST_API_KEY;
 const AMAZON_TAG = process.env.AMAZON_TAG;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -58,6 +65,7 @@ const OPTIONS = {
   details: hasFlag('--details'),
   maxProducts: parseInt(getArg('--max') || '10', 10),
   delayMs: parseInt(getArg('--delay') || '2000', 10),
+  noRewrite: hasFlag('--no-rewrite'),
 };
 
 /**
@@ -79,6 +87,124 @@ const validateEnv = () => {
   if (!AMAZON_TAG) {
     console.warn('⚠️  AMAZON_TAG not set, using default: parklookup-20');
   }
+
+  if (!OPENAI_API_KEY && !OPTIONS.noRewrite) {
+    console.warn('⚠️  OPENAI_API_KEY not set, content rewriting will be skipped');
+  }
+};
+
+/**
+ * Creates an OpenAI client
+ */
+const createOpenAIClient = () => {
+  if (!OPENAI_API_KEY) {
+    return null;
+  }
+  return new OpenAI({ apiKey: OPENAI_API_KEY });
+};
+
+/**
+ * Rewrites product title and description using OpenAI to avoid duplicate content
+ * @param {Object} openai - OpenAI client instance
+ * @param {string} title - Original product title
+ * @param {string} description - Original product description
+ * @param {string} brand - Product brand
+ * @returns {Promise<{title: string, description: string}>} Rewritten content
+ */
+const rewriteProductContent = async (openai, title, description, brand) => {
+  if (!openai) {
+    return { title, description };
+  }
+
+  try {
+    const prompt = `You are a product copywriter for an outdoor and camping gear website called ParkLookup.
+Rewrite the following Amazon product title and description to be unique, engaging, and SEO-friendly.
+Keep the essential product information but make it original to avoid duplicate content issues.
+Focus on how the product benefits outdoor enthusiasts, campers, and park visitors.
+
+Original Title: ${title}
+Original Description: ${description || 'No description available'}
+Brand: ${brand || 'Unknown'}
+
+Respond in JSON format with exactly these fields:
+{
+  "title": "rewritten title (max 100 characters)",
+  "description": "rewritten description (max 500 characters, focus on benefits for outdoor activities)"
+}`;
+
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'You are a helpful product copywriter. Always respond with valid JSON only.',
+        },
+        { role: 'user', content: prompt },
+      ],
+      temperature: 0.7,
+      max_tokens: 300,
+      response_format: { type: 'json_object' },
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new Error('Empty response from OpenAI');
+    }
+
+    const parsed = JSON.parse(content);
+    return {
+      title: parsed.title || title,
+      description: parsed.description || description,
+    };
+  } catch (error) {
+    console.warn(`   ⚠️  Failed to rewrite content: ${error.message}`);
+    return { title, description };
+  }
+};
+
+/**
+ * Rewrites multiple products in batch
+ * @param {Object} openai - OpenAI client instance
+ * @param {Array} products - Array of product objects
+ * @param {number} delayMs - Delay between API calls
+ * @returns {Promise<Array>} Products with rewritten content
+ */
+const rewriteProductsBatch = async (openai, products, delayMs) => {
+  if (!openai || OPTIONS.noRewrite) {
+    return products;
+  }
+
+  console.log(`   🤖 Rewriting ${products.length} product descriptions with AI...`);
+  const rewrittenProducts = [];
+
+  for (let i = 0; i < products.length; i++) {
+    const product = products[i];
+
+    // Add delay between API calls to avoid rate limiting
+    if (i > 0) {
+      await delay(delayMs / 2); // Use half the delay for OpenAI calls
+    }
+
+    const { title, description } = await rewriteProductContent(
+      openai,
+      product.title,
+      product.description,
+      product.brand
+    );
+
+    rewrittenProducts.push({
+      ...product,
+      title,
+      description,
+      original_title: product.title,
+      original_description: product.description,
+    });
+
+    process.stdout.write(`\r   AI rewrite progress: ${i + 1}/${products.length}`);
+  }
+  console.log(''); // New line after progress
+
+  return rewrittenProducts;
 };
 
 /**
@@ -194,7 +320,7 @@ const deduplicateProducts = (products) => {
 /**
  * Upserts products into the database
  */
-const upsertProducts = async (supabase, products, categoryId) => {
+const upsertProducts = async (supabase, products, categoryId, aiRewritten = false) => {
   const results = {
     inserted: 0,
     updated: 0,
@@ -219,6 +345,10 @@ const upsertProducts = async (supabase, products, categoryId) => {
           asin: product.asin,
           title: product.title,
           description: product.description,
+          original_title: product.original_title || null,
+          original_description: product.original_description || null,
+          ai_rewritten: aiRewritten && !!product.original_title,
+          ai_rewritten_at: aiRewritten && product.original_title ? new Date().toISOString() : null,
           brand: product.brand,
           category_id: categoryId,
           price: product.price,
@@ -308,8 +438,8 @@ const linkProductsToActivities = async (supabase, products, searchTerm) => {
 /**
  * Imports products for a single search term
  */
-const importForSearchTerm = async (supabase, searchTerm, options) => {
-  const { maxProducts, delayMs, details } = options;
+const importForSearchTerm = async (supabase, openai, searchTerm, options) => {
+  const { maxProducts, delayMs, details, noRewrite } = options;
 
   console.log(`\n🔍 Searching for: "${searchTerm}"`);
 
@@ -351,11 +481,17 @@ const importForSearchTerm = async (supabase, searchTerm, options) => {
       products = rawProducts.map((p) => transformSearchProduct(p, searchTerm));
     }
 
+    // Rewrite product content with AI (unless disabled)
+    if (!noRewrite && openai) {
+      products = await rewriteProductsBatch(openai, products, delayMs);
+    }
+
     // Get category ID
     const categoryId = await getCategoryId(supabase, searchTerm);
 
-    // Upsert products
-    const results = await upsertProducts(supabase, products, categoryId);
+    // Upsert products (pass aiRewritten flag)
+    const aiRewritten = !noRewrite && !!openai;
+    const results = await upsertProducts(supabase, products, categoryId, aiRewritten);
 
     // Link products to activities
     await linkProductsToActivities(supabase, products, searchTerm);
@@ -372,6 +508,7 @@ const importForSearchTerm = async (supabase, searchTerm, options) => {
         duration_ms: endTime - startTime,
         errors: results.errors,
         with_details: details,
+        ai_rewritten: !noRewrite && !!openai,
       },
     });
 
@@ -416,12 +553,14 @@ const main = async () => {
     console.log('  node scripts/import-products.js --search-term "camping gear"');
     console.log('  node scripts/import-products.js --all');
     console.log('  node scripts/import-products.js --all --details --max 5');
+    console.log('  node scripts/import-products.js --all --no-rewrite');
     console.log('\nOptions:');
     console.log('  --search-term <term>  Import products for a specific search term');
     console.log('  --all                 Import products for all predefined search terms');
     console.log('  --details             Fetch detailed product information (slower)');
     console.log('  --max <number>        Maximum products per search term (default: 10)');
     console.log('  --delay <ms>          Delay between API calls (default: 2000)');
+    console.log('  --no-rewrite          Skip AI rewriting of titles and descriptions');
     console.log('\nPredefined search terms:');
     CAMPING_SEARCH_TERMS.forEach((term) => console.log(`  - ${term}`));
     process.exit(0);
@@ -433,9 +572,13 @@ const main = async () => {
   console.log(`  - Fetch details: ${OPTIONS.details}`);
   console.log(`  - Delay between calls: ${OPTIONS.delayMs}ms`);
   console.log(`  - Amazon affiliate tag: ${AMAZON_TAG || 'parklookup-20'}`);
+  console.log(`  - AI content rewriting: ${!OPTIONS.noRewrite && OPENAI_API_KEY ? 'enabled' : 'disabled'}`);
 
   // Create Supabase client
   const supabase = createSupabaseClient();
+
+  // Create OpenAI client (if API key is available)
+  const openai = createOpenAIClient();
 
   // Track overall results
   const overallResults = {
@@ -455,7 +598,7 @@ const main = async () => {
       await delay(OPTIONS.delayMs);
     }
 
-    const results = await importForSearchTerm(supabase, searchTerm, OPTIONS);
+    const results = await importForSearchTerm(supabase, openai, searchTerm, OPTIONS);
     overallResults.totalProducts += results.inserted;
     overallResults.totalErrors += results.errors.length;
   }
