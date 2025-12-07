@@ -142,6 +142,7 @@ export async function PATCH(request, { params }) {
 
 /**
  * DELETE handler for removing a favorite
+ * The [id] parameter can be either the favorite record ID or the nps_park_id (UUID)
  */
 export async function DELETE(request, { params }) {
   try {
@@ -154,15 +155,33 @@ export async function DELETE(request, { params }) {
 
     const supabase = createServerClient({ useServiceRole: true });
 
-    const { error } = await supabase
+    // Try to delete by nps_park_id first (most common case from FavoriteButton)
+    const { data: deletedByParkId, error: parkIdError } = await supabase
+      .from('favorites')
+      .delete()
+      .eq('nps_park_id', id)
+      .eq('user_id', user.id)
+      .select();
+
+    if (!parkIdError && deletedByParkId && deletedByParkId.length > 0) {
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+
+    // If no rows deleted by nps_park_id, try by favorite record id
+    const { data: deletedById, error: idError } = await supabase
       .from('favorites')
       .delete()
       .eq('id', id)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .select();
 
-    if (error) {
-      console.error('Database error:', error);
+    if (idError) {
+      console.error('Database error:', idError);
       return NextResponse.json({ error: 'Failed to delete favorite' }, { status: 500 });
+    }
+
+    if (!deletedById || deletedById.length === 0) {
+      return NextResponse.json({ error: 'Favorite not found' }, { status: 404 });
     }
 
     return NextResponse.json({ success: true }, { status: 200 });
