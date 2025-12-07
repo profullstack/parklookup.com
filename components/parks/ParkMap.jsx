@@ -68,7 +68,23 @@ function useAddressLookup(latitude, longitude) {
       const data = await response.json();
       
       if (data.found) {
-        setAddress(data.formattedAddress || data.shortAddress);
+        // Use the best available address format:
+        // 1. formattedAddress if it has street info
+        // 2. address.label (full address from HERE API)
+        // 3. shortAddress as fallback
+        const formattedAddr = data.formattedAddress;
+        const label = data.address?.label;
+        const shortAddr = data.shortAddress;
+        
+        // If formattedAddress has a newline, it has street info - use it
+        // Otherwise prefer the label which is more descriptive
+        if (formattedAddr && formattedAddr.includes('\n')) {
+          setAddress(formattedAddr);
+        } else if (label) {
+          setAddress(label);
+        } else {
+          setAddress(formattedAddr || shortAddr);
+        }
       } else {
         setAddress(null);
       }
