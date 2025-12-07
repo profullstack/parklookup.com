@@ -21,6 +21,7 @@ vi.mock('next/link', () => ({
 global.fetch = vi.fn();
 
 // Mock place data
+// Note: 'lodging' category was removed as ValueSERP always returned 0 results
 const mockPlacesData = {
   parkCode: 'yose',
   places: [
@@ -41,8 +42,8 @@ const mockPlacesData = {
     {
       id: 'place-2',
       data_cid: '22340000532159598532',
-      title: 'Mountain View Lodge',
-      category: 'lodging',
+      title: 'Yosemite Valley Cinema',
+      category: 'entertainment',
       address: 'Yosemite Valley, CA',
       rating: 4.8,
       reviews_count: 250,
@@ -84,12 +85,12 @@ const mockPlacesData = {
         longitude: -87.3653,
       },
     ],
-    lodging: [
+    entertainment: [
       {
         id: 'place-2',
         data_cid: '22340000532159598532',
-        title: 'Mountain View Lodge',
-        category: 'lodging',
+        title: 'Yosemite Valley Cinema',
+        category: 'entertainment',
         address: 'Yosemite Valley, CA',
         rating: 4.8,
         reviews_count: 250,
@@ -215,7 +216,7 @@ describe('NearbyPlaces', () => {
 
       await waitFor(() => {
         expect(screen.getByText("Coppolillo's Italian Steakhouse")).toBeInTheDocument();
-        expect(screen.getByText('Mountain View Lodge')).toBeInTheDocument();
+        expect(screen.getByText('Yosemite Valley Cinema')).toBeInTheDocument();
         expect(screen.getByText('Valley Bar & Grill')).toBeInTheDocument();
       });
     });
@@ -225,7 +226,7 @@ describe('NearbyPlaces', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Dining')).toBeInTheDocument();
-        expect(screen.getByText('Lodging')).toBeInTheDocument();
+        expect(screen.getByText('Entertainment')).toBeInTheDocument();
         // Use getAllByText since "Bars & Nightlife" appears in multiple places (filter, header, badge)
         const barsElements = screen.getAllByText(/Bars & Nightlife/i);
         expect(barsElements.length).toBeGreaterThan(0);
@@ -290,7 +291,7 @@ describe('NearbyPlaces', () => {
       // Should only show dining places
       expect(screen.getByText("Coppolillo's Italian Steakhouse")).toBeInTheDocument();
       // Other categories should not be visible as section headers
-      expect(screen.queryByText('Lodging')).not.toBeInTheDocument();
+      expect(screen.queryByText('Entertainment')).not.toBeInTheDocument();
     });
 
     it('should show all places when All tab clicked', async () => {
@@ -311,7 +312,7 @@ describe('NearbyPlaces', () => {
       // Should show all categories
       await waitFor(() => {
         expect(screen.getByText('Dining')).toBeInTheDocument();
-        expect(screen.getByText('Lodging')).toBeInTheDocument();
+        expect(screen.getByText('Entertainment')).toBeInTheDocument();
       });
     });
   });

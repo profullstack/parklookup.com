@@ -498,16 +498,27 @@ export default function PlaceDetailPage() {
         )}
 
         {/* Hours */}
-        {place.hours && Object.keys(place.hours).length > 0 && (
+        {place.hours && (Array.isArray(place.hours) ? place.hours.length > 0 : Object.keys(place.hours).length > 0) && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Hours</h2>
             <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
-              {Object.entries(place.hours).map(([day, hours]) => (
-                <div key={day} className="flex justify-between py-1">
-                  <span className="text-gray-600 dark:text-gray-400 capitalize">{day}</span>
-                  <span className="text-gray-900 dark:text-white">{hours}</span>
-                </div>
-              ))}
+              {Array.isArray(place.hours) ? (
+                // Handle array format: [{name: "Sunday", value: "5 PM–2 AM"}, ...]
+                place.hours.map((item, index) => (
+                  <div key={index} className="flex justify-between py-1">
+                    <span className="text-gray-600 dark:text-gray-400">{item.name}</span>
+                    <span className="text-gray-900 dark:text-white">{item.value}</span>
+                  </div>
+                ))
+              ) : (
+                // Handle object format: {sunday: "5 PM–2 AM", ...}
+                Object.entries(place.hours).map(([day, hours]) => (
+                  <div key={day} className="flex justify-between py-1">
+                    <span className="text-gray-600 dark:text-gray-400 capitalize">{day}</span>
+                    <span className="text-gray-900 dark:text-white">{typeof hours === 'object' ? hours.value || JSON.stringify(hours) : hours}</span>
+                  </div>
+                ))
+              )}
             </div>
           </div>
         )}
