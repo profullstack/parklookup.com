@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -47,6 +47,43 @@ const ParkIcon = L.divIcon({
 });
 
 /**
+ * Custom hook to fetch address for coordinates
+ */
+function useAddressLookup(latitude, longitude) {
+  const [address, setAddress] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const fetchAddress = useCallback(async () => {
+    if (!latitude || !longitude || address !== null) return;
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(`/api/geocode?lat=${latitude}&lng=${longitude}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch address');
+      }
+      const data = await response.json();
+      
+      if (data.found) {
+        setAddress(data.formattedAddress || data.shortAddress);
+      } else {
+        setAddress(null);
+      }
+    } catch (err) {
+      console.error('Error fetching address:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [latitude, longitude, address]);
+
+  return { address, loading, error, fetchAddress };
+}
+
+/**
  * ParkMap component - displays a Leaflet map with park location
  * @param {Object} props
  * @param {number} props.latitude - Park latitude
@@ -63,11 +100,19 @@ export default function ParkMap({
   className = '',
 }) {
   const mapRef = useRef(null);
+  const { address, loading, fetchAddress } = useAddressLookup(latitude, longitude);
 
   // Set default icon for all markers
   useEffect(() => {
     L.Marker.prototype.options.icon = DefaultIcon;
   }, []);
+
+  // Fetch address on mount
+  useEffect(() => {
+    if (latitude && longitude) {
+      fetchAddress();
+    }
+  }, [latitude, longitude, fetchAddress]);
 
   if (!latitude || !longitude) {
     return (
@@ -83,11 +128,40 @@ export default function ParkMap({
 
   return (
     <div className={`h-64 md:h-96 ${className}`}>
+      {/* Address display above map */}
+      <div className="bg-white dark:bg-gray-800 rounded-t-lg p-3 border-b border-gray-200 dark:border-gray-700">
+        <div className="flex items-start gap-2">
+          <svg className="w-5 h-5 text-green-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <div className="flex-1 min-w-0">
+            {loading ? (
+              <p className="text-sm text-gray-500 dark:text-gray-400 italic">Loading address...</p>
+            ) : address ? (
+              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{address}</p>
+            ) : (
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {latitude.toFixed(4)}, {longitude.toFixed(4)}
+              </p>
+            )}
+          </div>
+          <a
+            href={`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+          >
+            Get Directions →
+          </a>
+        </div>
+      </div>
+      
       <MapContainer
         center={position}
         zoom={zoom}
         scrollWheelZoom={true}
-        className="h-full w-full rounded-lg z-0"
+        className="h-[calc(100%-52px)] w-full rounded-b-lg z-0"
         ref={mapRef}
       >
         <TileLayer
@@ -96,10 +170,16 @@ export default function ParkMap({
         />
         <Marker position={position} icon={ParkIcon}>
           <Popup>
-            <div className="text-center">
+            <div className="text-center min-w-[180px]">
               <strong className="text-green-700">{parkName}</strong>
+              {address && (
+                <>
+                  <br />
+                  <span className="text-sm text-gray-600 whitespace-pre-line">📍 {address}</span>
+                </>
+              )}
               <br />
-              <span className="text-sm text-gray-600">
+              <span className="text-xs text-gray-500">
                 {latitude.toFixed(4)}, {longitude.toFixed(4)}
               </span>
               <br />

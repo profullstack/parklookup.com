@@ -3,7 +3,7 @@ import ParkCard from '@/components/parks/ParkCard';
 import { createAnonClient } from '@/lib/supabase/server';
 
 /**
- * Fetches all parks from the database
+ * Fetches all parks from the database (NPS + State Parks)
  * @param {number} page - Page number (1-indexed)
  * @param {number} limit - Number of parks per page
  * @returns {Promise<Object>} Parks data with pagination info
@@ -12,14 +12,14 @@ async function getParks(page = 1, limit = 24) {
   const supabase = createAnonClient();
   const offset = (page - 1) * limit;
 
-  // Get total count
+  // Get total count from all_parks view (includes NPS + state parks)
   const { count } = await supabase
-    .from('nps_parks')
+    .from('all_parks')
     .select('*', { count: 'exact', head: true });
 
-  // Get parks for current page
+  // Get parks for current page from all_parks view
   const { data: parks, error } = await supabase
-    .from('nps_parks')
+    .from('all_parks')
     .select(
       `
       id,
@@ -31,7 +31,8 @@ async function getParks(page = 1, limit = 24) {
       longitude,
       designation,
       url,
-      images
+      images,
+      source
     `
     )
     .order('full_name', { ascending: true })
@@ -55,13 +56,13 @@ async function getParks(page = 1, limit = 24) {
  * Generate metadata for the parks page
  */
 export const metadata = {
-  title: 'All National Parks | ParkLookup',
+  title: 'All Parks | ParkLookup',
   description:
-    'Browse all national parks, monuments, historic sites, and more. Find your next outdoor adventure.',
+    'Browse all national parks, state parks, monuments, historic sites, and more. Find your next outdoor adventure.',
   openGraph: {
-    title: 'All National Parks | ParkLookup',
+    title: 'All Parks | ParkLookup',
     description:
-      'Browse all national parks, monuments, historic sites, and more. Find your next outdoor adventure.',
+      'Browse all national parks, state parks, monuments, historic sites, and more. Find your next outdoor adventure.',
   },
 };
 
@@ -83,9 +84,10 @@ export default async function ParksPage({ searchParams }) {
               ← Back to Home
             </Link>
           </nav>
-          <h1 className="text-4xl font-bold mb-2">All National Parks</h1>
+          <h1 className="text-4xl font-bold mb-2">All Parks</h1>
           <p className="text-green-100 text-lg">
-            {total} parks, monuments, and historic sites to explore
+            {total.toLocaleString()} national parks, state parks, monuments, and historic sites to
+            explore
           </p>
         </div>
       </div>

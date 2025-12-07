@@ -1,6 +1,7 @@
 /**
  * Single Park API Route
  * GET /api/parks/[parkCode] - Get a single park by park code
+ * Supports both NPS parks (e.g., "yose") and state parks (e.g., "Q4647844")
  */
 
 import { NextResponse } from 'next/server';
@@ -11,7 +12,7 @@ import { createServerClient } from '@/lib/supabase/client';
  */
 export async function GET(request, { params }) {
   try {
-    const { parkCode } = params;
+    const { parkCode } = await params;
 
     if (!parkCode) {
       return NextResponse.json({ error: 'Park code is required' }, { status: 400 });
@@ -19,9 +20,9 @@ export async function GET(request, { params }) {
 
     const supabase = createServerClient();
 
-    // Fetch park with linked Wikidata data
+    // Fetch park from all_parks view (includes both NPS and state parks)
     const { data: park, error } = await supabase
-      .from('parks_combined')
+      .from('all_parks')
       .select(
         `
         id,
@@ -47,7 +48,8 @@ export async function GET(request, { params }) {
         inception,
         managing_org,
         commons_category,
-        link_confidence
+        link_confidence,
+        source
       `
       )
       .eq('park_code', parkCode)
