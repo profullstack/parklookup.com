@@ -405,6 +405,7 @@ export default function ParkDetailPage() {
                   latitude={parseFloat(park.latitude)}
                   longitude={parseFloat(park.longitude)}
                   parkName={park.full_name}
+                  address={park.physical_address}
                 />
               </div>
             ) : (
