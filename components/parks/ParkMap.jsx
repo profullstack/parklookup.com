@@ -47,12 +47,58 @@ const ParkIcon = L.divIcon({
 });
 
 /**
+ * Custom hook for fetching address from coordinates
+ */
+function useAddressLookup(latitude, longitude, initialAddress = null) {
+  const [address, setAddress] = useState(initialAddress);
+  const [loading, setLoading] = useState(!initialAddress && !!latitude && !!longitude);
+
+  useEffect(() => {
+    // If we already have an address (from database), don't fetch
+    if (initialAddress) {
+      setAddress(initialAddress);
+      setLoading(false);
+      return;
+    }
+
+    // If no coordinates, nothing to fetch
+    if (!latitude || !longitude) {
+      setLoading(false);
+      return;
+    }
+
+    const fetchAddress = async () => {
+      try {
+        setLoading(true);
+        const response = await fetch(`/api/geocode?lat=${latitude}&lng=${longitude}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.formattedAddress) {
+            setAddress(data.formattedAddress);
+          } else if (data.address?.label) {
+            setAddress(data.address.label);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch address:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAddress();
+  }, [latitude, longitude, initialAddress]);
+
+  return { address, loading };
+}
+
+/**
  * ParkMap component - displays a Leaflet map with park location
  * @param {Object} props
  * @param {number} props.latitude - Park latitude
  * @param {number} props.longitude - Park longitude
  * @param {string} props.parkName - Name of the park
- * @param {string} [props.address] - Physical address (pre-stored in database)
+ * @param {string} [props.address] - Physical address (pre-stored in database, or fetched if not provided)
  * @param {number} [props.zoom=10] - Initial zoom level
  * @param {string} [props.className] - Additional CSS classes
  */
@@ -60,11 +106,12 @@ export default function ParkMap({
   latitude,
   longitude,
   parkName,
-  address = null,
+  address: initialAddress = null,
   zoom = 10,
   className = '',
 }) {
   const mapRef = useRef(null);
+  const { address, loading } = useAddressLookup(latitude, longitude, initialAddress);
 
   // Set default icon for all markers
   useEffect(() => {
@@ -93,7 +140,11 @@ export default function ParkMap({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
           <div className="flex-1 min-w-0">
-            {address ? (
+            {loading ? (
+              <p className="text-sm text-gray-400 dark:text-gray-500 animate-pulse">
+                Loading address...
+              </p>
+            ) : address ? (
               <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-line">{address}</p>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400">
