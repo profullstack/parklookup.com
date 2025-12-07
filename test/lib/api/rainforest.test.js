@@ -334,7 +334,7 @@ describe('Rainforest API Client', () => {
 
       expect(transformed.asin).toBe('B0748HGDVD');
       expect(transformed.title).toBe('Coleman Sundome Camping Tent');
-      expect(transformed.description).toContain('Easy 10-minute setup');
+      expect(transformed.description).toContain('Easy setup camping tent');
       expect(transformed.price).toBe(89.99);
       expect(transformed.original_price).toBe(109.99);
       expect(transformed.main_image_url).toBe(
