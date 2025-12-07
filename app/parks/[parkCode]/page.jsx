@@ -9,6 +9,7 @@ import { FavoriteButton } from '@/components/parks/FavoriteButton';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import WeatherForecast from '@/components/weather/WeatherForecast';
 import { ProductCarousel } from '@/components/products/ProductCard';
+import NearbyPlaces from '@/components/parks/NearbyPlaces';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -433,30 +434,41 @@ export default function ParkDetailPage() {
 
         {/* Activities Tab */}
         {activeTab === 'activities' && (
-          <div>
-            {activities.length > 0 ? (
-              <div className="flex flex-wrap gap-2">
-                {activities.map((activity, index) => {
-                  const activityName = activity.name || activity;
-                  const activitySlug = activityName.toLowerCase().replace(/\s+/g, '-');
-                  return (
-                    <Link
-                      key={index}
-                      href={`/activities/${encodeURIComponent(activitySlug)}`}
-                      className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
-                    >
-                      {activityName}
-                    </Link>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                <p className="text-gray-600 dark:text-gray-400">
-                  No activities listed for this park
-                </p>
+          <div className="space-y-8">
+            {/* Park Activities */}
+            {activities.length > 0 && (
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                  Park Activities
+                </h2>
+                <div className="flex flex-wrap gap-2">
+                  {activities.map((activity, index) => {
+                    const activityName = activity.name || activity;
+                    const activitySlug = activityName.toLowerCase().replace(/\s+/g, '-');
+                    return (
+                      <Link
+                        key={index}
+                        href={`/activities/${encodeURIComponent(activitySlug)}`}
+                        className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors"
+                      >
+                        {activityName}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             )}
+
+            {/* Nearby Places */}
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                Nearby Places
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                Restaurants, entertainment, lodging, and more near the park
+              </p>
+              <NearbyPlaces parkCode={parkCode} />
+            </div>
           </div>
         )}
 

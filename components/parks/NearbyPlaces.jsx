@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 
 /**
  * Category icons and labels
@@ -47,70 +48,73 @@ function PlaceCard({ place }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow">
-      {/* Thumbnail */}
-      {place.thumbnail && (
-        <div className="relative h-32 bg-gray-200 dark:bg-gray-700">
-          <Image
-            src={place.thumbnail}
-            alt={place.title}
-            fill
-            className="object-cover"
-            unoptimized // External images from Google
-          />
-        </div>
-      )}
-
-      <div className="p-4">
-        {/* Category badge */}
-        <span
-          className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${config.color} mb-2`}
-        >
-          {config.icon} {config.label}
-        </span>
-
-        {/* Title */}
-        <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-1">{place.title}</h4>
-
-        {/* Rating */}
-        {place.rating && (
-          <div className="flex items-center gap-1 mt-1">
-            <span className="text-yellow-500">★</span>
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {place.rating}
-              {place.reviews_count && (
-                <span className="text-gray-400 dark:text-gray-500">
-                  {' '}
-                  ({place.reviews_count.toLocaleString()})
-                </span>
-              )}
-            </span>
-            {place.price_level && (
-              <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-                {place.price_level}
-              </span>
-            )}
+      {/* Clickable link wrapper for thumbnail and title */}
+      <Link href={`/places/${place.data_cid}`}>
+        {/* Thumbnail */}
+        {place.thumbnail && (
+          <div className="relative h-32 bg-gray-200 dark:bg-gray-700">
+            <Image
+              src={place.thumbnail}
+              alt={place.title}
+              fill
+              className="object-cover"
+              unoptimized // External images from Google
+            />
           </div>
         )}
 
-        {/* Address */}
-        {place.address && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
-            📍 {place.address}
-          </p>
-        )}
+        <div className="p-4 pb-2">
+          {/* Category badge */}
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${config.color} mb-2`}
+          >
+            {config.icon} {config.label}
+          </span>
 
-        {/* Actions */}
-        <div className="flex gap-2 mt-3">
-          {place.website && (
-            <a
-              href={place.website}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
-            >
-              Website
-            </a>
+          {/* Title */}
+          <h4 className="font-semibold text-gray-900 dark:text-white line-clamp-1 hover:text-green-600 dark:hover:text-green-400 transition-colors">
+            {place.title}
+          </h4>
+
+          {/* Rating */}
+          {place.rating && (
+            <div className="flex items-center gap-1 mt-1">
+              <span className="text-yellow-500">★</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">
+                {place.rating}
+                {place.reviews_count && (
+                  <span className="text-gray-400 dark:text-gray-500">
+                    {' '}
+                    ({place.reviews_count.toLocaleString()})
+                  </span>
+                )}
+              </span>
+              {place.price_level && (
+                <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+                  {place.price_level}
+                </span>
+              )}
+            </div>
           )}
+
+          {/* Address */}
+          {place.address && (
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
+              📍 {place.address}
+            </p>
+          )}
+        </div>
+      </Link>
+
+      {/* Actions - outside the link */}
+      <div className="px-4 pb-4">
+        <div className="flex gap-2">
+          <Link
+            href={`/places/${place.data_cid}`}
+            className="text-xs px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 transition-colors"
+          >
+            View Details
+          </Link>
           {place.phone && (
             <a
               href={`tel:${place.phone}`}
@@ -328,13 +332,14 @@ export function NearbyPlacesCompact({ parkCode, limit = 5 }) {
       {places.map((place) => {
         const config = CATEGORY_CONFIG[place.category];
         return (
-          <div
+          <Link
             key={place.id || place.data_cid}
-            className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+            href={`/places/${place.data_cid}`}
+            className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <span className="text-lg">{config?.icon || '📍'}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+              <p className="text-sm font-medium text-gray-900 dark:text-white truncate hover:text-green-600 dark:hover:text-green-400">
                 {place.title}
               </p>
               {place.rating && (
@@ -343,7 +348,7 @@ export function NearbyPlacesCompact({ parkCode, limit = 5 }) {
                 </p>
               )}
             </div>
-          </div>
+          </Link>
         );
       })}
     </div>

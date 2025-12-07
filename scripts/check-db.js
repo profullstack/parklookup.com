@@ -58,15 +58,24 @@ async function checkTables() {
   const { data: locations, error: locError } = await supabase.from('nps_park_locations').select('id').limit(1);
   console.log('nps_park_locations:', locError ? `Error: ${locError.message}` : `OK (${locations?.length || 0} sample)`);
 
+  // Check nearby_places table
+  const { data: nearbyPlaces, error: nearbyError } = await supabase.from('nearby_places').select('id, title, data_cid').limit(3);
+  console.log('nearby_places:', nearbyError ? `Error: ${nearbyError.message}` : `OK (${nearbyPlaces?.length || 0} sample)`);
+  if (nearbyPlaces && nearbyPlaces.length > 0) {
+    console.log('  Sample places:', nearbyPlaces.map((p) => p.title).join(', '));
+  }
+
   // Count total parks
   const { count: npsCount } = await supabase.from('nps_parks').select('*', { count: 'exact', head: true });
   const { count: wikiCount } = await supabase.from('wikidata_parks').select('*', { count: 'exact', head: true });
   const { count: statesCount } = await supabase.from('states').select('*', { count: 'exact', head: true });
+  const { count: nearbyCount } = await supabase.from('nearby_places').select('*', { count: 'exact', head: true });
 
   console.log('\nCounts:');
   console.log('  NPS Parks:', npsCount ?? 'N/A');
   console.log('  Wikidata Parks:', wikiCount ?? 'N/A');
   console.log('  States:', statesCount ?? 'N/A');
+  console.log('  Nearby Places:', nearbyCount ?? 'N/A');
 }
 
 checkTables().catch(console.error);
