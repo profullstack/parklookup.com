@@ -257,16 +257,46 @@ describe('Wikidata SPARQL Fetcher', () => {
     });
   });
 
+  describe('PARK_TYPES', () => {
+    it('should export park type constants', async () => {
+      const { PARK_TYPES } = await import('@/lib/api/wikidata.js');
+
+      expect(PARK_TYPES.NATIONAL_PARK).toBe('Q46169');
+      expect(PARK_TYPES.STATE_PARK).toBe('Q15243209');
+    });
+  });
+
   describe('buildSparqlQuery', () => {
-    it('should build a valid SPARQL query with limit and offset', async () => {
+    it('should build a valid SPARQL query with limit and offset (defaults to " State " name filter)', async () => {
       const { buildSparqlQuery } = await import('@/lib/api/wikidata.js');
 
       const query = buildSparqlQuery({ limit: 50, offset: 100 });
 
       expect(query).toContain('LIMIT 50');
       expect(query).toContain('OFFSET 100');
-      expect(query).toContain('wdt:P31 wd:Q46169'); // Instance of national park
+      expect(query).toContain('REGEX(?parkLabel, " State ", "i")'); // Name-based filter with spaces
+      expect(query).toContain('wd:Q22698'); // Park base class
       expect(query).toContain('wdt:P17 wd:Q30'); // Country: USA
+    });
+
+    it('should allow custom name filters', async () => {
+      const { buildSparqlQuery } = await import('@/lib/api/wikidata.js');
+
+      const query = buildSparqlQuery({
+        limit: 50,
+        offset: 0,
+        nameFilter: 'National Park',
+      });
+
+      expect(query).toContain('REGEX(?parkLabel, "National Park", "i")');
+    });
+
+    it('should use " State " as default name filter to match State Park, State Beach, etc.', async () => {
+      const { buildSparqlQuery } = await import('@/lib/api/wikidata.js');
+
+      const query = buildSparqlQuery({ limit: 50, offset: 0 });
+
+      expect(query).toContain(' State '); // Spaces around "State" to avoid matching "Interstate"
     });
   });
 });

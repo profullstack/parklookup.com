@@ -69,6 +69,35 @@ const logImport = async (supabase, status, metadata = {}) => {
 };
 
 /**
+ * Deduplicates parks by wikidata_id, keeping the first occurrence with the most data
+ * @param {Array} parks - Array of park objects
+ * @returns {Array} Deduplicated array of parks
+ */
+const deduplicateParks = (parks) => {
+  const parkMap = new Map();
+
+  for (const park of parks) {
+    if (!park.wikidata_id) continue;
+
+    const existing = parkMap.get(park.wikidata_id);
+    if (!existing) {
+      parkMap.set(park.wikidata_id, park);
+    } else {
+      // Merge data, preferring non-null values
+      const merged = { ...existing };
+      for (const [key, value] of Object.entries(park)) {
+        if (value !== null && value !== undefined && merged[key] === null) {
+          merged[key] = value;
+        }
+      }
+      parkMap.set(park.wikidata_id, merged);
+    }
+  }
+
+  return Array.from(parkMap.values());
+};
+
+/**
  * Upserts parks into the database
  */
 const upsertParks = async (supabase, parks) => {
@@ -78,10 +107,14 @@ const upsertParks = async (supabase, parks) => {
     errors: [],
   };
 
+  // Deduplicate parks before upserting
+  const uniqueParks = deduplicateParks(parks);
+  console.log(`   Deduplicated ${parks.length} parks to ${uniqueParks.length} unique parks`);
+
   // Process in batches of 50
   const batchSize = 50;
-  for (let i = 0; i < parks.length; i += batchSize) {
-    const batch = parks.slice(i, i + batchSize);
+  for (let i = 0; i < uniqueParks.length; i += batchSize) {
+    const batch = uniqueParks.slice(i, i + batchSize);
 
     const { data, error } = await supabase
       .from('wikidata_parks')

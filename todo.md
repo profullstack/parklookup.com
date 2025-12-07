@@ -28,7 +28,7 @@
 ### Data Import
 - [ ] Deploy Edge Functions to Supabase: `pnpx supabase functions deploy`
 - [ ] Import NPS park data (call import-nps Edge Function)
-- [ ] Import Wikidata park data (call import-wikidata Edge Function)
+- [x] Import Wikidata state parks data (4,240 parks imported via `node scripts/import-wikidata.js`)
 - [ ] Run park linking algorithm (call link-parks Edge Function)
 - [ ] Verify data integrity in Supabase dashboard
 
@@ -72,13 +72,13 @@
 - [ ] Implement structured data (JSON-LD) for parks
 
 ### Deployment
-- [ ] Create Railway project
-- [ ] Configure environment variables in Railway
-- [ ] Deploy to Railway staging environment
-- [ ] Test staging deployment
-- [ ] Configure custom domain (parklookup.com)
-- [ ] Set up SSL certificate
-- [ ] Deploy to production
+- [x] Create Railway project
+- [x] Configure environment variables in Railway
+- [x] Deploy to Railway staging environment
+- [x] Test staging deployment
+- [x] Configure custom domain (parklookup.com)
+- [x] Set up SSL certificate
+- [x] Deploy to production
 
 ### Post-Launch
 - [ ] Set up monitoring/error tracking (Sentry, etc.)
