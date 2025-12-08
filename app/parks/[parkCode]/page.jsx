@@ -10,6 +10,7 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import WeatherForecast from '@/components/weather/WeatherForecast';
 import { ProductCarousel } from '@/components/products/ProductCard';
 import NearbyPlaces from '@/components/parks/NearbyPlaces';
+import ParkReviews from '@/components/parks/ParkReviews';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -236,7 +237,7 @@ export default function ParkDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Tabs */}
         <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 mb-6 -mx-4 px-4">
-          {['overview', 'map', 'activities', 'info'].map((tab) => (
+          {['overview', 'map', 'activities', 'reviews', 'info'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -469,6 +470,16 @@ export default function ParkDetailPage() {
               </p>
               <NearbyPlaces parkCode={parkCode} />
             </div>
+          </div>
+        )}
+
+        {/* Reviews Tab */}
+        {activeTab === 'reviews' && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Reviews & Ratings
+            </h2>
+            <ParkReviews parkCode={parkCode} />
           </div>
         )}
 
