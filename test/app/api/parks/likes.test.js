@@ -5,17 +5,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock next/headers
+vi.mock('next/headers', () => ({
+  headers: vi.fn(),
+}));
+
 // Mock the modules
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/auth', () => ({
-  getSession: vi.fn(),
-}));
-
+import { headers } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getSession } from '@/lib/auth/auth';
 import { GET, POST, DELETE } from '@/app/api/parks/[parkCode]/likes/route';
 
 describe('Park Likes API', () => {
@@ -23,10 +24,41 @@ describe('Park Likes API', () => {
     vi.clearAllMocks();
   });
 
+  /**
+   * Helper to setup authenticated mock
+   */
+  const setupAuthenticatedMock = (mockSupabase, mockUser) => {
+    // Mock headers to return authorization
+    headers.mockResolvedValue({
+      get: vi.fn((name) => {
+        if (name === 'authorization') {
+          return `Bearer test-token`;
+        }
+        return null;
+      }),
+    });
+
+    // Mock auth.getUser to return the user
+    mockSupabase.auth = {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      }),
+    };
+  };
+
+  /**
+   * Helper to setup unauthenticated mock
+   */
+  const setupUnauthenticatedMock = () => {
+    headers.mockResolvedValue({
+      get: vi.fn(() => null),
+    });
+  };
+
   describe('GET /api/parks/[parkCode]/likes', () => {
     it('should return likes count and user status when authenticated', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -34,6 +66,8 @@ describe('Park Likes API', () => {
         eq: vi.fn().mockReturnThis(),
         single: vi.fn(),
       };
+
+      setupAuthenticatedMock(mockSupabase, mockUser);
 
       // First call for park lookup
       mockSupabase.single.mockResolvedValueOnce({
@@ -57,7 +91,7 @@ describe('Park Likes API', () => {
         return mockSupabase;
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/likes');
       const response = await GET(request, { params: Promise.resolve({ parkCode: 'yose' }) });
@@ -69,7 +103,7 @@ describe('Park Likes API', () => {
     });
 
     it('should return likes count without user status when not authenticated', async () => {
-      getSession.mockResolvedValue(null);
+      setupUnauthenticatedMock();
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -91,7 +125,7 @@ describe('Park Likes API', () => {
         return mockSupabase;
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/likes');
       const response = await GET(request, { params: Promise.resolve({ parkCode: 'yose' }) });
@@ -102,7 +136,7 @@ describe('Park Likes API', () => {
     });
 
     it('should return 404 for non-existent park', async () => {
-      getSession.mockResolvedValue(null);
+      setupUnauthenticatedMock();
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -114,7 +148,7 @@ describe('Park Likes API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/invalid/likes');
       const response = await GET(request, { params: Promise.resolve({ parkCode: 'invalid' }) });
@@ -126,7 +160,6 @@ describe('Park Likes API', () => {
   describe('POST /api/parks/[parkCode]/likes', () => {
     it('should add a like when authenticated', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -139,6 +172,8 @@ describe('Park Likes API', () => {
         upsert: vi.fn().mockResolvedValue({ error: null }),
       };
 
+      setupAuthenticatedMock(mockSupabase, mockUser);
+
       // Override select for count after upsert
       mockSupabase.select.mockImplementation((query, options) => {
         if (options?.count === 'exact') {
@@ -149,7 +184,7 @@ describe('Park Likes API', () => {
         return mockSupabase;
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/likes', {
         method: 'POST',
@@ -163,7 +198,7 @@ describe('Park Likes API', () => {
     });
 
     it('should return 401 when not authenticated', async () => {
-      getSession.mockResolvedValue(null);
+      setupUnauthenticatedMock();
 
       const request = new Request('http://localhost/api/parks/yose/likes', {
         method: 'POST',
@@ -176,7 +211,6 @@ describe('Park Likes API', () => {
 
     it('should return 404 for non-existent park', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -188,7 +222,8 @@ describe('Park Likes API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      setupAuthenticatedMock(mockSupabase, mockUser);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/invalid/likes', {
         method: 'POST',
@@ -201,7 +236,6 @@ describe('Park Likes API', () => {
 
     it('should handle duplicate likes gracefully (upsert)', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -214,6 +248,8 @@ describe('Park Likes API', () => {
         upsert: vi.fn().mockResolvedValue({ error: null }),
       };
 
+      setupAuthenticatedMock(mockSupabase, mockUser);
+
       mockSupabase.select.mockImplementation((query, options) => {
         if (options?.count === 'exact') {
           return {
@@ -223,7 +259,7 @@ describe('Park Likes API', () => {
         return mockSupabase;
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/likes', {
         method: 'POST',
@@ -239,7 +275,6 @@ describe('Park Likes API', () => {
   describe('DELETE /api/parks/[parkCode]/likes', () => {
     it('should remove a like when authenticated', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -251,6 +286,8 @@ describe('Park Likes API', () => {
         }),
         delete: vi.fn().mockReturnThis(),
       };
+
+      setupAuthenticatedMock(mockSupabase, mockUser);
 
       mockSupabase.delete.mockReturnValue({
         eq: vi.fn().mockReturnValue({
@@ -267,7 +304,7 @@ describe('Park Likes API', () => {
         return mockSupabase;
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/likes', {
         method: 'DELETE',
@@ -281,7 +318,7 @@ describe('Park Likes API', () => {
     });
 
     it('should return 401 when not authenticated', async () => {
-      getSession.mockResolvedValue(null);
+      setupUnauthenticatedMock();
 
       const request = new Request('http://localhost/api/parks/yose/likes', {
         method: 'DELETE',
@@ -294,7 +331,6 @@ describe('Park Likes API', () => {
 
     it('should return 404 for non-existent park', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -306,7 +342,8 @@ describe('Park Likes API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      setupAuthenticatedMock(mockSupabase, mockUser);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/invalid/likes', {
         method: 'DELETE',

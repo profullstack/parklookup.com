@@ -5,17 +5,18 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+// Mock next/headers
+vi.mock('next/headers', () => ({
+  headers: vi.fn(),
+}));
+
 // Mock the modules
 vi.mock('@/lib/supabase/server', () => ({
   createServiceClient: vi.fn(),
 }));
 
-vi.mock('@/lib/auth/auth', () => ({
-  getSession: vi.fn(),
-}));
-
+import { headers } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getSession } from '@/lib/auth/auth';
 import { GET, POST } from '@/app/api/parks/[parkCode]/comments/route';
 import {
   PUT,
@@ -26,6 +27,38 @@ describe('Park Comments API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  /**
+   * Helper to setup authenticated mock
+   */
+  const setupAuthenticatedMock = (mockSupabase, mockUser) => {
+    // Mock headers to return authorization
+    headers.mockResolvedValue({
+      get: vi.fn((name) => {
+        if (name === 'authorization') {
+          return `Bearer test-token`;
+        }
+        return null;
+      }),
+    });
+
+    // Mock auth.getUser to return the user
+    mockSupabase.auth = {
+      getUser: vi.fn().mockResolvedValue({
+        data: { user: mockUser },
+        error: null,
+      }),
+    };
+  };
+
+  /**
+   * Helper to setup unauthenticated mock
+   */
+  const setupUnauthenticatedMock = () => {
+    headers.mockResolvedValue({
+      get: vi.fn(() => null),
+    });
+  };
 
   describe('GET /api/parks/[parkCode]/comments', () => {
     it('should return comments for a valid park', async () => {
@@ -62,7 +95,7 @@ describe('Park Comments API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/comments');
       const response = await GET(request, { params: Promise.resolve({ parkCode: 'yose' }) });
@@ -84,7 +117,7 @@ describe('Park Comments API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/invalid/comments');
       const response = await GET(request, { params: Promise.resolve({ parkCode: 'invalid' }) });
@@ -107,7 +140,7 @@ describe('Park Comments API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/comments');
       const response = await GET(request, { params: Promise.resolve({ parkCode: 'yose' }) });
@@ -121,7 +154,6 @@ describe('Park Comments API', () => {
   describe('POST /api/parks/[parkCode]/comments', () => {
     it('should create a comment when authenticated', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockComment = {
         id: 'new-comment',
@@ -143,6 +175,8 @@ describe('Park Comments API', () => {
         insert: vi.fn().mockReturnThis(),
       };
 
+      setupAuthenticatedMock(mockSupabase, mockUser);
+
       // Override select after insert
       mockSupabase.insert.mockReturnValue({
         select: vi.fn().mockReturnValue({
@@ -153,7 +187,7 @@ describe('Park Comments API', () => {
         }),
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/comments', {
         method: 'POST',
@@ -170,7 +204,7 @@ describe('Park Comments API', () => {
     });
 
     it('should return 401 when not authenticated', async () => {
-      getSession.mockResolvedValue(null);
+      setupUnauthenticatedMock();
 
       const request = new Request('http://localhost/api/parks/yose/comments', {
         method: 'POST',
@@ -185,7 +219,9 @@ describe('Park Comments API', () => {
 
     it('should return 400 when content is empty', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
+      const mockSupabase = {};
+      setupAuthenticatedMock(mockSupabase, mockUser);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/comments', {
         method: 'POST',
@@ -200,7 +236,9 @@ describe('Park Comments API', () => {
 
     it('should return 400 when rating is invalid', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
+      const mockSupabase = {};
+      setupAuthenticatedMock(mockSupabase, mockUser);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/comments', {
         method: 'POST',
@@ -215,7 +253,6 @@ describe('Park Comments API', () => {
 
     it('should allow comment without rating', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockComment = {
         id: 'new-comment',
@@ -237,6 +274,8 @@ describe('Park Comments API', () => {
         insert: vi.fn().mockReturnThis(),
       };
 
+      setupAuthenticatedMock(mockSupabase, mockUser);
+
       mockSupabase.insert.mockReturnValue({
         select: vi.fn().mockReturnValue({
           single: vi.fn().mockResolvedValue({
@@ -246,7 +285,7 @@ describe('Park Comments API', () => {
         }),
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request('http://localhost/api/parks/yose/comments', {
         method: 'POST',
@@ -265,7 +304,6 @@ describe('Park Comments API', () => {
   describe('PUT /api/parks/[parkCode]/comments/[commentId]', () => {
     it('should update own comment', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const existingComment = {
         id: 'comment-1',
@@ -292,6 +330,8 @@ describe('Park Comments API', () => {
         update: vi.fn().mockReturnThis(),
       };
 
+      setupAuthenticatedMock(mockSupabase, mockUser);
+
       mockSupabase.update.mockReturnValue({
         eq: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
@@ -303,7 +343,7 @@ describe('Park Comments API', () => {
         }),
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request(
         'http://localhost/api/parks/yose/comments/comment-1',
@@ -326,7 +366,6 @@ describe('Park Comments API', () => {
 
     it('should return 403 when updating another users comment', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const existingComment = {
         id: 'comment-1',
@@ -346,7 +385,8 @@ describe('Park Comments API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      setupAuthenticatedMock(mockSupabase, mockUser);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request(
         'http://localhost/api/parks/yose/comments/comment-1',
@@ -366,7 +406,6 @@ describe('Park Comments API', () => {
 
     it('should return 404 for non-existent comment', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
@@ -378,7 +417,8 @@ describe('Park Comments API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      setupAuthenticatedMock(mockSupabase, mockUser);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request(
         'http://localhost/api/parks/yose/comments/invalid',
@@ -400,7 +440,6 @@ describe('Park Comments API', () => {
   describe('DELETE /api/parks/[parkCode]/comments/[commentId]', () => {
     it('should delete own comment', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const existingComment = {
         id: 'comment-1',
@@ -420,11 +459,13 @@ describe('Park Comments API', () => {
         delete: vi.fn().mockReturnThis(),
       };
 
+      setupAuthenticatedMock(mockSupabase, mockUser);
+
       mockSupabase.delete.mockReturnValue({
         eq: vi.fn().mockResolvedValue({ error: null }),
       });
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request(
         'http://localhost/api/parks/yose/comments/comment-1',
@@ -442,7 +483,6 @@ describe('Park Comments API', () => {
 
     it('should return 403 when deleting another users comment', async () => {
       const mockUser = { id: 'user-123', email: 'test@example.com' };
-      getSession.mockResolvedValue({ user: mockUser });
 
       const existingComment = {
         id: 'comment-1',
@@ -461,7 +501,8 @@ describe('Park Comments API', () => {
         }),
       };
 
-      createServiceClient.mockResolvedValue(mockSupabase);
+      setupAuthenticatedMock(mockSupabase, mockUser);
+      createServiceClient.mockReturnValue(mockSupabase);
 
       const request = new Request(
         'http://localhost/api/parks/yose/comments/comment-1',
@@ -476,7 +517,7 @@ describe('Park Comments API', () => {
     });
 
     it('should return 401 when not authenticated', async () => {
-      getSession.mockResolvedValue(null);
+      setupUnauthenticatedMock();
 
       const request = new Request(
         'http://localhost/api/parks/yose/comments/comment-1',

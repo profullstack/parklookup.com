@@ -1,6 +1,36 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
-import { getSession } from '@/lib/auth/auth';
+import { headers } from 'next/headers';
+
+/**
+ * Get user from Authorization header
+ * @param {Request} request - The request object
+ * @returns {Promise<Object|null>} User object or null
+ */
+async function getUserFromRequest(request) {
+  try {
+    const headersList = await headers();
+    const authorization = headersList.get('authorization');
+    
+    if (!authorization?.startsWith('Bearer ')) {
+      return null;
+    }
+    
+    const token = authorization.replace('Bearer ', '');
+    const supabase = createServiceClient();
+    
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+    
+    if (error || !user) {
+      return null;
+    }
+    
+    return user;
+  } catch (error) {
+    console.error('Error getting user from request:', error);
+    return null;
+  }
+}
 
 /**
  * PUT /api/parks/[parkCode]/comments/[commentId]
@@ -8,8 +38,8 @@ import { getSession } from '@/lib/auth/auth';
  */
 export async function PUT(request, { params }) {
   try {
-    const session = await getSession();
-    if (!session?.user) {
+    const user = await getUserFromRequest(request);
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -24,7 +54,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Rating must be between 1 and 5' }, { status: 400 });
     }
 
-    const supabase = await createServiceClient();
+    const supabase = createServiceClient();
 
     // Check if the comment exists and belongs to the user
     const { data: existingComment, error: fetchError } = await supabase
@@ -37,7 +67,7 @@ export async function PUT(request, { params }) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    if (existingComment.user_id !== session.user.id) {
+    if (existingComment.user_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -71,13 +101,13 @@ export async function PUT(request, { params }) {
  */
 export async function DELETE(request, { params }) {
   try {
-    const session = await getSession();
-    if (!session?.user) {
+    const user = await getUserFromRequest(request);
+    if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { commentId } = await params;
-    const supabase = await createServiceClient();
+    const supabase = createServiceClient();
 
     // Check if the comment exists and belongs to the user
     const { data: existingComment, error: fetchError } = await supabase
@@ -90,7 +120,7 @@ export async function DELETE(request, { params }) {
       return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
     }
 
-    if (existingComment.user_id !== session.user.id) {
+    if (existingComment.user_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

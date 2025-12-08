@@ -3,6 +3,32 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
+// Storage key for auth token (must match useAuth.js)
+const AUTH_TOKEN_KEY = 'parklookup_auth_token';
+
+/**
+ * Get stored token from localStorage
+ */
+const getStoredToken = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Get authorization headers for API requests
+ */
+const getAuthHeaders = () => {
+  const token = getStoredToken();
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
+  }
+  return {};
+};
+
 /**
  * Comment component for displaying individual reviews
  */
@@ -182,16 +208,21 @@ export default function ParkReviews({ parkCode }) {
     const fetchData = async () => {
       try {
         setLoading(true);
+        const authHeaders = getAuthHeaders();
 
         // Fetch comments
-        const commentsRes = await fetch(`/api/parks/${parkCode}/comments`);
+        const commentsRes = await fetch(`/api/parks/${parkCode}/comments`, {
+          headers: authHeaders,
+        });
         if (commentsRes.ok) {
           const commentsData = await commentsRes.json();
           setComments(commentsData.comments || []);
         }
 
         // Fetch likes status
-        const likesRes = await fetch(`/api/parks/${parkCode}/likes`);
+        const likesRes = await fetch(`/api/parks/${parkCode}/likes`, {
+          headers: authHeaders,
+        });
         if (likesRes.ok) {
           const likesData = await likesRes.json();
           setLikesCount(likesData.likes_count || 0);
@@ -219,7 +250,10 @@ export default function ParkReviews({ parkCode }) {
     try {
       setIsTogglingLike(true);
       const method = userHasLiked ? 'DELETE' : 'POST';
-      const res = await fetch(`/api/parks/${parkCode}/likes`, { method });
+      const res = await fetch(`/api/parks/${parkCode}/likes`, {
+        method,
+        headers: getAuthHeaders(),
+      });
 
       if (res.ok) {
         const data = await res.json();
@@ -244,13 +278,20 @@ export default function ParkReviews({ parkCode }) {
       setIsSubmittingComment(true);
       const res = await fetch(`/api/parks/${parkCode}/comments`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({ content, rating }),
       });
 
       if (res.ok) {
         const data = await res.json();
         setComments([data.comment, ...comments]);
+      } else {
+        const errorData = await res.json();
+        console.error('Error posting comment:', errorData);
+        alert(errorData.error || 'Failed to post review');
       }
     } catch (err) {
       console.error('Error posting comment:', err);
@@ -264,7 +305,10 @@ export default function ParkReviews({ parkCode }) {
     try {
       const res = await fetch(`/api/parks/${parkCode}/comments/${commentId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
         body: JSON.stringify({ content, rating }),
       });
 
@@ -284,6 +328,7 @@ export default function ParkReviews({ parkCode }) {
     try {
       const res = await fetch(`/api/parks/${parkCode}/comments/${commentId}`, {
         method: 'DELETE',
+        headers: getAuthHeaders(),
       });
 
       if (res.ok) {
