@@ -279,10 +279,17 @@ describe('Favorites API Routes', () => {
       it('should add a favorite successfully', async () => {
         vi.resetModules();
 
-        mockSupabaseClient.single.mockResolvedValue({
-          data: mockFavorite,
-          error: null,
-        });
+        // First call: determineParkSource checks nps_parks - found
+        // Second call: insert favorite
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: 'park-uuid-456' },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: mockFavorite,
+            error: null,
+          });
 
         const { POST } = await import('@/app/api/favorites/route.js');
 
@@ -305,10 +312,17 @@ describe('Favorites API Routes', () => {
       it('should add a favorite with notes', async () => {
         vi.resetModules();
 
-        mockSupabaseClient.single.mockResolvedValue({
-          data: { ...mockFavorite, notes: 'My notes' },
-          error: null,
-        });
+        // First call: determineParkSource checks nps_parks - found
+        // Second call: insert favorite
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: 'park-uuid-456' },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: { ...mockFavorite, notes: 'My notes' },
+            error: null,
+          });
 
         const { POST } = await import('@/app/api/favorites/route.js');
 
@@ -326,6 +340,40 @@ describe('Favorites API Routes', () => {
 
         expect(response.status).toBe(201);
         expect(data.favorite).toBeDefined();
+      });
+
+      it('should add a wikidata park favorite when source is provided', async () => {
+        vi.resetModules();
+
+        const wikidataFavorite = {
+          ...mockFavorite,
+          nps_park_id: null,
+          wikidata_park_id: 'wikidata-uuid-123',
+        };
+
+        // When source is provided, no determineParkSource call
+        mockSupabaseClient.single.mockResolvedValue({
+          data: wikidataFavorite,
+          error: null,
+        });
+
+        const { POST } = await import('@/app/api/favorites/route.js');
+
+        const request = new Request('http://localhost:3000/api/favorites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ parkId: 'wikidata-uuid-123', source: 'wikidata' }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(201);
+        expect(data.favorite).toBeDefined();
+        expect(data.source).toBe('wikidata');
       });
 
       it('should return 400 when parkId is missing', async () => {
@@ -351,10 +399,17 @@ describe('Favorites API Routes', () => {
       it('should return 409 when park is already in favorites', async () => {
         vi.resetModules();
 
-        mockSupabaseClient.single.mockResolvedValue({
-          data: null,
-          error: { code: '23505', message: 'Duplicate key' },
-        });
+        // First call: determineParkSource checks nps_parks - found
+        // Second call: insert fails with duplicate
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: 'park-uuid-456' },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: '23505', message: 'Duplicate key' },
+          });
 
         const { POST } = await import('@/app/api/favorites/route.js');
 
@@ -373,16 +428,56 @@ describe('Favorites API Routes', () => {
         expect(response.status).toBe(409);
         expect(data.error).toBe('Park already in favorites');
       });
+
+      it('should return 404 when park not found in either table', async () => {
+        vi.resetModules();
+
+        // First call: determineParkSource checks nps_parks - not found
+        // Second call: determineParkSource checks wikidata_parks - not found
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: 'PGRST116', message: 'Not found' },
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: 'PGRST116', message: 'Not found' },
+          });
+
+        const { POST } = await import('@/app/api/favorites/route.js');
+
+        const request = new Request('http://localhost:3000/api/favorites', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ parkId: 'nonexistent-park' }),
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(404);
+        expect(data.error).toBe('Park not found');
+      });
     });
 
     describe('Error Handling', () => {
       it('should return 500 when database insert fails', async () => {
         vi.resetModules();
 
-        mockSupabaseClient.single.mockResolvedValue({
-          data: null,
-          error: { code: 'OTHER', message: 'Database error' },
-        });
+        // First call: determineParkSource checks nps_parks - found
+        // Second call: insert fails with generic error
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: 'park-uuid-456' },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: 'OTHER', message: 'Database error' },
+          });
 
         const { POST } = await import('@/app/api/favorites/route.js');
 

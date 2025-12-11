@@ -3,6 +3,8 @@
  * GET /api/favorites/[id] - Get a single favorite
  * PATCH /api/favorites/[id] - Update a favorite
  * DELETE /api/favorites/[id] - Delete a favorite
+ *
+ * Supports both NPS parks (nps_park_id) and Wikidata/state parks (wikidata_park_id)
  */
 
 import { NextResponse } from 'next/server';
@@ -54,6 +56,7 @@ export async function GET(request, { params }) {
         id,
         user_id,
         nps_park_id,
+        wikidata_park_id,
         notes,
         visited,
         visited_at,
@@ -69,6 +72,16 @@ export async function GET(request, { params }) {
           designation,
           url,
           images
+        ),
+        wikidata_parks (
+          id,
+          wikidata_id,
+          label,
+          state,
+          latitude,
+          longitude,
+          image_url,
+          website
         )
       `
       )
@@ -84,7 +97,42 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Failed to fetch favorite' }, { status: 500 });
     }
 
-    return NextResponse.json({ favorite });
+    // Transform to include park data in a unified format
+    const isNpsPark = favorite.nps_park_id && favorite.nps_parks;
+    const isWikidataPark = favorite.wikidata_park_id && favorite.wikidata_parks;
+    
+    let park = null;
+    let source = null;
+    
+    if (isNpsPark) {
+      park = favorite.nps_parks;
+      source = 'nps';
+    } else if (isWikidataPark) {
+      const wp = favorite.wikidata_parks;
+      park = {
+        id: wp.id,
+        park_code: wp.wikidata_id,
+        full_name: wp.label,
+        description: null,
+        states: wp.state,
+        latitude: wp.latitude,
+        longitude: wp.longitude,
+        designation: 'State Park',
+        url: wp.website,
+        images: wp.image_url ? [{ url: wp.image_url, title: wp.label }] : null,
+      };
+      source = 'wikidata';
+    }
+
+    return NextResponse.json({
+      favorite: {
+        ...favorite,
+        park,
+        source,
+        nps_parks: undefined,
+        wikidata_parks: undefined,
+      }
+    });
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -142,7 +190,10 @@ export async function PATCH(request, { params }) {
 
 /**
  * DELETE handler for removing a favorite
- * The [id] parameter can be either the favorite record ID or the nps_park_id (UUID)
+ * The [id] parameter can be:
+ * - The favorite record ID
+ * - The nps_park_id (UUID)
+ * - The wikidata_park_id (UUID)
  */
 export async function DELETE(request, { params }) {
   try {
@@ -156,18 +207,30 @@ export async function DELETE(request, { params }) {
     const supabase = createServerClient({ useServiceRole: true });
 
     // Try to delete by nps_park_id first (most common case from FavoriteButton)
-    const { data: deletedByParkId, error: parkIdError } = await supabase
+    const { data: deletedByNpsParkId, error: npsError } = await supabase
       .from('favorites')
       .delete()
       .eq('nps_park_id', id)
       .eq('user_id', user.id)
       .select();
 
-    if (!parkIdError && deletedByParkId && deletedByParkId.length > 0) {
+    if (!npsError && deletedByNpsParkId && deletedByNpsParkId.length > 0) {
       return NextResponse.json({ success: true }, { status: 200 });
     }
 
-    // If no rows deleted by nps_park_id, try by favorite record id
+    // Try to delete by wikidata_park_id (for state parks)
+    const { data: deletedByWikidataParkId, error: wikiError } = await supabase
+      .from('favorites')
+      .delete()
+      .eq('wikidata_park_id', id)
+      .eq('user_id', user.id)
+      .select();
+
+    if (!wikiError && deletedByWikidataParkId && deletedByWikidataParkId.length > 0) {
+      return NextResponse.json({ success: true }, { status: 200 });
+    }
+
+    // If no rows deleted by park IDs, try by favorite record id
     const { data: deletedById, error: idError } = await supabase
       .from('favorites')
       .delete()

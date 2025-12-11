@@ -361,7 +361,7 @@ describe('Single Favorite API Routes', () => {
         expect(data.success).toBe(true);
       });
 
-      it('should delete favorite by record id when nps_park_id fails', async () => {
+      it('should delete favorite by wikidata_park_id when nps_park_id fails', async () => {
         vi.resetModules();
 
         // First delete by nps_park_id returns empty
@@ -370,7 +370,45 @@ describe('Single Favorite API Routes', () => {
             data: [],
             error: null,
           })
-          // Second delete by id succeeds
+          // Second delete by wikidata_park_id succeeds
+          .mockResolvedValueOnce({
+            data: [mockFavorite],
+            error: null,
+          });
+
+        const { DELETE } = await import('@/app/api/favorites/[id]/route.js');
+
+        const request = new Request('http://localhost:3000/api/favorites/wikidata-uuid-123', {
+          method: 'DELETE',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await DELETE(request, {
+          params: Promise.resolve({ id: 'wikidata-uuid-123' }),
+        });
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.success).toBe(true);
+      });
+
+      it('should delete favorite by record id when both park_id lookups fail', async () => {
+        vi.resetModules();
+
+        // First delete by nps_park_id returns empty
+        mockSupabaseClient.select
+          .mockResolvedValueOnce({
+            data: [],
+            error: null,
+          })
+          // Second delete by wikidata_park_id returns empty
+          .mockResolvedValueOnce({
+            data: [],
+            error: null,
+          })
+          // Third delete by id succeeds
           .mockResolvedValueOnce({
             data: [mockFavorite],
             error: null,
@@ -397,8 +435,12 @@ describe('Single Favorite API Routes', () => {
       it('should return 404 when favorite not found', async () => {
         vi.resetModules();
 
-        // Both delete attempts return empty
+        // All three delete attempts return empty
         mockSupabaseClient.select
+          .mockResolvedValueOnce({
+            data: [],
+            error: null,
+          })
           .mockResolvedValueOnce({
             data: [],
             error: null,
@@ -433,7 +475,12 @@ describe('Single Favorite API Routes', () => {
             data: [],
             error: null,
           })
-          // Second delete by id fails
+          // Second delete by wikidata_park_id returns empty
+          .mockResolvedValueOnce({
+            data: [],
+            error: null,
+          })
+          // Third delete by id fails with error
           .mockResolvedValueOnce({
             data: null,
             error: { message: 'Database error' },
