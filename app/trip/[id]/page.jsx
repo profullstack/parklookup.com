@@ -29,7 +29,7 @@ export default function TripDetailPage() {
    * Fetch trip data
    */
   const fetchTrip = useCallback(async () => {
-    if (!session?.access_token || !id) return;
+    if (!session?.access_token || !id) {return;}
 
     try {
       setLoading(true);
@@ -45,7 +45,7 @@ export default function TripDetailPage() {
         if (response.status === 404) {
           setError({ message: 'Trip not found' });
         } else if (response.status === 401) {
-          router.push('/signin?redirect=/trip/' + id);
+          router.push(`/signin?redirect=/trip/${  id}`);
         } else {
           const data = await response.json();
           setError({ message: data.error || 'Failed to load trip' });
@@ -92,7 +92,7 @@ export default function TripDetailPage() {
    * Handle delete trip
    */
   const handleDelete = useCallback(async () => {
-    if (!session?.access_token || !id) return;
+    if (!session?.access_token || !id) {return;}
 
     try {
       setIsDeleting(true);

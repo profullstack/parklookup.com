@@ -45,10 +45,10 @@ function buildSparqlQuery({ limit = 50, offset = 0 }) {
  * Parse coordinates from Wikidata Point format
  */
 function parseCoordinates(coordString) {
-  if (!coordString) return null;
+  if (!coordString) {return null;}
 
   const match = coordString.match(/Point\(([^ ]+) ([^)]+)\)/);
-  if (!match) return null;
+  if (!match) {return null;}
 
   return {
     longitude: parseFloat(match[1]),
@@ -60,7 +60,7 @@ function parseCoordinates(coordString) {
  * Extract Wikidata ID from URI
  */
 function extractWikidataId(uri) {
-  if (!uri) return null;
+  if (!uri) {return null;}
   const match = uri.match(/Q\d+$/);
   return match ? match[0] : null;
 }

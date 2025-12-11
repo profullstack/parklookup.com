@@ -38,8 +38,8 @@ function SearchContent() {
 
       try {
         const params = new URLSearchParams();
-        if (query) params.set('q', query);
-        if (state) params.set('state', state);
+        if (query) {params.set('q', query);}
+        if (state) {params.set('state', state);}
         params.set('limit', limit.toString());
         params.set('offset', ((pageNum - 1) * limit).toString());
 
@@ -82,8 +82,8 @@ function SearchContent() {
   // Handle search submission
   const handleSearch = (searchQuery, searchState) => {
     const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (searchState) params.set('state', searchState);
+    if (searchQuery) {params.set('q', searchQuery);}
+    if (searchState) {params.set('state', searchState);}
     router.push(`/search?${params.toString()}`);
   };
 

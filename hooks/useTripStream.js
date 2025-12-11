@@ -165,7 +165,7 @@ export function useTripStream() {
           }
 
           const parsed = parseSSELine(trimmedLine);
-          if (!parsed) continue;
+          if (!parsed) {continue;}
 
           if (parsed.type === 'event') {
             currentEvent = parsed.value;

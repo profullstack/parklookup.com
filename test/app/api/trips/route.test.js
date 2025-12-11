@@ -1334,7 +1334,7 @@ describe('Nearby Places', () => {
       };
       
       nearbyPlacesData.forEach(item => {
-        if (!item.nearby_places) return;
+        if (!item.nearby_places) {return;}
         const category = item.nearby_places.category?.toLowerCase() || 'attractions';
         if (nearbyPlacesMap[category]) {
           nearbyPlacesMap[category].push(item.nearby_places);
@@ -1396,7 +1396,7 @@ describe('Nearby Places', () => {
       
       const transformed = {
         ...rawPlace,
-        distanceMiles: distanceMiles,
+        distanceMiles,
       };
       
       expect(transformed.title).toBe('Great Restaurant');

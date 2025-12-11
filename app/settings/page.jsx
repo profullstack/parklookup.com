@@ -35,10 +35,15 @@ export default function SettingsPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
+  // eslint-disable-next-line no-undef
+  const showAlert = (message) => window.alert(message);
+  // eslint-disable-next-line no-undef
+  const showConfirm = (message) => window.confirm(message);
+
   // Fetch profile
   useEffect(() => {
     const fetchProfile = async () => {
-      if (!user) return;
+      if (!user) {return;}
 
       try {
         const response = await fetch('/api/profile');
@@ -181,7 +186,7 @@ export default function SettingsPage() {
                       type="button"
                       onClick={() => {
                         // TODO: Implement upgrade flow
-                        alert('Upgrade functionality coming soon!');
+                        showAlert('Upgrade functionality coming soon!');
                       }}
                       className="bg-gradient-to-r from-green-600 to-green-700"
                     >
@@ -306,12 +311,12 @@ export default function SettingsPage() {
                   className="text-red-600 border-red-300 hover:bg-red-50"
                   onClick={() => {
                     if (
-                      confirm(
+                      showConfirm(
                         'Are you sure you want to delete your account? This action cannot be undone.'
                       )
                     ) {
                       // TODO: Implement account deletion
-                      alert('Account deletion coming soon. Please contact support.');
+                      showAlert('Account deletion coming soon. Please contact support.');
                     }
                   }}
                 >

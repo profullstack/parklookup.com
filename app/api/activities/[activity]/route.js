@@ -66,7 +66,7 @@ export async function GET(request, { params }) {
       }
       
       return park.activities.some(act => {
-        if (!act || !act.name) return false;
+        if (!act || !act.name) {return false;}
         const actSlug = activityToSlug(act.name);
         return actSlug === activitySlug;
       });

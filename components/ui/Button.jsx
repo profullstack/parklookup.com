@@ -21,7 +21,7 @@ const sizes = {
   lg: 'px-6 py-3 text-lg',
 };
 
-const Button = forwardRef(function Button(
+const Button = forwardRef((
   {
     children,
     variant = 'primary',
@@ -33,8 +33,7 @@ const Button = forwardRef(function Button(
     ...props
   },
   ref
-) {
-  return (
+) => (
     <button
       ref={ref}
       type={type}
@@ -75,7 +74,6 @@ const Button = forwardRef(function Button(
       )}
       {children}
     </button>
-  );
-});
+  ));
 
 export default Button;

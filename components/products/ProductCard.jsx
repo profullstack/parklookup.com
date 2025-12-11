@@ -34,7 +34,7 @@ export function ProductCard({ product }) {
 
   // Format price
   const formatPrice = (amount, curr) => {
-    if (!amount) return null;
+    if (!amount) {return null;}
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: curr,
@@ -49,7 +49,7 @@ export function ProductCard({ product }) {
 
   // Render star rating
   const renderStars = (rating) => {
-    if (!rating) return null;
+    if (!rating) {return null;}
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
     const emptyStars = 5 - fullStars - (hasHalfStar ? 1 : 0);

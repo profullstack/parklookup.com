@@ -16,9 +16,16 @@ const mockSupabase = {
   from: vi.fn(),
 };
 
-vi.mock('@/lib/supabase/server', () => ({
+vi.mock('@/lib/supabase/client', () => ({
   createServerClient: vi.fn(() => mockSupabase),
 }));
+
+// Helper to create request with auth header
+const createAuthRequest = (url, options = {}) => {
+  const headers = new Headers(options.headers || {});
+  headers.set('Authorization', 'Bearer test-token');
+  return new Request(url, { ...options, headers });
+};
 
 describe('Profile API', () => {
   beforeEach(() => {
@@ -30,13 +37,23 @@ describe('Profile API', () => {
   });
 
   describe('GET /api/profile', () => {
+    it('should return 401 if no authorization header', async () => {
+      const request = new Request('http://localhost/api/profile');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe('Unauthorized');
+    });
+
     it('should return 401 if user is not authenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'Not authenticated' },
       });
 
-      const response = await GET();
+      const request = createAuthRequest('http://localhost/api/profile');
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(401);
@@ -69,7 +86,8 @@ describe('Profile API', () => {
         }),
       });
 
-      const response = await GET();
+      const request = createAuthRequest('http://localhost/api/profile');
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -114,7 +132,8 @@ describe('Profile API', () => {
         }),
       });
 
-      const response = await GET();
+      const request = createAuthRequest('http://localhost/api/profile');
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -138,7 +157,8 @@ describe('Profile API', () => {
         }),
       });
 
-      const response = await GET();
+      const request = createAuthRequest('http://localhost/api/profile');
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -173,7 +193,8 @@ describe('Profile API', () => {
         }),
       });
 
-      const response = await GET();
+      const request = createAuthRequest('http://localhost/api/profile');
+      const response = await GET(request);
       const data = await response.json();
 
       expect(response.status).toBe(500);
@@ -182,13 +203,26 @@ describe('Profile API', () => {
   });
 
   describe('PUT /api/profile', () => {
+    it('should return 401 if no authorization header', async () => {
+      const request = new Request('http://localhost/api/profile', {
+        method: 'PUT',
+        body: JSON.stringify({ display_name: 'newname' }),
+      });
+
+      const response = await PUT(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(401);
+      expect(data.error).toBe('Unauthorized');
+    });
+
     it('should return 401 if user is not authenticated', async () => {
       mockSupabase.auth.getUser.mockResolvedValueOnce({
         data: { user: null },
         error: { message: 'Not authenticated' },
       });
 
-      const request = new Request('http://localhost/api/profile', {
+      const request = createAuthRequest('http://localhost/api/profile', {
         method: 'PUT',
         body: JSON.stringify({ display_name: 'newname' }),
       });
@@ -237,7 +271,7 @@ describe('Profile API', () => {
         }),
       });
 
-      const request = new Request('http://localhost/api/profile', {
+      const request = createAuthRequest('http://localhost/api/profile', {
         method: 'PUT',
         body: JSON.stringify({
           display_name: 'newname',
@@ -289,7 +323,7 @@ describe('Profile API', () => {
         }),
       });
 
-      const request = new Request('http://localhost/api/profile', {
+      const request = createAuthRequest('http://localhost/api/profile', {
         method: 'PUT',
         body: JSON.stringify({ display_name: 'newuser' }),
       });
@@ -336,7 +370,7 @@ describe('Profile API', () => {
         }),
       });
 
-      const request = new Request('http://localhost/api/profile', {
+      const request = createAuthRequest('http://localhost/api/profile', {
         method: 'PUT',
         body: JSON.stringify({ avatar_url: 'https://example.com/avatar.jpg' }),
       });
@@ -375,7 +409,7 @@ describe('Profile API', () => {
         }),
       });
 
-      const request = new Request('http://localhost/api/profile', {
+      const request = createAuthRequest('http://localhost/api/profile', {
         method: 'PUT',
         body: JSON.stringify({ display_name: 'newname' }),
       });
@@ -413,7 +447,7 @@ describe('Profile API', () => {
         }),
       });
 
-      const request = new Request('http://localhost/api/profile', {
+      const request = createAuthRequest('http://localhost/api/profile', {
         method: 'PUT',
         body: JSON.stringify({ display_name: 'newuser' }),
       });
@@ -461,7 +495,7 @@ describe('Profile API', () => {
       });
 
       // Only update preferences
-      const request = new Request('http://localhost/api/profile', {
+      const request = createAuthRequest('http://localhost/api/profile', {
         method: 'PUT',
         body: JSON.stringify({ preferences: { units: 'metric' } }),
       });

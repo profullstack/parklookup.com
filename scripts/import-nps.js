@@ -24,8 +24,8 @@ loadEnv();
 
 // Get environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const NPS_API_KEY = process.env.NPS_API_KEY;
+const {SUPABASE_SERVICE_ROLE_KEY} = process.env;
+const {NPS_API_KEY} = process.env;
 
 /**
  * Validates required environment variables
@@ -33,9 +33,9 @@ const NPS_API_KEY = process.env.NPS_API_KEY;
 const validateEnv = () => {
   const missing = [];
 
-  if (!SUPABASE_URL) missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
-  if (!SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-  if (!NPS_API_KEY) missing.push('NPS_API_KEY');
+  if (!SUPABASE_URL) {missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');}
+  if (!SUPABASE_SERVICE_ROLE_KEY) {missing.push('SUPABASE_SERVICE_ROLE_KEY');}
+  if (!NPS_API_KEY) {missing.push('NPS_API_KEY');}
 
   if (missing.length > 0) {
     console.error('❌ Missing required environment variables:');
@@ -47,14 +47,12 @@ const validateEnv = () => {
 /**
  * Creates a Supabase client with service role key
  */
-const createSupabaseClient = () => {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+const createSupabaseClient = () => createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   });
-};
 
 /**
  * Logs an import event to the database
@@ -174,7 +172,7 @@ const main = async () => {
     });
 
     // Print summary
-    console.log('\n' + '='.repeat(50));
+    console.log(`\n${  '='.repeat(50)}`);
     console.log('📊 Import Summary:');
     console.log(`   - Parks fetched: ${rawParks.length}`);
     console.log(`   - Parks upserted: ${results.inserted}`);

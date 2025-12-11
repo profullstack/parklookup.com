@@ -162,19 +162,17 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
   const defaultZoom = 4;
 
   // Filter parks with valid coordinates
-  const validParks = useMemo(() => {
-    return parks.filter(
+  const validParks = useMemo(() => parks.filter(
       (p) =>
         p.latitude &&
         p.longitude &&
         !isNaN(parseFloat(p.latitude)) &&
         !isNaN(parseFloat(p.longitude))
-    );
-  }, [parks]);
+    ), [parks]);
 
   // Filter parks within 100 miles of user location
   const nearbyParks = useMemo(() => {
-    if (!userLocation) return validParks;
+    if (!userLocation) {return validParks;}
 
     return validParks.filter((park) => {
       const distance = calculateDistance(

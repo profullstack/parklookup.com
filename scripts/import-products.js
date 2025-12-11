@@ -47,10 +47,10 @@ loadEnv();
 
 // Get environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
-const RAINFOREST_API_KEY = process.env.RAINFOREST_API_KEY;
-const AMAZON_TAG = process.env.AMAZON_TAG;
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+const {SUPABASE_SERVICE_ROLE_KEY} = process.env;
+const {RAINFOREST_API_KEY} = process.env;
+const {AMAZON_TAG} = process.env;
+const {OPENAI_API_KEY} = process.env;
 
 // Parse command line arguments
 const args = process.argv.slice(2);
@@ -76,9 +76,9 @@ const OPTIONS = {
 const validateEnv = () => {
   const missing = [];
 
-  if (!SUPABASE_URL) missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
-  if (!SUPABASE_SERVICE_ROLE_KEY) missing.push('SUPABASE_SERVICE_ROLE_KEY');
-  if (!RAINFOREST_API_KEY) missing.push('RAINFOREST_API_KEY');
+  if (!SUPABASE_URL) {missing.push('SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');}
+  if (!SUPABASE_SERVICE_ROLE_KEY) {missing.push('SUPABASE_SERVICE_ROLE_KEY');}
+  if (!RAINFOREST_API_KEY) {missing.push('RAINFOREST_API_KEY');}
 
   if (missing.length > 0) {
     console.error('❌ Missing required environment variables:');
@@ -212,14 +212,12 @@ const rewriteProductsBatch = async (openai, products, delayMs) => {
 /**
  * Creates a Supabase client with service role key
  */
-const createSupabaseClient = () => {
-  return createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+const createSupabaseClient = () => createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
     },
   });
-};
 
 /**
  * Delay execution for a specified time
@@ -299,7 +297,7 @@ const deduplicateProducts = (products) => {
   const productMap = new Map();
 
   for (const product of products) {
-    if (!product.asin) continue;
+    if (!product.asin) {continue;}
 
     const existing = productMap.get(product.asin);
     if (!existing) {
@@ -623,7 +621,7 @@ const main = async () => {
   const endTime = new Date();
   const duration = (endTime - overallResults.startTime) / 1000;
 
-  console.log('\n' + '='.repeat(50));
+  console.log(`\n${  '='.repeat(50)}`);
   console.log('📊 Import Summary:');
   console.log(`   - Search terms processed: ${overallResults.totalTerms}`);
   console.log(`   - Total products imported: ${overallResults.totalProducts}`);

@@ -5,23 +5,31 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServerClient } from '@/lib/supabase/client';
 
 /**
  * GET /api/profile
  * Get the current user's profile
  */
-export async function GET() {
+export async function GET(request) {
   try {
-    const supabase = await createServerClient({ useServiceRole: true });
+    // Get auth token from request headers
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Get authenticated user
+    const token = authHeader.substring(7);
+    const supabase = createServerClient({ useServiceRole: true });
+
+    // Get authenticated user using the token
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('Auth error:', authError?.message);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -83,15 +91,23 @@ export async function GET() {
  */
 export async function PUT(request) {
   try {
-    const supabase = await createServerClient({ useServiceRole: true });
+    // Get auth token from request headers
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader?.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
 
-    // Get authenticated user
+    const token = authHeader.substring(7);
+    const supabase = createServerClient({ useServiceRole: true });
+
+    // Get authenticated user using the token
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
+      console.error('Auth error:', authError?.message);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -101,9 +117,15 @@ export async function PUT(request) {
 
     // Build update object
     const updates = {};
-    if (display_name !== undefined) updates.display_name = display_name;
-    if (avatar_url !== undefined) updates.avatar_url = avatar_url;
-    if (preferences !== undefined) updates.preferences = preferences;
+    if (display_name !== undefined) {
+      updates.display_name = display_name;
+    }
+    if (avatar_url !== undefined) {
+      updates.avatar_url = avatar_url;
+    }
+    if (preferences !== undefined) {
+      updates.preferences = preferences;
+    }
 
     // Check if profile exists
     const { data: existingProfile } = await supabase

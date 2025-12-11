@@ -79,7 +79,7 @@ export function useOfflineStorage() {
    */
   const cacheParks = useCallback(
     async (parks) => {
-      if (!db || !parks?.length) return;
+      if (!db || !parks?.length) {return;}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('cachedParks', 'readwrite');
@@ -104,7 +104,7 @@ export function useOfflineStorage() {
    * @returns {Promise<Array>} - Array of cached parks
    */
   const getCachedParks = useCallback(async () => {
-    if (!db) return [];
+    if (!db) {return [];}
 
     return new Promise((resolve, reject) => {
       const tx = db.transaction('cachedParks', 'readonly');
@@ -123,7 +123,7 @@ export function useOfflineStorage() {
    */
   const getCachedPark = useCallback(
     async (parkCode) => {
-      if (!db) return null;
+      if (!db) {return null;}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('cachedParks', 'readonly');
@@ -145,7 +145,7 @@ export function useOfflineStorage() {
    */
   const addPendingFavorite = useCallback(
     async (parkId, action) => {
-      if (!db) return;
+      if (!db) {return;}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('pendingFavorites', 'readwrite');
@@ -182,7 +182,7 @@ export function useOfflineStorage() {
    * @returns {Promise<Array>} - Array of pending actions
    */
   const getPendingFavorites = useCallback(async () => {
-    if (!db) return [];
+    if (!db) {return [];}
 
     return new Promise((resolve, reject) => {
       const tx = db.transaction('pendingFavorites', 'readonly');
@@ -200,7 +200,7 @@ export function useOfflineStorage() {
    */
   const removePendingFavorite = useCallback(
     async (id) => {
-      if (!db) return;
+      if (!db) {return;}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('pendingFavorites', 'readwrite');
@@ -221,7 +221,7 @@ export function useOfflineStorage() {
    */
   const updateLocalFavorite = useCallback(
     async (parkId, isFavorite) => {
-      if (!db) return;
+      if (!db) {return;}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('userFavorites', 'readwrite');
@@ -245,7 +245,7 @@ export function useOfflineStorage() {
    * @returns {Promise<Array<string>>} - Array of park IDs
    */
   const getLocalFavorites = useCallback(async () => {
-    if (!db) return [];
+    if (!db) {return [];}
 
     return new Promise((resolve, reject) => {
       const tx = db.transaction('userFavorites', 'readonly');
@@ -264,7 +264,7 @@ export function useOfflineStorage() {
    */
   const isLocalFavorite = useCallback(
     async (parkId) => {
-      if (!db) return false;
+      if (!db) {return false;}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('userFavorites', 'readonly');
@@ -284,7 +284,7 @@ export function useOfflineStorage() {
    */
   const addSearchHistory = useCallback(
     async (query) => {
-      if (!db || !query?.trim()) return;
+      if (!db || !query?.trim()) {return;}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('searchHistory', 'readwrite');
@@ -308,7 +308,7 @@ export function useOfflineStorage() {
    */
   const getSearchHistory = useCallback(
     async (limit = 10) => {
-      if (!db) return [];
+      if (!db) {return [];}
 
       return new Promise((resolve, reject) => {
         const tx = db.transaction('searchHistory', 'readonly');
@@ -336,7 +336,7 @@ export function useOfflineStorage() {
    * Clear all cached data
    */
   const clearCache = useCallback(async () => {
-    if (!db) return;
+    if (!db) {return;}
 
     const stores = ['cachedParks', 'pendingFavorites', 'userFavorites', 'searchHistory'];
 

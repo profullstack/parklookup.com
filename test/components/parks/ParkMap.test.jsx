@@ -481,11 +481,9 @@ describe('ParkMap Address Display', () => {
 
     // The address should be displayed with whitespace preserved
     // Use getAllByText since address appears in both address bar and popup
-    const addressElements = screen.getAllByText((content, element) => {
-      return element?.classList?.contains('whitespace-pre-line') &&
+    const addressElements = screen.getAllByText((content, element) => element?.classList?.contains('whitespace-pre-line') &&
              content.includes('9035 Village Dr') &&
-             content.includes('Yosemite Valley');
-    });
+             content.includes('Yosemite Valley'));
     expect(addressElements.length).toBeGreaterThan(0);
   });
 

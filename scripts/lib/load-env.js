@@ -25,7 +25,7 @@ export const loadEnv = () => {
 
   envContent.split('\n').forEach((line) => {
     // Skip empty lines and comments
-    if (!line || line.startsWith('#')) return;
+    if (!line || line.startsWith('#')) {return;}
 
     const eqIndex = line.indexOf('=');
     if (eqIndex > 0) {

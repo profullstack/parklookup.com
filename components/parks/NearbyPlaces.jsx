@@ -140,7 +140,7 @@ function PlaceCard({ place }) {
 function CategorySection({ category, places }) {
   const config = CATEGORY_CONFIG[category] || CATEGORY_CONFIG.attractions;
 
-  if (!places || places.length === 0) return null;
+  if (!places || places.length === 0) {return null;}
 
   return (
     <div className="mb-6">
@@ -173,7 +173,7 @@ export default function NearbyPlaces({ parkCode }) {
 
   useEffect(() => {
     const fetchPlaces = async () => {
-      if (!parkCode) return;
+      if (!parkCode) {return;}
 
       try {
         setLoading(true);
@@ -290,7 +290,7 @@ export function NearbyPlacesCompact({ parkCode, limit = 5 }) {
 
   useEffect(() => {
     const fetchPlaces = async () => {
-      if (!parkCode) return;
+      if (!parkCode) {return;}
 
       try {
         const response = await fetch(`/api/parks/${parkCode}/nearby-places?limit=${limit}`);

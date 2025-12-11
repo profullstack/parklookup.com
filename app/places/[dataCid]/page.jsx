@@ -149,7 +149,7 @@ function CommentForm({ onSubmit, isSubmitting }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim()) {return;}
 
     await onSubmit(content, rating || null);
     setContent('');
@@ -332,7 +332,7 @@ export default function PlaceDetailPage() {
 
   // Handle comment delete
   const handleCommentDelete = async (commentId) => {
-    if (!confirm('Are you sure you want to delete this review?')) return;
+    if (!confirm('Are you sure you want to delete this review?')) {return;}
 
     try {
       const res = await fetch(`/api/places/${dataCid}/comments/${commentId}`, {
@@ -380,7 +380,7 @@ export default function PlaceDetailPage() {
     );
   }
 
-  if (!place) return null;
+  if (!place) {return null;}
 
   const config = CATEGORY_CONFIG[place.category] || CATEGORY_CONFIG.attractions;
 

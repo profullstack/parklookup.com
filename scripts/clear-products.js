@@ -20,7 +20,7 @@ loadEnv();
 
 // Get environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const {SUPABASE_SERVICE_ROLE_KEY} = process.env;
 
 /**
  * Creates a Supabase client with service role key
@@ -28,8 +28,8 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const createSupabaseClient = () => {
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
     console.error('❌ Missing required environment variables:');
-    if (!SUPABASE_URL) console.error('   - SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');
-    if (!SUPABASE_SERVICE_ROLE_KEY) console.error('   - SUPABASE_SERVICE_ROLE_KEY');
+    if (!SUPABASE_URL) {console.error('   - SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL');}
+    if (!SUPABASE_SERVICE_ROLE_KEY) {console.error('   - SUPABASE_SERVICE_ROLE_KEY');}
     process.exit(1);
   }
 

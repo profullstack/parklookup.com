@@ -175,7 +175,7 @@ export default function TripForm({ onSubmit, isLoading = false, disabled = false
    * Calculate trip duration
    */
   const getTripDuration = () => {
-    if (!formData.startDate || !formData.endDate) return null;
+    if (!formData.startDate || !formData.endDate) {return null;}
     const start = new Date(formData.startDate);
     const end = new Date(formData.endDate);
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;

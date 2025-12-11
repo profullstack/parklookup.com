@@ -553,7 +553,7 @@ Examples:
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-  console.log('\n' + '='.repeat(60));
+  console.log(`\n${  '='.repeat(60)}`);
   console.log('Summary');
   console.log('='.repeat(60));
   console.log(`Total places added: ${totals.success}`);

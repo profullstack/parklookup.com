@@ -5,8 +5,7 @@
  * Testing Framework: Vitest with React Testing Library
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
 
 // Mock react-leaflet components
 vi.mock('react-leaflet', () => ({
@@ -36,10 +35,8 @@ vi.mock('leaflet', () => ({
 
 // Mock next/dynamic to return the actual component
 vi.mock('next/dynamic', () => ({
-  default: (importFn) => {
-    const Component = ({ children, ...props }) => {
-      return <div {...props}>{children}</div>;
-    };
+  default: (_importFn) => {
+    const Component = ({ children, ...props }) => <div {...props}>{children}</div>;
     return Component;
   },
 }));
@@ -429,10 +426,12 @@ describe('TripMap Component - Integration Tests', () => {
       // to ensure bounds are recalculated
       
       let mapKey = 0;
-      const stops1 = [{ dayNumber: 1 }];
-      const stops2 = [{ dayNumber: 1 }, { dayNumber: 2 }];
+      // Simulate initial stops
+      const _stops1 = [{ dayNumber: 1 }];
+      // Simulate updated stops
+      const _stops2 = [{ dayNumber: 1 }, { dayNumber: 2 }];
       
-      // Simulate stops change
+      // Simulate stops change - map key should increment
       mapKey += 1;
       
       expect(mapKey).toBe(1);

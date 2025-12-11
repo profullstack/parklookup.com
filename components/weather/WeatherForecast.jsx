@@ -11,17 +11,17 @@ import { useState, useEffect } from 'react';
 function getWeatherEmoji(shortForecast, isDaytime) {
   const forecast = shortForecast.toLowerCase();
 
-  if (forecast.includes('thunder') || forecast.includes('storm')) return '⛈️';
-  if (forecast.includes('rain') && forecast.includes('snow')) return '🌨️';
-  if (forecast.includes('rain') || forecast.includes('shower')) return '🌧️';
-  if (forecast.includes('snow') || forecast.includes('flurr')) return '❄️';
-  if (forecast.includes('sleet') || forecast.includes('ice')) return '🌨️';
-  if (forecast.includes('fog') || forecast.includes('mist')) return '🌫️';
-  if (forecast.includes('cloud') && forecast.includes('sun')) return '⛅';
-  if (forecast.includes('partly') || forecast.includes('mostly cloudy')) return isDaytime ? '⛅' : '☁️';
-  if (forecast.includes('cloud') || forecast.includes('overcast')) return '☁️';
-  if (forecast.includes('wind')) return '💨';
-  if (forecast.includes('clear') || forecast.includes('sunny')) return isDaytime ? '☀️' : '🌙';
+  if (forecast.includes('thunder') || forecast.includes('storm')) {return '⛈️';}
+  if (forecast.includes('rain') && forecast.includes('snow')) {return '🌨️';}
+  if (forecast.includes('rain') || forecast.includes('shower')) {return '🌧️';}
+  if (forecast.includes('snow') || forecast.includes('flurr')) {return '❄️';}
+  if (forecast.includes('sleet') || forecast.includes('ice')) {return '🌨️';}
+  if (forecast.includes('fog') || forecast.includes('mist')) {return '🌫️';}
+  if (forecast.includes('cloud') && forecast.includes('sun')) {return '⛅';}
+  if (forecast.includes('partly') || forecast.includes('mostly cloudy')) {return isDaytime ? '⛅' : '☁️';}
+  if (forecast.includes('cloud') || forecast.includes('overcast')) {return '☁️';}
+  if (forecast.includes('wind')) {return '💨';}
+  if (forecast.includes('clear') || forecast.includes('sunny')) {return isDaytime ? '☀️' : '🌙';}
 
   return isDaytime ? '🌤️' : '🌙';
 }
@@ -33,13 +33,13 @@ function getWeatherEmoji(shortForecast, isDaytime) {
  * @returns {string} CSS class for temperature color
  */
 function getTempColorClass(temp) {
-  if (temp >= 90) return 'text-red-600';
-  if (temp >= 80) return 'text-orange-500';
-  if (temp >= 70) return 'text-yellow-600';
-  if (temp >= 60) return 'text-green-600';
-  if (temp >= 50) return 'text-teal-600';
-  if (temp >= 40) return 'text-blue-500';
-  if (temp >= 32) return 'text-blue-600';
+  if (temp >= 90) {return 'text-red-600';}
+  if (temp >= 80) {return 'text-orange-500';}
+  if (temp >= 70) {return 'text-yellow-600';}
+  if (temp >= 60) {return 'text-green-600';}
+  if (temp >= 50) {return 'text-teal-600';}
+  if (temp >= 40) {return 'text-blue-500';}
+  if (temp >= 32) {return 'text-blue-600';}
   return 'text-blue-800';
 }
 

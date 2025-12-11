@@ -52,7 +52,7 @@ export function InstallPrompt() {
   }, []);
 
   const handleInstall = async () => {
-    if (!deferredPrompt) return;
+    if (!deferredPrompt) {return;}
 
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
@@ -68,7 +68,7 @@ export function InstallPrompt() {
     localStorage.setItem('installPromptDismissed', Date.now().toString());
   };
 
-  if (!showPrompt || isInstalled) return null;
+  if (!showPrompt || isInstalled) {return null;}
 
   return (
     <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:w-96 bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 z-50 border border-gray-200 dark:border-gray-700">

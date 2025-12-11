@@ -14,7 +14,7 @@ import Card, { CardContent } from '@/components/ui/Card';
  * @returns {string} Formatted date
  */
 const formatDate = (dateString) => {
-  if (!dateString) return '';
+  if (!dateString) {return '';}
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
     month: 'short',
@@ -82,7 +82,7 @@ export default function TripCard({ trip, onDelete }) {
    * Calculate trip duration
    */
   const getDuration = () => {
-    if (!startDate || !endDate) return null;
+    if (!startDate || !endDate) {return null;}
     const start = new Date(startDate);
     const end = new Date(endDate);
     const days = Math.ceil((end - start) / (1000 * 60 * 60 * 24)) + 1;

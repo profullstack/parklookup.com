@@ -29,10 +29,6 @@ const Polyline = dynamic(
   () => import('react-leaflet').then(mod => mod.Polyline),
   { ssr: false }
 );
-const useMap = dynamic(
-  () => import('react-leaflet').then(mod => mod.useMap),
-  { ssr: false }
-);
 
 /**
  * Create custom numbered marker icon
@@ -40,7 +36,7 @@ const useMap = dynamic(
  * @returns {Object} Leaflet icon
  */
 const createNumberedIcon = (number) => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') {return null;}
   
   const L = require('leaflet');
   
@@ -73,7 +69,7 @@ const createNumberedIcon = (number) => {
  * @returns {Object} Leaflet icon
  */
 const createOriginIcon = () => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') {return null;}
   
   const L = require('leaflet');
   
@@ -177,40 +173,6 @@ const getStraightLineCoordinates = (stops, origin) => {
 };
 
 /**
- * Map bounds fitter component
- * Fits the map to the given bounds after mount
- */
-function MapBoundsFitter({ bounds }) {
-  const [mapReady, setMapReady] = useState(false);
-  
-  useEffect(() => {
-    // Delay to ensure map is fully rendered
-    const timer = setTimeout(() => setMapReady(true), 100);
-    return () => clearTimeout(timer);
-  }, []);
-
-  useEffect(() => {
-    if (!mapReady || typeof window === 'undefined') return;
-    
-    // Get the map instance from the parent context
-    const mapContainer = document.querySelector('.leaflet-container');
-    if (mapContainer && mapContainer._leaflet_map) {
-      const map = mapContainer._leaflet_map;
-      if (bounds && bounds.length === 2) {
-        try {
-          map.fitBounds(bounds, { padding: [50, 50] });
-          map.invalidateSize();
-        } catch (e) {
-          console.warn('Failed to fit bounds:', e);
-        }
-      }
-    }
-  }, [bounds, mapReady]);
-
-  return null;
-}
-
-/**
  * TripMap component
  * @param {Object} props - Component props
  * @param {Array} props.stops - Trip stops with park data
@@ -225,6 +187,7 @@ export default function TripMap({ stops = [], origin, originName, className = ''
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [routeInfo, setRouteInfo] = useState(null);
   const [routeLoading, setRouteLoading] = useState(false);
+  // eslint-disable-next-line no-unused-vars
   const [routeError, setRouteError] = useState(null);
   const mapRef = useRef(null);
 
@@ -287,7 +250,7 @@ export default function TripMap({ stops = [], origin, originName, className = ''
 
   // Fetch route when stops or origin change
   useEffect(() => {
-    if (!isClient) return;
+    if (!isClient) {return;}
     
     const waypoints = getWaypoints(stops, origin);
     if (waypoints.length >= 2) {
@@ -306,7 +269,7 @@ export default function TripMap({ stops = [], origin, originName, className = ''
 
   // Invalidate map size after render
   useEffect(() => {
-    if (!isClient) return;
+    if (!isClient) {return;}
     
     const timer = setTimeout(() => {
       if (mapRef.current) {
@@ -398,10 +361,10 @@ export default function TripMap({ stops = [], origin, originName, className = ''
 
         {/* Stop markers */}
         {sortedStops.map(stop => {
-          if (!stop.park?.latitude || !stop.park?.longitude) return null;
+          if (!stop.park?.latitude || !stop.park?.longitude) {return null;}
           
           const icon = icons.numbered[stop.dayNumber];
-          if (!icon) return null;
+          if (!icon) {return null;}
 
           return (
             <Marker

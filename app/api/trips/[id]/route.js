@@ -309,10 +309,14 @@ export async function GET(request, { params }) {
         if (nearbyPlacesData) {
           // Group by park_code and category
           nearbyPlacesData.forEach(item => {
-            if (!item.nearby_places) return;
+            if (!item.nearby_places) {
+              return;
+            }
             
             const parkCode = parkIdMap[item.park_id];
-            if (!parkCode) return;
+            if (!parkCode) {
+              return;
+            }
 
             if (!nearbyPlacesMap[parkCode]) {
               nearbyPlacesMap[parkCode] = {
@@ -385,7 +389,7 @@ export async function GET(request, { params }) {
             url: parkData.url,
             images: parkData.images,
             activities: parkData.activities,
-            source: source,
+            source,
           } : null,
           activities: stop.activities,
           morningPlan: stop.morning_plan,

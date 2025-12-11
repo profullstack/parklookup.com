@@ -52,9 +52,7 @@ export default function StatesPage() {
     Territories: ['DC', 'PR', 'VI', 'GU', 'AS', 'MP'],
   };
 
-  const getStatesByRegion = (regionCodes) => {
-    return states.filter((state) => regionCodes.includes(state.code));
-  };
+  const getStatesByRegion = (regionCodes) => states.filter((state) => regionCodes.includes(state.code));
 
   if (loading) {
     return (
@@ -154,7 +152,7 @@ export default function StatesPage() {
         {/* States by Region */}
         {Object.entries(regions).map(([region, codes]) => {
           const regionStates = getStatesByRegion(codes);
-          if (regionStates.length === 0) return null;
+          if (regionStates.length === 0) {return null;}
 
           return (
             <div key={region} className="mb-8">

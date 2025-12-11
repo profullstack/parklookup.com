@@ -9,7 +9,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
  * Normalize a string for comparison
  */
 function normalizeString(str) {
-  if (!str) return '';
+  if (!str) {return '';}
   return str
     .toLowerCase()
     .replace(/[^a-z0-9]/g, '')
@@ -27,8 +27,8 @@ function calculateLevenshteinDistance(str1, str2) {
     .fill(null)
     .map(() => Array(n + 1).fill(0));
 
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 0; i <= m; i++) {dp[i][0] = i;}
+  for (let j = 0; j <= n; j++) {dp[0][j] = j;}
 
   for (let i = 1; i <= m; i++) {
     for (let j = 1; j <= n; j++) {
@@ -47,13 +47,13 @@ function calculateLevenshteinDistance(str1, str2) {
  * Calculate name similarity between two strings
  */
 function calculateNameSimilarity(name1, name2) {
-  if (!name1 || !name2) return 0;
+  if (!name1 || !name2) {return 0;}
 
   const normalized1 = normalizeString(name1);
   const normalized2 = normalizeString(name2);
 
-  if (!normalized1 || !normalized2) return 0;
-  if (normalized1 === normalized2) return 1.0;
+  if (!normalized1 || !normalized2) {return 0;}
+  if (normalized1 === normalized2) {return 1.0;}
 
   const distance = calculateLevenshteinDistance(normalized1, normalized2);
   const maxLength = Math.max(normalized1.length, normalized2.length);
@@ -85,7 +85,7 @@ function haversineDistance(coord1, coord2) {
  * Calculate location similarity based on distance
  */
 function calculateLocationSimilarity(coord1, coord2, maxDistance = 100) {
-  if (!coord1 || !coord2) return 0;
+  if (!coord1 || !coord2) {return 0;}
   if (
     coord1.latitude == null ||
     coord1.longitude == null ||
@@ -97,8 +97,8 @@ function calculateLocationSimilarity(coord1, coord2, maxDistance = 100) {
 
   const distance = haversineDistance(coord1, coord2);
 
-  if (distance === 0) return 1.0;
-  if (distance >= maxDistance) return 0;
+  if (distance === 0) {return 1.0;}
+  if (distance >= maxDistance) {return 0;}
 
   return 1 - distance / maxDistance;
 }
@@ -182,10 +182,10 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body for options
-    let options = { threshold: 0.6 };
+    const options = { threshold: 0.6 };
     try {
       const body = await req.json();
-      if (body.threshold) options.threshold = body.threshold;
+      if (body.threshold) {options.threshold = body.threshold;}
     } catch {
       // Use defaults if no body
     }

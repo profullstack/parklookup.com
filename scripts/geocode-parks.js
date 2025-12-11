@@ -227,7 +227,7 @@ async function main() {
     results.wikidata_parks = await geocodeTable('wikidata_parks', { limit, dryRun });
   }
 
-  console.log('\n' + '='.repeat(50));
+  console.log(`\n${  '='.repeat(50)}`);
   console.log('Summary');
   console.log('='.repeat(50));
 

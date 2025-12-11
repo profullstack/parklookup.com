@@ -16,7 +16,7 @@ import Button from '@/components/ui/Button';
  * @returns {string} Formatted date
  */
 const formatDate = (dateString) => {
-  if (!dateString) return '';
+  if (!dateString) {return '';}
   const date = new Date(dateString);
   return date.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -35,17 +35,17 @@ const formatDate = (dateString) => {
 function getWeatherEmoji(shortForecast, isDaytime = true) {
   const forecast = shortForecast?.toLowerCase() || '';
 
-  if (forecast.includes('thunder') || forecast.includes('storm')) return '⛈️';
-  if (forecast.includes('rain') && forecast.includes('snow')) return '🌨️';
-  if (forecast.includes('rain') || forecast.includes('shower')) return '🌧️';
-  if (forecast.includes('snow') || forecast.includes('flurr')) return '❄️';
-  if (forecast.includes('sleet') || forecast.includes('ice')) return '🌨️';
-  if (forecast.includes('fog') || forecast.includes('mist')) return '🌫️';
-  if (forecast.includes('cloud') && forecast.includes('sun')) return '⛅';
-  if (forecast.includes('partly') || forecast.includes('mostly cloudy')) return isDaytime ? '⛅' : '☁️';
-  if (forecast.includes('cloud') || forecast.includes('overcast')) return '☁️';
-  if (forecast.includes('wind')) return '💨';
-  if (forecast.includes('clear') || forecast.includes('sunny')) return isDaytime ? '☀️' : '🌙';
+  if (forecast.includes('thunder') || forecast.includes('storm')) {return '⛈️';}
+  if (forecast.includes('rain') && forecast.includes('snow')) {return '🌨️';}
+  if (forecast.includes('rain') || forecast.includes('shower')) {return '🌧️';}
+  if (forecast.includes('snow') || forecast.includes('flurr')) {return '❄️';}
+  if (forecast.includes('sleet') || forecast.includes('ice')) {return '🌨️';}
+  if (forecast.includes('fog') || forecast.includes('mist')) {return '🌫️';}
+  if (forecast.includes('cloud') && forecast.includes('sun')) {return '⛅';}
+  if (forecast.includes('partly') || forecast.includes('mostly cloudy')) {return isDaytime ? '⛅' : '☁️';}
+  if (forecast.includes('cloud') || forecast.includes('overcast')) {return '☁️';}
+  if (forecast.includes('wind')) {return '💨';}
+  if (forecast.includes('clear') || forecast.includes('sunny')) {return isDaytime ? '☀️' : '🌙';}
 
   return isDaytime ? '🌤️' : '🌙';
 }
@@ -56,13 +56,13 @@ function getWeatherEmoji(shortForecast, isDaytime = true) {
  * @returns {string} Tailwind CSS class
  */
 function getTempColorClass(temp) {
-  if (temp >= 90) return 'text-red-600';
-  if (temp >= 80) return 'text-orange-500';
-  if (temp >= 70) return 'text-yellow-600';
-  if (temp >= 60) return 'text-green-600';
-  if (temp >= 50) return 'text-teal-600';
-  if (temp >= 40) return 'text-blue-500';
-  if (temp >= 32) return 'text-blue-600';
+  if (temp >= 90) {return 'text-red-600';}
+  if (temp >= 80) {return 'text-orange-500';}
+  if (temp >= 70) {return 'text-yellow-600';}
+  if (temp >= 60) {return 'text-green-600';}
+  if (temp >= 50) {return 'text-teal-600';}
+  if (temp >= 40) {return 'text-blue-500';}
+  if (temp >= 32) {return 'text-blue-600';}
   return 'text-blue-800';
 }
 
@@ -88,7 +88,7 @@ const getDifficultyColor = (difficulty) => {
  * @returns {string|null} Internal link to park detail page
  */
 const getParkLink = (stop) => {
-  if (!stop.parkCode) return null;
+  if (!stop.parkCode) {return null;}
   
   // Always link to our internal park detail page
   // The /api/parks/[parkCode] endpoint supports both NPS and Wikidata parks
@@ -98,7 +98,7 @@ const getParkLink = (stop) => {
 /**
  * Weather section for a day card - fetches and displays weather for the park location
  */
-function DayWeatherSection({ latitude, longitude, dayNumber, tripStartDate }) {
+function DayWeatherSection({ latitude, longitude, dayNumber }) {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -131,7 +131,7 @@ function DayWeatherSection({ latitude, longitude, dayNumber, tripStartDate }) {
 
   // Get the forecast for this specific day
   const getDayForecast = () => {
-    if (!weather?.forecast?.length) return null;
+    if (!weather?.forecast?.length) {return null;}
 
     // Group forecast periods by day (combine day/night)
     const dailyForecasts = [];
@@ -166,7 +166,7 @@ function DayWeatherSection({ latitude, longitude, dayNumber, tripStartDate }) {
   }
 
   const forecast = getDayForecast();
-  if (!forecast) return null;
+  if (!forecast) {return null;}
 
   const { day, night } = forecast;
 
@@ -209,7 +209,7 @@ function DayCard({ stop, tripStartDate }) {
   
   // Calculate actual date for this day
   const getDateForDay = () => {
-    if (!tripStartDate) return null;
+    if (!tripStartDate) {return null;}
     const date = new Date(tripStartDate);
     date.setDate(date.getDate() + stop.dayNumber - 1);
     return date.toLocaleDateString('en-US', {
@@ -371,7 +371,7 @@ function DayCard({ stop, tripStartDate }) {
  * Packing list section component
  */
 function PackingListSection({ packingList }) {
-  if (!packingList) return null;
+  if (!packingList) {return null;}
 
   const sections = [
     { key: 'essentials', label: 'Essentials', icon: '✅' },
@@ -387,7 +387,7 @@ function PackingListSection({ packingList }) {
         <div className="grid md:grid-cols-2 gap-4">
           {sections.map(section => {
             const items = packingList[section.key];
-            if (!items || items.length === 0) return null;
+            if (!items || items.length === 0) {return null;}
 
             return (
               <div key={section.key}>
@@ -415,7 +415,7 @@ function PackingListSection({ packingList }) {
  * Safety notes section component
  */
 function SafetyNotesSection({ safetyNotes }) {
-  if (!safetyNotes || safetyNotes.length === 0) return null;
+  if (!safetyNotes || safetyNotes.length === 0) {return null;}
 
   return (
     <Card className="border-orange-200 bg-orange-50">
@@ -438,7 +438,7 @@ function SafetyNotesSection({ safetyNotes }) {
  * Photo spots section component
  */
 function PhotoSpotsSection({ photoSpots }) {
-  if (!photoSpots || photoSpots.length === 0) return null;
+  if (!photoSpots || photoSpots.length === 0) {return null;}
 
   return (
     <Card className="border-purple-200 bg-purple-50">
@@ -461,7 +461,7 @@ function PhotoSpotsSection({ photoSpots }) {
  * Budget section component
  */
 function BudgetSection({ budget }) {
-  if (!budget) return null;
+  if (!budget) {return null;}
 
   return (
     <Card className="border-green-200 bg-green-50">
@@ -496,7 +496,7 @@ function BudgetSection({ budget }) {
  * Nearby places section for a day card
  */
 function NearbyPlacesSection({ nearbyPlaces }) {
-  if (!nearbyPlaces) return null;
+  if (!nearbyPlaces) {return null;}
 
   const categories = [
     { key: 'dining', label: 'Dining', icon: '🍽️', color: 'orange' },
@@ -508,7 +508,7 @@ function NearbyPlacesSection({ nearbyPlaces }) {
   ];
 
   const hasPlaces = categories.some(cat => nearbyPlaces[cat.key]?.length > 0);
-  if (!hasPlaces) return null;
+  if (!hasPlaces) {return null;}
 
   return (
     <div className="mt-4 pt-4 border-t border-gray-200">
@@ -516,7 +516,7 @@ function NearbyPlacesSection({ nearbyPlaces }) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {categories.map(cat => {
           const places = nearbyPlaces[cat.key];
-          if (!places || places.length === 0) return null;
+          if (!places || places.length === 0) {return null;}
 
           return (
             <div key={cat.key} className="space-y-2">
@@ -575,7 +575,7 @@ function NearbyPlacesSection({ nearbyPlaces }) {
  * Recommended products section component
  */
 function RecommendedProductsSection({ products }) {
-  if (!products || products.length === 0) return null;
+  if (!products || products.length === 0) {return null;}
 
   return (
     <Card className="border-indigo-200 bg-indigo-50">
@@ -645,7 +645,6 @@ export default function TripDetail({ trip, onRegenerate, onDelete, isRegeneratin
     origin,
     startDate,
     endDate,
-    interests,
     difficulty,
     radiusMiles,
     summary,

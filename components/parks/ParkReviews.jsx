@@ -10,7 +10,7 @@ const AUTH_TOKEN_KEY = 'parklookup_auth_token';
  * Get stored token from localStorage
  */
 const getStoredToken = () => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') {return null;}
   try {
     return localStorage.getItem(AUTH_TOKEN_KEY);
   } catch {
@@ -141,7 +141,7 @@ function CommentForm({ onSubmit, isSubmitting }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!content.trim()) return;
+    if (!content.trim()) {return;}
 
     await onSubmit(content, rating || null);
     setContent('');
@@ -323,7 +323,7 @@ export default function ParkReviews({ parkCode }) {
 
   // Handle comment delete
   const handleCommentDelete = async (commentId) => {
-    if (!confirm('Are you sure you want to delete this review?')) return;
+    if (!confirm('Are you sure you want to delete this review?')) {return;}
 
     try {
       const res = await fetch(`/api/parks/${parkCode}/comments/${commentId}`, {

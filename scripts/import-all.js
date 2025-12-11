@@ -27,8 +27,7 @@ const __dirname = dirname(__filename);
 /**
  * Runs a script and returns a promise
  */
-const runScript = (scriptPath, name) => {
-  return new Promise((resolve, reject) => {
+const runScript = (scriptPath, name) => new Promise((resolve, reject) => {
     console.log(`\n${'='.repeat(60)}`);
     console.log(`🚀 Running: ${name}`);
     console.log('='.repeat(60));
@@ -50,7 +49,6 @@ const runScript = (scriptPath, name) => {
       reject(new Error(`Failed to start ${name}: ${error.message}`));
     });
   });
-};
 
 /**
  * Main function

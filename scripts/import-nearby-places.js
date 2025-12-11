@@ -86,7 +86,7 @@ async function searchPlaces(query, location) {
     api_key: valueserpApiKey,
     search_type: 'places',
     q: query,
-    location: location,
+    location,
     google_domain: 'google.com',
     gl: 'us',
     hl: 'en',
@@ -293,7 +293,7 @@ async function importPlacesForPark(park, categories, options = {}) {
         .map((place) => ({
           data_cid: place.data_cid,
           title: place.title,
-          category: category,
+          category,
           address: place.address,
           phone: place.phone,
           website: place.website,
@@ -533,7 +533,7 @@ Examples:
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
 
-  console.log('\n' + '='.repeat(60));
+  console.log(`\n${  '='.repeat(60)}`);
   console.log('Summary');
   console.log('='.repeat(60));
   console.log(`Total places added: ${totals.success}`);

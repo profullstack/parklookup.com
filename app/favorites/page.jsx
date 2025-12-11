@@ -28,7 +28,7 @@ export default function FavoritesPage() {
   // Handle authentication redirect
   useEffect(() => {
     // Wait for auth to finish loading
-    if (authLoading) return;
+    if (authLoading) {return;}
 
     // Redirect to sign in if not authenticated
     if (!isAuthenticated) {
@@ -40,7 +40,7 @@ export default function FavoritesPage() {
   useEffect(() => {
     const fetchFavorites = async () => {
       // Wait for auth to finish loading
-      if (authLoading) return;
+      if (authLoading) {return;}
 
       // Don't fetch if not authenticated
       if (!isAuthenticated || !session?.access_token) {

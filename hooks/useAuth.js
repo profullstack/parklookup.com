@@ -17,7 +17,7 @@ const AUTH_TOKEN_KEY = 'parklookup_auth_token';
  * Get stored token from localStorage
  */
 const getStoredToken = () => {
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined') {return null;}
   try {
     return localStorage.getItem(AUTH_TOKEN_KEY);
   } catch {
@@ -29,7 +29,7 @@ const getStoredToken = () => {
  * Store token in localStorage
  */
 const storeToken = (token) => {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') {return;}
   try {
     if (token) {
       localStorage.setItem(AUTH_TOKEN_KEY, token);

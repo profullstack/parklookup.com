@@ -25,7 +25,7 @@ export default function TripsPage() {
    * Fetch user trips
    */
   const fetchTrips = useCallback(async () => {
-    if (!session?.access_token) return;
+    if (!session?.access_token) {return;}
 
     try {
       setLoading(true);
@@ -79,7 +79,7 @@ export default function TripsPage() {
    * Handle delete trip
    */
   const handleDeleteTrip = useCallback(async (tripId) => {
-    if (!session?.access_token) return;
+    if (!session?.access_token) {return;}
 
     if (!confirm('Are you sure you want to delete this trip?')) {
       return;

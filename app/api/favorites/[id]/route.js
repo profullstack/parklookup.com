@@ -109,9 +109,9 @@ export async function PATCH(request, { params }) {
 
     // Build update object
     const updates = {};
-    if (notes !== undefined) updates.notes = notes;
-    if (visited !== undefined) updates.visited = visited;
-    if (visitedAt !== undefined) updates.visited_at = visitedAt;
+    if (notes !== undefined) {updates.notes = notes;}
+    if (visited !== undefined) {updates.visited = visited;}
+    if (visitedAt !== undefined) {updates.visited_at = visitedAt;}
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No updates provided' }, { status: 400 });
