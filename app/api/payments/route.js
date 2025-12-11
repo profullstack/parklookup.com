@@ -98,10 +98,12 @@ export async function GET(request) {
       customer: profile.stripe_customer_id,
       status: 'active',
       limit: 1,
-      expand: ['data.latest_invoice', 'data.discount', 'data.discount.coupon'],
+      expand: ['data.latest_invoice', 'data.discount', 'data.discount.coupon', 'data.latest_invoice.discount', 'data.latest_invoice.total_discount_amounts'],
     });
     
     let stripeSubscription = subscriptions.data[0];
+    
+    console.log('Raw Stripe subscription response:', JSON.stringify(stripeSubscription, null, 2));
     
     // If no active subscription found, try to get the one from the database
     if (!stripeSubscription && profile.stripe_subscription_id) {
@@ -144,11 +146,41 @@ export async function GET(request) {
       // Get base price from the subscription item
       const baseAmount = stripeSubscription.items.data[0]?.price?.unit_amount || 0;
       
-      // Check if there's an active discount/coupon
-      const discount = stripeSubscription.discount;
+      // Check if there's an active discount/coupon on the subscription
+      let discount = stripeSubscription.discount;
+      
+      // If no discount on subscription, check the latest invoice for discount info
+      const latestInvoice = stripeSubscription.latest_invoice;
+      if (!discount && latestInvoice && typeof latestInvoice === 'object') {
+        // Check if invoice has discount amounts
+        if (latestInvoice.total_discount_amounts && latestInvoice.total_discount_amounts.length > 0) {
+          const invoiceDiscount = latestInvoice.total_discount_amounts[0];
+          console.log('Found discount on invoice:', invoiceDiscount);
+        }
+        // Check if invoice has a discount object
+        if (latestInvoice.discount) {
+          discount = latestInvoice.discount;
+          console.log('Using discount from invoice:', discount);
+        }
+      }
+      
       const hasDiscount = !!discount;
       const discountPercent = discount?.coupon?.percent_off || null;
       const discountAmount = discount?.coupon?.amount_off || null;
+      
+      // Also check if the amount paid differs from base amount (indicates a discount was applied)
+      const invoiceAmountPaid = latestInvoice && typeof latestInvoice === 'object' ? latestInvoice.amount_paid : null;
+      const hasImpliedDiscount = invoiceAmountPaid !== null && invoiceAmountPaid < baseAmount;
+      
+      console.log('Discount detection:', {
+        hasDiscount,
+        hasImpliedDiscount,
+        baseAmount,
+        invoiceAmountPaid,
+        discountPercent,
+        discountAmount,
+        discountObject: discount,
+      });
       
       // Calculate the actual amount after discount
       let actualAmountPaid = baseAmount;
@@ -161,9 +193,32 @@ export async function GET(request) {
       }
       
       // If we have a latest invoice with amount_paid, use that as it's the most accurate
-      const latestInvoice = stripeSubscription.latest_invoice;
-      if (latestInvoice && typeof latestInvoice === 'object' && latestInvoice.amount_paid > 0) {
-        actualAmountPaid = latestInvoice.amount_paid;
+      if (invoiceAmountPaid !== null && invoiceAmountPaid > 0) {
+        actualAmountPaid = invoiceAmountPaid;
+      }
+      
+      // If there's an implied discount (amount paid < base), calculate the discount info
+      let effectiveDiscount = null;
+      if (hasDiscount) {
+        effectiveDiscount = {
+          percentOff: discountPercent,
+          amountOff: discountAmount,
+          couponName: discount?.coupon?.name || discount?.coupon?.id,
+          duration: discount?.coupon?.duration,
+          durationInMonths: discount?.coupon?.duration_in_months,
+        };
+      } else if (hasImpliedDiscount) {
+        // Calculate implied discount from the price difference
+        const impliedDiscountAmount = baseAmount - invoiceAmountPaid;
+        const impliedDiscountPercent = Math.round((impliedDiscountAmount / baseAmount) * 100);
+        effectiveDiscount = {
+          percentOff: impliedDiscountPercent,
+          amountOff: impliedDiscountAmount,
+          couponName: 'Discount Applied',
+          duration: 'unknown',
+          durationInMonths: null,
+        };
+        console.log('Using implied discount:', effectiveDiscount);
       }
       
       console.log('Stripe subscription data:', {
@@ -175,10 +230,11 @@ export async function GET(request) {
         baseAmount,
         actualAmountPaid,
         hasDiscount,
+        hasImpliedDiscount,
         discountPercent,
         discountAmount,
         couponName: discount?.coupon?.name || discount?.coupon?.id,
-        latestInvoiceAmountPaid: latestInvoice?.amount_paid,
+        effectiveDiscount,
       });
 
       subscription = {
@@ -194,13 +250,7 @@ export async function GET(request) {
           currency: stripeSubscription.items.data[0]?.price?.currency || 'usd',
           interval: stripeSubscription.items.data[0]?.price?.recurring?.interval || 'month',
         },
-        discount: hasDiscount ? {
-          percentOff: discountPercent,
-          amountOff: discountAmount,
-          couponName: discount?.coupon?.name || discount?.coupon?.id,
-          duration: discount?.coupon?.duration, // 'forever', 'once', 'repeating'
-          durationInMonths: discount?.coupon?.duration_in_months,
-        } : null,
+        discount: effectiveDiscount,
       };
     }
 
