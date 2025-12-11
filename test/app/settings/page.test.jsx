@@ -564,8 +564,25 @@ describe('Settings Page', () => {
       });
     });
 
-    it('should show alert when clicking upgrade button', async () => {
-      const mockAlert = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    it('should call checkout API when clicking upgrade button', async () => {
+      // First call returns profile, second call is the checkout API
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ profile: mockProfile }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            url: 'https://checkout.stripe.com/test',
+            sessionId: 'cs_test_123',
+          }),
+        });
+
+      // Mock window.location.href
+      const originalLocation = window.location;
+      delete window.location;
+      window.location = { href: '' };
 
       render(<SettingsPage />);
 
@@ -574,9 +591,19 @@ describe('Settings Page', () => {
         fireEvent.click(upgradeButton);
       });
 
-      expect(mockAlert).toHaveBeenCalledWith('Upgrade functionality coming soon!');
+      await waitFor(() => {
+        expect(mockFetch).toHaveBeenCalledWith('/api/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer test-auth-token',
+          },
+          body: JSON.stringify({}),
+        });
+      });
 
-      mockAlert.mockRestore();
+      // Restore window.location
+      window.location = originalLocation;
     });
 
     it('should not show upgrade button for pro users', async () => {
