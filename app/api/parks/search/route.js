@@ -76,7 +76,9 @@ export async function GET(request) {
     // Helper function to normalize Wikimedia URLs
     // Converts http:// to https:// and Special:FilePath URLs to direct image URLs
     const normalizeWikimediaUrl = (url) => {
-      if (!url || typeof url !== 'string') return null;
+      if (!url || typeof url !== 'string') {
+        return null;
+      }
       
       let normalized = url.trim();
       

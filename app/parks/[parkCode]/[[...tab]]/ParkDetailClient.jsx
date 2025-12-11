@@ -477,16 +477,18 @@ export default function ParkDetailClient({
         </div>
       )}
 
-      {/* Image Gallery - shown on all tabs */}
-      {images.length > 1 && (
+      {/* Image Gallery - shown on all tabs when there are images */}
+      {images.length > 0 && (
         <div className="mt-8">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Photos</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {images.slice(1, 7).map((image, index) => (
+            {/* For parks with multiple images, skip the first one (shown in hero) */}
+            {/* For parks with only 1 image, show it in the gallery too */}
+            {(images.length > 1 ? images.slice(1, 7) : images).map((image, index) => (
               <div key={index} className="relative aspect-video rounded-lg overflow-hidden">
                 <Image
                   src={image.url}
-                  alt={image.altText || `${park.full_name} photo ${index + 2}`}
+                  alt={image.altText || `${park.full_name} photo ${index + (images.length > 1 ? 2 : 1)}`}
                   fill
                   className="object-cover hover:scale-105 transition-transform duration-300"
                 />

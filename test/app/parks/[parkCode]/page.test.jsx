@@ -579,7 +579,7 @@ describe('ParkDetailClient', () => {
       expect(images.length).toBeGreaterThan(0);
     });
 
-    it('should not display gallery when only one image', () => {
+    it('should display gallery even with only one image (for state parks)', () => {
       render(
         <ParkDetailClient
           park={mockStatePark}
@@ -587,6 +587,25 @@ describe('ParkDetailClient', () => {
           products={[]}
           hasCoordinates={true}
           images={mockStatePark.images}
+          activities={mockStatePark.activities}
+          entranceFees={mockStatePark.entrance_fees}
+          operatingHours={mockStatePark.operating_hours}
+        />
+      );
+
+      // State parks with only 1 image should still show the gallery
+      // This ensures state park photos are visible in the gallery section
+      expect(screen.getByText('Photos')).toBeInTheDocument();
+    });
+
+    it('should not display gallery when no images', () => {
+      render(
+        <ParkDetailClient
+          park={mockStatePark}
+          activeTab="overview"
+          products={[]}
+          hasCoordinates={true}
+          images={[]}
           activities={mockStatePark.activities}
           entranceFees={mockStatePark.entrance_fees}
           operatingHours={mockStatePark.operating_hours}

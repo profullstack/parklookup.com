@@ -44,7 +44,9 @@ export default function PopularParks() {
         
         // Helper function to check if URL is from Wikimedia (needs unoptimized)
         const isWikimediaUrl = (url) => {
-          if (!url) return false;
+          if (!url) {
+            return false;
+          }
           return url.includes('wikimedia.org') || url.includes('wikipedia.org');
         };
         

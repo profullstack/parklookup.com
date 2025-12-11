@@ -16,10 +16,12 @@ import { createServerClient } from '@/lib/supabase/client';
  * @returns {string} Normalized URL with HTTPS
  */
 const normalizeImageUrl = (url) => {
-  if (!url) return url;
+  if (!url) {
+    return url;
+  }
 
   // Convert http:// to https://
-  let normalizedUrl = url.replace(/^http:\/\//i, 'https://');
+  const normalizedUrl = url.replace(/^http:\/\//i, 'https://');
 
   return normalizedUrl;
 };

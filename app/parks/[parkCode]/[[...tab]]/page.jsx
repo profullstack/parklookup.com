@@ -16,7 +16,9 @@ const DEFAULT_TAB = 'overview';
  * @returns {string} Normalized URL with HTTPS
  */
 const normalizeImageUrl = (url) => {
-  if (!url) return url;
+  if (!url) {
+    return url;
+  }
   return url.replace(/^http:\/\//i, 'https://');
 };
 
