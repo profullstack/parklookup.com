@@ -189,7 +189,9 @@ const handleCheckoutSessionCompleted = async (supabase, session) => {
  * @param {object} invoice - Invoice object
  */
 const handleInvoicePaid = async (supabase, invoice) => {
-  const { customer, subscription } = invoice;
+  const { customer } = invoice;
+  // Subscription ID can be in different places depending on the invoice type
+  const subscriptionId = invoice.subscription || invoice.lines?.data?.[0]?.subscription;
 
   const user = await findUserByStripeCustomerId(supabase, customer);
 
@@ -201,13 +203,18 @@ const handleInvoicePaid = async (supabase, invoice) => {
     return;
   }
 
-  // Update subscription status to active (in case it was past_due)
-  await updateUserSubscription(supabase, user.id, {
+  // Build update object - only include subscription_id if we have it
+  const updates = {
     subscription_status: 'active',
-    stripe_subscription_id: subscription,
-  });
+  };
+  
+  if (subscriptionId) {
+    updates.stripe_subscription_id = subscriptionId;
+  }
 
-  console.log(`Invoice paid for user ${user.id}, subscription: ${subscription}`);
+  await updateUserSubscription(supabase, user.id, updates);
+
+  console.log(`Invoice paid for user ${user.id}, subscription: ${subscriptionId || 'N/A'}`);
 };
 
 /**

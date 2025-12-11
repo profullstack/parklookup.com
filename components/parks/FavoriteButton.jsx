@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -21,15 +21,21 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
 
   useEffect(() => {
     const checkFavoriteStatus = async () => {
-      // Only check if we have user, session with token, and parkId
-      if (!user || !session?.access_token || !parkId) {
+      // Only check if we have user and parkId
+      if (!user || !parkId) {
+        return;
+      }
+
+      // Get token from localStorage
+      const token = localStorage.getItem('parklookup_auth_token');
+      if (!token) {
         return;
       }
 
       try {
         const response = await fetch(`/api/favorites?parkId=${parkId}`, {
           headers: {
-            Authorization: `Bearer ${session.access_token}`,
+            Authorization: `Bearer ${token}`,
           },
         });
         if (response.ok) {
@@ -42,7 +48,7 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
     };
 
     checkFavoriteStatus();
-  }, [user, session, parkId]);
+  }, [user, parkId]);
 
   const toggleFavorite = async (e) => {
     e.preventDefault();
@@ -50,17 +56,23 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
 
     if (!user) {
       // Redirect to login or show login modal
-      window.location.href = '/auth/signin';
+      window.location.href = '/signin';
+      return;
+    }
+
+    // Get token from localStorage
+    const token = localStorage.getItem('parklookup_auth_token');
+    if (!token) {
+      window.location.href = '/signin';
       return;
     }
 
     setLoading(true);
 
     try {
-      const authHeaders = {};
-      if (session?.access_token) {
-        authHeaders.Authorization = `Bearer ${session.access_token}`;
-      }
+      const authHeaders = {
+        Authorization: `Bearer ${token}`,
+      };
 
       if (isFavorite) {
         // Remove from favorites

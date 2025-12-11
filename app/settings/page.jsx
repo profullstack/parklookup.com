@@ -301,10 +301,12 @@ function SettingsContent() {
                   <div>
                     <p className="font-medium text-gray-900">Account Status</p>
                     <p className="text-sm text-gray-500">
-                      {profile?.is_pro ? 'Pro Member' : 'Free Account'}
+                      {profile?.subscription_tier === 'pro' && profile?.subscription_status === 'active'
+                        ? 'Pro Member'
+                        : 'Free Account'}
                     </p>
                   </div>
-                  {profile?.is_pro ? (
+                  {profile?.subscription_tier === 'pro' && profile?.subscription_status === 'active' ? (
                     <span className="px-3 py-1 bg-green-100 text-green-800 text-sm font-medium rounded-full">
                       ✨ Pro
                     </span>
@@ -318,7 +320,7 @@ function SettingsContent() {
                     </Button>
                   )}
                 </div>
-                {!profile?.is_pro && (
+                {!(profile?.subscription_tier === 'pro' && profile?.subscription_status === 'active') && (
                   <p className="mt-2 text-xs text-gray-500">
                     Pro members get unlimited trip creation and premium features.
                   </p>

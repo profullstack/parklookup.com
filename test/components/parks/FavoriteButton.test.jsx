@@ -17,10 +17,24 @@ vi.mock('@/hooks/useAuth', () => ({
 // Mock fetch
 global.fetch = vi.fn();
 
+// Mock localStorage
+const mockLocalStorage = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+  clear: vi.fn(),
+};
+Object.defineProperty(window, 'localStorage', {
+  value: mockLocalStorage,
+  writable: true,
+});
+
 describe('FavoriteButton', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     global.fetch.mockReset();
+    mockLocalStorage.getItem.mockReset();
+    mockLocalStorage.setItem.mockReset();
   });
 
   describe('Rendering', () => {
@@ -60,7 +74,6 @@ describe('FavoriteButton', () => {
     it('should redirect to signin when clicking without being logged in', async () => {
       mockUseAuth.mockReturnValue({
         user: null,
-        session: null,
       });
 
       // Mock window.location
@@ -73,7 +86,7 @@ describe('FavoriteButton', () => {
       const button = screen.getByRole('button');
       fireEvent.click(button);
 
-      expect(window.location.href).toBe('/auth/signin');
+      expect(window.location.href).toBe('/signin');
 
       // Restore window.location
       window.location = originalLocation;
@@ -82,8 +95,9 @@ describe('FavoriteButton', () => {
     it('should check favorite status when user is logged in', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       global.fetch.mockResolvedValueOnce({
         ok: true,
@@ -109,8 +123,9 @@ describe('FavoriteButton', () => {
     it('should show unfilled heart when park is not a favorite', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       global.fetch.mockResolvedValueOnce({
         ok: true,
@@ -128,8 +143,9 @@ describe('FavoriteButton', () => {
     it('should show filled heart when park is a favorite', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       global.fetch.mockResolvedValueOnce({
         ok: true,
@@ -151,8 +167,9 @@ describe('FavoriteButton', () => {
     it('should add to favorites when clicking unfavorited park', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       // First call: check status (not favorited)
       global.fetch.mockResolvedValueOnce({
@@ -194,8 +211,9 @@ describe('FavoriteButton', () => {
     it('should remove from favorites when clicking favorited park', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       // First call: check status (favorited)
       global.fetch.mockResolvedValueOnce({
@@ -237,8 +255,9 @@ describe('FavoriteButton', () => {
     it('should update button state after adding favorite', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       // First call: check status (not favorited)
       global.fetch.mockResolvedValueOnce({
@@ -273,8 +292,9 @@ describe('FavoriteButton', () => {
     it('should update button state after removing favorite', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       // First call: check status (favorited)
       global.fetch.mockResolvedValueOnce({
@@ -313,8 +333,9 @@ describe('FavoriteButton', () => {
     it('should disable button while loading', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       // First call: check status
       global.fetch.mockResolvedValueOnce({
@@ -356,8 +377,9 @@ describe('FavoriteButton', () => {
     it('should handle fetch errors gracefully', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       // Mock console.error to suppress error output in tests
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -379,8 +401,9 @@ describe('FavoriteButton', () => {
     it('should handle toggle errors gracefully', async () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
-        session: { access_token: 'test-token' },
       });
+
+      mockLocalStorage.getItem.mockReturnValue('test-token');
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 

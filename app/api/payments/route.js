@@ -58,7 +58,7 @@ export async function GET(request) {
   // Get user profile with Stripe customer ID
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('stripe_customer_id, stripe_subscription_id, subscription_status, subscription_period_end, is_pro')
+    .select('stripe_customer_id, stripe_subscription_id, subscription_status, subscription_tier, subscription_period_end')
     .eq('id', user.id)
     .single();
 
@@ -85,15 +85,25 @@ export async function GET(request) {
     if (profile.stripe_subscription_id) {
       try {
         const stripeSubscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
+        
+        // Safely convert timestamps - they might be undefined or invalid
+        const currentPeriodStart = stripeSubscription.current_period_start
+          ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
+          : null;
+        const currentPeriodEnd = stripeSubscription.current_period_end
+          ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+          : null;
+        const canceledAt = stripeSubscription.canceled_at
+          ? new Date(stripeSubscription.canceled_at * 1000).toISOString()
+          : null;
+        
         subscription = {
           id: stripeSubscription.id,
           status: stripeSubscription.status,
-          currentPeriodStart: new Date(stripeSubscription.current_period_start * 1000).toISOString(),
-          currentPeriodEnd: new Date(stripeSubscription.current_period_end * 1000).toISOString(),
+          currentPeriodStart,
+          currentPeriodEnd,
           cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-          canceledAt: stripeSubscription.canceled_at
-            ? new Date(stripeSubscription.canceled_at * 1000).toISOString()
-            : null,
+          canceledAt,
           plan: {
             amount: stripeSubscription.items.data[0]?.price?.unit_amount || 0,
             currency: stripeSubscription.items.data[0]?.price?.currency || 'usd',
@@ -127,7 +137,7 @@ export async function GET(request) {
       subscription,
       payments,
       hasStripeCustomer: true,
-      isPro: profile.is_pro,
+      isPro: profile.subscription_tier === 'pro' && profile.subscription_status === 'active',
     });
   } catch (error) {
     console.error('Error fetching payment data:', error);
