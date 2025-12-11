@@ -42,11 +42,22 @@ export default function PopularParks() {
           return null;
         };
         
+        // Helper function to check if URL is from Wikimedia (needs unoptimized)
+        const isWikimediaUrl = (url) => {
+          if (!url) return false;
+          return url.includes('wikimedia.org') || url.includes('wikipedia.org');
+        };
+        
         // Add the image URL to each park for rendering
-        const parksWithImageUrls = (data.parks || []).map(park => ({
-          ...park,
-          validatedImageUrl: getImageUrl(park)
-        }));
+        const parksWithImageUrls = (data.parks || []).map(park => {
+          const imageUrl = getImageUrl(park);
+          return {
+            ...park,
+            validatedImageUrl: imageUrl,
+            // Wikimedia URLs need unoptimized because they use redirects
+            useUnoptimized: isWikimediaUrl(imageUrl)
+          };
+        });
         
         console.log('PopularParks: Received', parksWithImageUrls.length, 'parks with images from API');
         
@@ -112,13 +123,23 @@ export default function PopularParks() {
               className="group block bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="relative h-48 overflow-hidden">
-                <Image
-                  src={park.validatedImageUrl}
-                  alt={park.full_name}
-                  fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                />
+                {park.useUnoptimized ? (
+                  // Use regular img for Wikimedia URLs (they use redirects that Next.js can't optimize)
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={park.validatedImageUrl}
+                    alt={park.full_name}
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                  />
+                ) : (
+                  <Image
+                    src={park.validatedImageUrl}
+                    alt={park.full_name}
+                    fill
+                    className="object-cover group-hover:scale-105 transition-transform duration-300"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-4">
                   <h3 className="text-white font-bold text-lg leading-tight">

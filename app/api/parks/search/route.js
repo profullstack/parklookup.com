@@ -73,6 +73,34 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Failed to search parks' }, { status: 500 });
     }
 
+    // Helper function to normalize Wikimedia URLs
+    // Converts http:// to https:// and Special:FilePath URLs to direct image URLs
+    const normalizeWikimediaUrl = (url) => {
+      if (!url || typeof url !== 'string') return null;
+      
+      let normalized = url.trim();
+      
+      // Convert http to https
+      if (normalized.startsWith('http://')) {
+        normalized = normalized.replace('http://', 'https://');
+      }
+      
+      // Convert Special:FilePath URLs to direct upload URLs
+      // http://commons.wikimedia.org/wiki/Special:FilePath/Image.jpg
+      // -> https://upload.wikimedia.org/wikipedia/commons/thumb/X/XX/Image.jpg/800px-Image.jpg
+      // For simplicity, we'll use the direct commons URL format
+      if (normalized.includes('commons.wikimedia.org/wiki/Special:FilePath/')) {
+        const filename = normalized.split('Special:FilePath/')[1];
+        if (filename) {
+          // Use the Wikimedia Commons API to get a direct URL
+          // Format: https://commons.wikimedia.org/wiki/Special:FilePath/FILENAME?width=800
+          normalized = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(decodeURIComponent(filename))}?width=800`;
+        }
+      }
+      
+      return normalized;
+    };
+
     // Helper function to check if a park has a valid image
     const hasValidImage = (park) => {
       // Check NPS images array - must have at least one image with a valid URL
@@ -89,8 +117,30 @@ export async function GET(request) {
       return false;
     };
 
-    // Filter parks if hasImages is requested
-    let filteredParks = parks || [];
+    // Helper function to normalize park image URLs
+    const normalizeParkImages = (park) => {
+      const normalized = { ...park };
+      
+      // Normalize wikidata_image URL
+      if (normalized.wikidata_image) {
+        normalized.wikidata_image = normalizeWikimediaUrl(normalized.wikidata_image);
+      }
+      
+      // Normalize images array URLs (for wikidata parks that have images constructed from wikidata_image)
+      if (Array.isArray(normalized.images) && normalized.images.length > 0) {
+        normalized.images = normalized.images.map(img => {
+          if (img?.url && img.url.includes('wikimedia.org')) {
+            return { ...img, url: normalizeWikimediaUrl(img.url) };
+          }
+          return img;
+        });
+      }
+      
+      return normalized;
+    };
+
+    // Normalize image URLs and filter parks if hasImages is requested
+    let filteredParks = (parks || []).map(normalizeParkImages);
     if (hasImages) {
       filteredParks = filteredParks.filter(hasValidImage).slice(0, limit);
     }
