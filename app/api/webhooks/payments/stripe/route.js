@@ -194,8 +194,11 @@ const handleInvoicePaid = async (supabase, invoice) => {
   const user = await findUserByStripeCustomerId(supabase, customer);
 
   if (!user) {
-    console.error('User not found for invoice:', invoice.id);
-    throw new Error('User not found');
+    // This can happen when invoice.paid fires before checkout.session.completed
+    // has finished processing. The checkout.session.completed handler will
+    // set up the user's subscription, so we can safely skip this event.
+    console.log(`User not found for invoice ${invoice.id}, skipping (will be handled by checkout.session.completed)`);
+    return;
   }
 
   // Update subscription status to active (in case it was past_due)

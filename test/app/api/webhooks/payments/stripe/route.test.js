@@ -361,6 +361,39 @@ describe('Stripe Webhook API Route', () => {
         expect(response.status).toBe(200);
         expect(data.received).toBe(true);
       });
+
+      it('should skip gracefully when user is not found (handled by checkout.session.completed)', async () => {
+        vi.resetModules();
+        mockSupabaseClient = createMockSupabaseClient();
+        // User not found - this happens when invoice.paid fires before checkout.session.completed
+        mockSupabaseClient.single.mockResolvedValue({
+          data: null,
+          error: { code: 'PGRST116', message: 'No rows returned' },
+        });
+
+        const { POST } = await import('@/app/api/webhooks/payments/stripe/route.js');
+
+        const payload = JSON.stringify(mockInvoicePaid);
+        const signature = generateStripeSignature(payload, WEBHOOK_SECRET);
+
+        const request = new Request('http://localhost:3000/api/webhooks/payments/stripe', {
+          method: 'POST',
+          body: payload,
+          headers: {
+            'Content-Type': 'application/json',
+            'stripe-signature': signature,
+          },
+        });
+
+        const response = await POST(request);
+        const data = await response.json();
+
+        // Should return 200 and skip processing (not 404)
+        expect(response.status).toBe(200);
+        expect(data.received).toBe(true);
+        // Should NOT have called update since user wasn't found
+        expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+      });
     });
 
     describe('Event: invoice.payment_failed', () => {
