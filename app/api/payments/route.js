@@ -89,90 +89,119 @@ export async function GET(request) {
   const stripe = new Stripe(stripeSecretKey);
 
   try {
-    // Get subscription details if exists
+    // Get the most recent active subscription from Stripe directly
+    // This ensures we always show the current subscription, even if the DB is out of sync
     let subscription = null;
-    if (profile.stripe_subscription_id) {
+    
+    // First, try to get all subscriptions for this customer and find the active one
+    const subscriptions = await stripe.subscriptions.list({
+      customer: profile.stripe_customer_id,
+      status: 'active',
+      limit: 1,
+      expand: ['data.latest_invoice', 'data.discount', 'data.discount.coupon'],
+    });
+    
+    let stripeSubscription = subscriptions.data[0];
+    
+    // If no active subscription found, try to get the one from the database
+    if (!stripeSubscription && profile.stripe_subscription_id) {
       try {
-        const stripeSubscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id, {
+        stripeSubscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id, {
           expand: ['latest_invoice', 'discount', 'discount.coupon'],
         });
-        
-        // Safely convert timestamps - they must be valid positive numbers
-        const currentPeriodStart = stripeSubscription.current_period_start && stripeSubscription.current_period_start > 0
-          ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
-          : null;
-        const currentPeriodEnd = stripeSubscription.current_period_end && stripeSubscription.current_period_end > 0
-          ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
-          : null;
-        const canceledAt = stripeSubscription.canceled_at && stripeSubscription.canceled_at > 0
-          ? new Date(stripeSubscription.canceled_at * 1000).toISOString()
-          : null;
-        
-        // Get base price from the subscription item
-        const baseAmount = stripeSubscription.items.data[0]?.price?.unit_amount || 0;
-        
-        // Check if there's an active discount/coupon
-        const discount = stripeSubscription.discount;
-        const hasDiscount = !!discount;
-        const discountPercent = discount?.coupon?.percent_off || null;
-        const discountAmount = discount?.coupon?.amount_off || null;
-        
-        // Calculate the actual amount after discount
-        let actualAmountPaid = baseAmount;
-        if (hasDiscount) {
-          if (discountPercent) {
-            actualAmountPaid = Math.round(baseAmount * (1 - discountPercent / 100));
-          } else if (discountAmount) {
-            actualAmountPaid = Math.max(0, baseAmount - discountAmount);
-          }
-        }
-        
-        // If we have a latest invoice with amount_paid, use that as it's the most accurate
-        const latestInvoice = stripeSubscription.latest_invoice;
-        if (latestInvoice && typeof latestInvoice === 'object' && latestInvoice.amount_paid > 0) {
-          actualAmountPaid = latestInvoice.amount_paid;
-        }
-        
-        console.log('Stripe subscription data:', {
-          id: stripeSubscription.id,
-          status: stripeSubscription.status,
-          cancel_at_period_end: stripeSubscription.cancel_at_period_end,
-          canceled_at: stripeSubscription.canceled_at,
-          current_period_end: stripeSubscription.current_period_end,
-          baseAmount,
-          actualAmountPaid,
-          hasDiscount,
-          discountPercent,
-          discountAmount,
-          couponName: discount?.coupon?.name || discount?.coupon?.id,
-          latestInvoiceAmountPaid: latestInvoice?.amount_paid,
-        });
-
-        subscription = {
-          id: stripeSubscription.id,
-          status: stripeSubscription.status,
-          currentPeriodStart,
-          currentPeriodEnd,
-          cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
-          canceledAt,
-          plan: {
-            amount: actualAmountPaid, // Show actual amount paid (after discount)
-            baseAmount, // Original price before discount
-            currency: stripeSubscription.items.data[0]?.price?.currency || 'usd',
-            interval: stripeSubscription.items.data[0]?.price?.recurring?.interval || 'month',
-          },
-          discount: hasDiscount ? {
-            percentOff: discountPercent,
-            amountOff: discountAmount,
-            couponName: discount?.coupon?.name || discount?.coupon?.id,
-            duration: discount?.coupon?.duration, // 'forever', 'once', 'repeating'
-            durationInMonths: discount?.coupon?.duration_in_months,
-          } : null,
-        };
       } catch (subError) {
-        console.error('Error fetching subscription:', subError);
+        console.error('Error fetching subscription from DB ID:', subError);
         // Subscription might have been deleted, continue without it
       }
+    }
+    
+    // Process the subscription if we found one
+    if (stripeSubscription) {
+      // Update the database with the correct subscription ID if it's different
+      if (stripeSubscription.id !== profile.stripe_subscription_id) {
+        console.log(`Updating subscription ID in DB from ${profile.stripe_subscription_id} to ${stripeSubscription.id}`);
+        await supabase
+          .from('profiles')
+          .update({
+            stripe_subscription_id: stripeSubscription.id,
+            subscription_status: stripeSubscription.status,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', user.id);
+      }
+      
+      // Safely convert timestamps - they must be valid positive numbers
+      const currentPeriodStart = stripeSubscription.current_period_start && stripeSubscription.current_period_start > 0
+        ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
+        : null;
+      const currentPeriodEnd = stripeSubscription.current_period_end && stripeSubscription.current_period_end > 0
+        ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+        : null;
+      const canceledAt = stripeSubscription.canceled_at && stripeSubscription.canceled_at > 0
+        ? new Date(stripeSubscription.canceled_at * 1000).toISOString()
+        : null;
+      
+      // Get base price from the subscription item
+      const baseAmount = stripeSubscription.items.data[0]?.price?.unit_amount || 0;
+      
+      // Check if there's an active discount/coupon
+      const discount = stripeSubscription.discount;
+      const hasDiscount = !!discount;
+      const discountPercent = discount?.coupon?.percent_off || null;
+      const discountAmount = discount?.coupon?.amount_off || null;
+      
+      // Calculate the actual amount after discount
+      let actualAmountPaid = baseAmount;
+      if (hasDiscount) {
+        if (discountPercent) {
+          actualAmountPaid = Math.round(baseAmount * (1 - discountPercent / 100));
+        } else if (discountAmount) {
+          actualAmountPaid = Math.max(0, baseAmount - discountAmount);
+        }
+      }
+      
+      // If we have a latest invoice with amount_paid, use that as it's the most accurate
+      const latestInvoice = stripeSubscription.latest_invoice;
+      if (latestInvoice && typeof latestInvoice === 'object' && latestInvoice.amount_paid > 0) {
+        actualAmountPaid = latestInvoice.amount_paid;
+      }
+      
+      console.log('Stripe subscription data:', {
+        id: stripeSubscription.id,
+        status: stripeSubscription.status,
+        cancel_at_period_end: stripeSubscription.cancel_at_period_end,
+        canceled_at: stripeSubscription.canceled_at,
+        current_period_end: stripeSubscription.current_period_end,
+        baseAmount,
+        actualAmountPaid,
+        hasDiscount,
+        discountPercent,
+        discountAmount,
+        couponName: discount?.coupon?.name || discount?.coupon?.id,
+        latestInvoiceAmountPaid: latestInvoice?.amount_paid,
+      });
+
+      subscription = {
+        id: stripeSubscription.id,
+        status: stripeSubscription.status,
+        currentPeriodStart,
+        currentPeriodEnd,
+        cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
+        canceledAt,
+        plan: {
+          amount: actualAmountPaid, // Show actual amount paid (after discount)
+          baseAmount, // Original price before discount
+          currency: stripeSubscription.items.data[0]?.price?.currency || 'usd',
+          interval: stripeSubscription.items.data[0]?.price?.recurring?.interval || 'month',
+        },
+        discount: hasDiscount ? {
+          percentOff: discountPercent,
+          amountOff: discountAmount,
+          couponName: discount?.coupon?.name || discount?.coupon?.id,
+          duration: discount?.coupon?.duration, // 'forever', 'once', 'repeating'
+          durationInMonths: discount?.coupon?.duration_in_months,
+        } : null,
+      };
     }
 
     // Get payment history (invoices)

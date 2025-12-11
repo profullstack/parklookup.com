@@ -7,12 +7,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock Stripe
 const mockStripeSubscriptionsRetrieve = vi.fn();
+const mockStripeSubscriptionsList = vi.fn();
 const mockStripeInvoicesList = vi.fn();
 vi.mock('stripe', () => {
   return {
     default: vi.fn(() => ({
       subscriptions: {
         retrieve: mockStripeSubscriptionsRetrieve,
+        list: mockStripeSubscriptionsList,
       },
       invoices: {
         list: mockStripeInvoicesList,
@@ -108,6 +110,7 @@ describe('Payments API Route', () => {
       error: null,
     });
 
+    mockStripeSubscriptionsList.mockResolvedValue({ data: [mockSubscription] });
     mockStripeSubscriptionsRetrieve.mockResolvedValue(mockSubscription);
     mockStripeInvoicesList.mockResolvedValue(mockInvoices);
   });
@@ -185,6 +188,7 @@ describe('Payments API Route', () => {
           data: { ...mockProfile, stripe_customer_id: null },
           error: null,
         });
+        mockStripeSubscriptionsList.mockResolvedValue({ data: [] });
 
         const { GET } = await import('@/app/api/payments/route.js');
 
@@ -255,6 +259,7 @@ describe('Payments API Route', () => {
           cancel_at_period_end: true,
           canceled_at: 1705000000, // When the user clicked cancel
         };
+        mockStripeSubscriptionsList.mockResolvedValue({ data: [cancelledSubscription] });
         mockStripeSubscriptionsRetrieve.mockResolvedValue(cancelledSubscription);
 
         const { GET } = await import('@/app/api/payments/route.js');
@@ -311,6 +316,7 @@ describe('Payments API Route', () => {
             },
           },
         };
+        mockStripeSubscriptionsList.mockResolvedValue({ data: [discountedSubscription] });
         mockStripeSubscriptionsRetrieve.mockResolvedValue(discountedSubscription);
 
         const { GET } = await import('@/app/api/payments/route.js');
@@ -351,6 +357,7 @@ describe('Payments API Route', () => {
             },
           },
         };
+        mockStripeSubscriptionsList.mockResolvedValue({ data: [discountedSubscription] });
         mockStripeSubscriptionsRetrieve.mockResolvedValue(discountedSubscription);
 
         const { GET } = await import('@/app/api/payments/route.js');
@@ -395,6 +402,7 @@ describe('Payments API Route', () => {
             },
           },
         };
+        mockStripeSubscriptionsList.mockResolvedValue({ data: [subscriptionWithInvoice] });
         mockStripeSubscriptionsRetrieve.mockResolvedValue(subscriptionWithInvoice);
 
         const { GET } = await import('@/app/api/payments/route.js');
