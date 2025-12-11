@@ -18,6 +18,7 @@
  *   --details             Fetch detailed product information (slower, more API calls)
  *   --max <number>        Maximum products per search term (default: 10)
  *   --delay <ms>          Delay between API calls in milliseconds (default: 2000)
+ *   --concurrency <n>     Number of search terms to process in parallel (default: 3)
  *   --no-rewrite          Skip AI rewriting of titles and descriptions
  *
  * Environment variables required:
@@ -65,6 +66,7 @@ const OPTIONS = {
   details: hasFlag('--details'),
   maxProducts: parseInt(getArg('--max') || '10', 10),
   delayMs: parseInt(getArg('--delay') || '2000', 10),
+  concurrency: parseInt(getArg('--concurrency') || '3', 10),
   noRewrite: hasFlag('--no-rewrite'),
 };
 
@@ -560,6 +562,7 @@ const main = async () => {
     console.log('  --details             Fetch detailed product information (slower)');
     console.log('  --max <number>        Maximum products per search term (default: 10)');
     console.log('  --delay <ms>          Delay between API calls (default: 2000)');
+    console.log('  --concurrency <n>     Number of search terms to process in parallel (default: 3)');
     console.log('  --no-rewrite          Skip AI rewriting of titles and descriptions');
     console.log('\nPredefined search terms:');
     CAMPING_SEARCH_TERMS.forEach((term) => console.log(`  - ${term}`));
@@ -571,6 +574,7 @@ const main = async () => {
   console.log(`  - Max products per term: ${OPTIONS.maxProducts}`);
   console.log(`  - Fetch details: ${OPTIONS.details}`);
   console.log(`  - Delay between calls: ${OPTIONS.delayMs}ms`);
+  console.log(`  - Concurrency: ${OPTIONS.concurrency} search terms in parallel`);
   console.log(`  - Amazon affiliate tag: ${AMAZON_TAG || 'parklookup-20'}`);
   console.log(`  - AI content rewriting: ${!OPTIONS.noRewrite && OPENAI_API_KEY ? 'enabled' : 'disabled'}`);
 
@@ -588,19 +592,31 @@ const main = async () => {
     startTime: new Date(),
   };
 
-  // Process each search term
-  for (let i = 0; i < searchTerms.length; i++) {
-    const searchTerm = searchTerms[i];
+  // Process search terms in parallel batches
+  const { concurrency } = OPTIONS;
+  for (let i = 0; i < searchTerms.length; i += concurrency) {
+    const batch = searchTerms.slice(i, i + concurrency);
 
-    // Add delay between search terms to avoid rate limiting
+    // Add delay between batches to avoid rate limiting
     if (i > 0) {
-      console.log(`\n⏳ Waiting ${OPTIONS.delayMs}ms before next search...`);
+      console.log(`\n⏳ Waiting ${OPTIONS.delayMs}ms before next batch...`);
       await delay(OPTIONS.delayMs);
     }
 
-    const results = await importForSearchTerm(supabase, openai, searchTerm, OPTIONS);
-    overallResults.totalProducts += results.inserted;
-    overallResults.totalErrors += results.errors.length;
+    console.log(`\n📦 Processing batch ${Math.floor(i / concurrency) + 1}/${Math.ceil(searchTerms.length / concurrency)} (${batch.length} terms)`);
+
+    // Process batch in parallel
+    const batchPromises = batch.map((searchTerm) =>
+      importForSearchTerm(supabase, openai, searchTerm, OPTIONS)
+    );
+
+    const batchResults = await Promise.all(batchPromises);
+
+    // Aggregate results
+    for (const results of batchResults) {
+      overallResults.totalProducts += results.inserted;
+      overallResults.totalErrors += results.errors.length;
+    }
   }
 
   // Print summary

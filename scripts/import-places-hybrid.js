@@ -21,6 +21,7 @@
  *   --limit <n>          Limit number of parks to process
  *   --offset <n>         Skip first N parks (for resuming)
  *   --places-per-cat <n> Number of places per category (default: 5)
+ *   --concurrency <n>    Number of parks to process in parallel (default: 3)
  *   --dry-run            Don't save to database, just show what would be done
  *   --skip-photos        Skip fetching photos (faster, less API calls)
  */
@@ -86,6 +87,9 @@ const CATEGORY_QUERIES = {
 let valueSerpCalls = 0;
 let scaleSerpCalls = 0;
 
+// Cooldown duration for server errors (30 seconds)
+const ERROR_COOLDOWN_MS = 30000;
+
 /**
  * Sleep for a given number of milliseconds
  */
@@ -94,9 +98,16 @@ function sleep(ms) {
 }
 
 /**
- * Make a request to ValueSERP API (for places search)
+ * Check if an HTTP status code indicates a server error that should trigger cooldown
  */
-async function makeValueSerpRequest(params) {
+function isServerError(status) {
+  return status >= 500 || status === 429; // 5xx errors or rate limiting
+}
+
+/**
+ * Make a request to ValueSERP API (for places search) with retry on server errors
+ */
+async function makeValueSerpRequest(params, retryCount = 0) {
   valueSerpCalls++;
   const searchParams = new URLSearchParams({
     api_key: valueSerpApiKey,
@@ -108,6 +119,16 @@ async function makeValueSerpRequest(params) {
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    // If server error, apply cooldown and retry once
+    if (isServerError(response.status) && retryCount < 1) {
+      console.warn(
+        `    ⚠️ ValueSERP server error (${response.status}), cooling down for 30 seconds...`
+      );
+      await sleep(ERROR_COOLDOWN_MS);
+      return makeValueSerpRequest(params, retryCount + 1);
+    }
+
     throw new Error(`ValueSERP API error: ${response.status} - ${errorText}`);
   }
 
@@ -121,9 +142,9 @@ async function makeValueSerpRequest(params) {
 }
 
 /**
- * Make a request to ScaleSERP API (for details and photos)
+ * Make a request to ScaleSERP API (for details and photos) with retry on server errors
  */
-async function makeScaleSerpRequest(params) {
+async function makeScaleSerpRequest(params, retryCount = 0) {
   scaleSerpCalls++;
   const searchParams = new URLSearchParams({
     api_key: scaleSerpApiKey,
@@ -135,6 +156,16 @@ async function makeScaleSerpRequest(params) {
 
   if (!response.ok) {
     const errorText = await response.text();
+
+    // If server error, apply cooldown and retry once
+    if (isServerError(response.status) && retryCount < 1) {
+      console.warn(
+        `    ⚠️ ScaleSERP server error (${response.status}), cooling down for 30 seconds...`
+      );
+      await sleep(ERROR_COOLDOWN_MS);
+      return makeScaleSerpRequest(params, retryCount + 1);
+    }
+
     throw new Error(`ScaleSERP API error: ${response.status} - ${errorText}`);
   }
 
@@ -427,10 +458,35 @@ async function importPlacesForPark(park, categories, options = {}) {
 }
 
 /**
- * Process parks sequentially
+ * Process a single park and return results with park info for logging
+ */
+async function processSinglePark(park, index, total, categories, options) {
+  const { dryRun, skipPhotos, placesPerCategory } = options;
+
+  console.log(`\n[${index + 1}/${total}] ${park.full_name}`);
+
+  try {
+    const results = await importPlacesForPark(park, categories, {
+      dryRun,
+      skipPhotos,
+      placesPerCategory,
+    });
+    return {
+      success: results.success,
+      failed: results.failed,
+      skipped: results.skipped,
+    };
+  } catch (err) {
+    console.error(`  Error processing ${park.full_name}:`, err.message);
+    return { success: 0, failed: 1, skipped: 0 };
+  }
+}
+
+/**
+ * Process parks in parallel batches
  */
 async function processParks(parks, categories, options) {
-  const { dryRun, skipPhotos, placesPerCategory } = options;
+  const { concurrency = 1 } = options;
 
   const totals = {
     success: 0,
@@ -438,26 +494,28 @@ async function processParks(parks, categories, options) {
     skipped: 0,
   };
 
-  for (let i = 0; i < parks.length; i++) {
-    const park = parks[i];
-    console.log(`\n[${i + 1}/${parks.length}] ${park.full_name}`);
+  // Process parks in batches of `concurrency`
+  for (let i = 0; i < parks.length; i += concurrency) {
+    const batch = parks.slice(i, i + concurrency);
 
-    try {
-      const results = await importPlacesForPark(park, categories, {
-        dryRun,
-        skipPhotos,
-        placesPerCategory,
-      });
-      totals.success += results.success;
-      totals.failed += results.failed;
-      totals.skipped += results.skipped;
-    } catch (err) {
-      console.error(`  Error processing ${park.full_name}:`, err.message);
-      totals.failed++;
+    // Process batch in parallel
+    const batchPromises = batch.map((park, batchIndex) =>
+      processSinglePark(park, i + batchIndex, parks.length, categories, options)
+    );
+
+    const batchResults = await Promise.all(batchPromises);
+
+    // Aggregate results
+    for (const result of batchResults) {
+      totals.success += result.success;
+      totals.failed += result.failed;
+      totals.skipped += result.skipped;
     }
 
-    // Delay between parks
-    await sleep(500);
+    // Delay between batches (not between individual parks)
+    if (i + concurrency < parks.length) {
+      await sleep(500);
+    }
   }
 
   return totals;
@@ -478,6 +536,7 @@ async function main() {
   let dryRun = false;
   let skipPhotos = false;
   let placesPerCategory = 5;
+  let concurrency = 3;
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--park-id' && args[i + 1]) {
@@ -497,6 +556,9 @@ async function main() {
       i++;
     } else if (args[i] === '--places-per-cat' && args[i + 1]) {
       placesPerCategory = parseInt(args[i + 1], 10);
+      i++;
+    } else if (args[i] === '--concurrency' && args[i + 1]) {
+      concurrency = parseInt(args[i + 1], 10);
       i++;
     } else if (args[i] === '--dry-run') {
       dryRun = true;
@@ -519,13 +581,17 @@ Options:
   --limit <n>          Limit number of parks to process
   --offset <n>         Skip first N parks (for resuming)
   --places-per-cat <n> Number of places per category (default: 5)
+  --concurrency <n>    Number of parks to process in parallel (default: 3)
   --dry-run            Don't save to database, just show what would be done
   --skip-photos        Skip fetching photos (faster, less API calls)
   --help, -h           Show this help message
 
 Examples:
-  # Import 5 places per category for first 10 parks
+  # Import 5 places per category for first 10 parks (3 at a time)
   node scripts/import-places-hybrid.js --limit 10
+
+  # Import with higher parallelism (5 parks at a time)
+  node scripts/import-places-hybrid.js --limit 20 --concurrency 5
 
   # Import all categories for Yellowstone
   node scripts/import-places-hybrid.js --park-code yell
@@ -562,6 +628,7 @@ Examples:
   console.log(`Places per category: ${placesPerCategory}`);
   console.log(`Limit: ${limit || 'none'}`);
   console.log(`Offset: ${offset}`);
+  console.log(`Concurrency: ${concurrency} parks in parallel`);
   console.log(`Dry run: ${dryRun}`);
   console.log(`Skip photos: ${skipPhotos}`);
   console.log('='.repeat(60));
@@ -597,6 +664,7 @@ Examples:
     dryRun,
     skipPhotos,
     placesPerCategory,
+    concurrency,
   });
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
