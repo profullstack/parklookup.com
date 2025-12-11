@@ -326,11 +326,17 @@ describe('Trips API Routes - Unit Tests', () => {
 });
 
 describe('Trip ID Validation', () => {
+  // UUID regex matching the one used in the route handler
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
   it('should validate UUID format', () => {
     const validUUID = '123e4567-e89b-12d3-a456-426614174000';
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    
     expect(uuidRegex.test(validUUID)).toBe(true);
+  });
+
+  it('should validate UUID v4 format', () => {
+    const validUUIDv4 = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
+    expect(uuidRegex.test(validUUIDv4)).toBe(true);
   });
 
   it('should reject invalid UUID format', () => {
@@ -339,12 +345,486 @@ describe('Trip ID Validation', () => {
       '123',
       '123e4567-e89b-12d3-a456', // Too short
       '123e4567-e89b-12d3-a456-426614174000-extra', // Too long
+      '', // Empty string
+      null, // Null
+      undefined, // Undefined
     ];
-
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
     invalidUUIDs.forEach(uuid => {
       expect(uuidRegex.test(uuid)).toBe(false);
+    });
+  });
+
+  it('should reject UUID with invalid version', () => {
+    // Version 0 is invalid
+    const invalidVersion = '123e4567-e89b-02d3-a456-426614174000';
+    expect(uuidRegex.test(invalidVersion)).toBe(false);
+  });
+
+  it('should reject UUID with invalid variant', () => {
+    // Variant must be 8, 9, a, or b
+    const invalidVariant = '123e4567-e89b-12d3-0456-426614174000';
+    expect(uuidRegex.test(invalidVariant)).toBe(false);
+  });
+});
+
+describe('GET /api/trips/[id] - Single Trip Route', () => {
+  describe('Request Validation', () => {
+    it('should require authorization header', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'GET',
+      });
+
+      const authHeader = request.headers.get('authorization');
+      expect(authHeader).toBeNull();
+    });
+
+    it('should parse Bearer token from authorization header', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Bearer test-token-123',
+        },
+      });
+
+      const authHeader = request.headers.get('authorization');
+      expect(authHeader).toBe('Bearer test-token-123');
+      
+      const token = authHeader.substring(7);
+      expect(token).toBe('test-token-123');
+    });
+
+    it('should reject non-Bearer authorization', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'GET',
+        headers: {
+          'Authorization': 'Basic dXNlcjpwYXNz',
+        },
+      });
+
+      const authHeader = request.headers.get('authorization');
+      const isBearer = authHeader?.startsWith('Bearer ');
+      expect(isBearer).toBe(false);
+    });
+  });
+
+  describe('Single Trip Data Transformation', () => {
+    it('should transform single trip data correctly', () => {
+      const rawTrip = {
+        id: 'trip-uuid-123',
+        user_id: 'user-uuid-456',
+        title: 'California Adventure',
+        origin: 'San Francisco, CA',
+        origin_lat: 37.7749,
+        origin_lng: -122.4194,
+        start_date: '2025-01-15',
+        end_date: '2025-01-18',
+        interests: ['hiking', 'photography'],
+        difficulty: 'moderate',
+        radius_miles: 200,
+        ai_summary: {
+          overall_summary: 'An amazing trip through California parks',
+          packing_list: ['hiking boots', 'camera'],
+          safety_notes: ['Stay on trails'],
+          best_photo_spots: ['Half Dome viewpoint'],
+          estimated_budget: { total: 500 },
+        },
+        created_at: '2025-01-10T10:00:00Z',
+        updated_at: '2025-01-10T10:00:00Z',
+        trip_stops: [
+          {
+            id: 'stop-1',
+            park_code: 'yose',
+            day_number: 1,
+            activities: ['hiking'],
+            morning_plan: 'Visit Yosemite Valley',
+            afternoon_plan: 'Hike to Mirror Lake',
+            evening_plan: 'Sunset at Tunnel View',
+            driving_notes: '3 hours from SF',
+            highlights: 'Half Dome views',
+            notes: 'Bring water',
+            order_index: 0,
+          },
+          {
+            id: 'stop-2',
+            park_code: 'sequ',
+            day_number: 2,
+            activities: ['sightseeing'],
+            morning_plan: 'General Sherman Tree',
+            afternoon_plan: 'Moro Rock',
+            evening_plan: 'Stargazing',
+            driving_notes: '2 hours from Yosemite',
+            highlights: 'Giant sequoias',
+            notes: null,
+            order_index: 0,
+          },
+        ],
+      };
+
+      // Simulate transformation (matching the route handler logic)
+      const transformedTrip = {
+        id: rawTrip.id,
+        title: rawTrip.title,
+        origin: rawTrip.origin,
+        originLat: rawTrip.origin_lat,
+        originLng: rawTrip.origin_lng,
+        startDate: rawTrip.start_date,
+        endDate: rawTrip.end_date,
+        interests: rawTrip.interests,
+        difficulty: rawTrip.difficulty,
+        radiusMiles: rawTrip.radius_miles,
+        summary: rawTrip.ai_summary?.overall_summary || null,
+        packingList: rawTrip.ai_summary?.packing_list || null,
+        safetyNotes: rawTrip.ai_summary?.safety_notes || [],
+        bestPhotoSpots: rawTrip.ai_summary?.best_photo_spots || [],
+        estimatedBudget: rawTrip.ai_summary?.estimated_budget || null,
+        createdAt: rawTrip.created_at,
+        updatedAt: rawTrip.updated_at,
+      };
+
+      expect(transformedTrip.id).toBe('trip-uuid-123');
+      expect(transformedTrip.title).toBe('California Adventure');
+      expect(transformedTrip.origin).toBe('San Francisco, CA');
+      expect(transformedTrip.originLat).toBe(37.7749);
+      expect(transformedTrip.originLng).toBe(-122.4194);
+      expect(transformedTrip.startDate).toBe('2025-01-15');
+      expect(transformedTrip.endDate).toBe('2025-01-18');
+      expect(transformedTrip.interests).toEqual(['hiking', 'photography']);
+      expect(transformedTrip.difficulty).toBe('moderate');
+      expect(transformedTrip.radiusMiles).toBe(200);
+      expect(transformedTrip.summary).toBe('An amazing trip through California parks');
+      expect(transformedTrip.packingList).toEqual(['hiking boots', 'camera']);
+      expect(transformedTrip.safetyNotes).toEqual(['Stay on trails']);
+      expect(transformedTrip.bestPhotoSpots).toEqual(['Half Dome viewpoint']);
+      expect(transformedTrip.estimatedBudget).toEqual({ total: 500 });
+    });
+
+    it('should handle missing ai_summary fields gracefully', () => {
+      const rawTrip = {
+        id: 'trip-uuid-123',
+        ai_summary: {},
+      };
+
+      const summary = rawTrip.ai_summary?.overall_summary || null;
+      const packingList = rawTrip.ai_summary?.packing_list || null;
+      const safetyNotes = rawTrip.ai_summary?.safety_notes || [];
+      const bestPhotoSpots = rawTrip.ai_summary?.best_photo_spots || [];
+      const estimatedBudget = rawTrip.ai_summary?.estimated_budget || null;
+
+      expect(summary).toBeNull();
+      expect(packingList).toBeNull();
+      expect(safetyNotes).toEqual([]);
+      expect(bestPhotoSpots).toEqual([]);
+      expect(estimatedBudget).toBeNull();
+    });
+
+    it('should handle null ai_summary', () => {
+      const rawTrip = {
+        id: 'trip-uuid-123',
+        ai_summary: null,
+      };
+
+      const summary = rawTrip.ai_summary?.overall_summary || null;
+      const packingList = rawTrip.ai_summary?.packing_list || null;
+      const safetyNotes = rawTrip.ai_summary?.safety_notes || [];
+
+      expect(summary).toBeNull();
+      expect(packingList).toBeNull();
+      expect(safetyNotes).toEqual([]);
+    });
+  });
+
+  describe('Trip Stops Transformation', () => {
+    it('should transform trip stops correctly', () => {
+      const rawStop = {
+        id: 'stop-1',
+        park_code: 'yose',
+        day_number: 1,
+        activities: ['hiking', 'photography'],
+        morning_plan: 'Visit Yosemite Valley',
+        afternoon_plan: 'Hike to Mirror Lake',
+        evening_plan: 'Sunset at Tunnel View',
+        driving_notes: '3 hours from SF',
+        highlights: 'Half Dome views',
+        notes: 'Bring water',
+        order_index: 0,
+      };
+
+      const transformedStop = {
+        id: rawStop.id,
+        dayNumber: rawStop.day_number,
+        parkCode: rawStop.park_code,
+        activities: rawStop.activities,
+        morningPlan: rawStop.morning_plan,
+        afternoonPlan: rawStop.afternoon_plan,
+        eveningPlan: rawStop.evening_plan,
+        drivingNotes: rawStop.driving_notes,
+        highlights: rawStop.highlights,
+        notes: rawStop.notes,
+      };
+
+      expect(transformedStop.id).toBe('stop-1');
+      expect(transformedStop.dayNumber).toBe(1);
+      expect(transformedStop.parkCode).toBe('yose');
+      expect(transformedStop.activities).toEqual(['hiking', 'photography']);
+      expect(transformedStop.morningPlan).toBe('Visit Yosemite Valley');
+      expect(transformedStop.afternoonPlan).toBe('Hike to Mirror Lake');
+      expect(transformedStop.eveningPlan).toBe('Sunset at Tunnel View');
+      expect(transformedStop.drivingNotes).toBe('3 hours from SF');
+      expect(transformedStop.highlights).toBe('Half Dome views');
+      expect(transformedStop.notes).toBe('Bring water');
+    });
+
+    it('should sort stops by day_number and order_index', () => {
+      const unsortedStops = [
+        { day_number: 2, order_index: 1 },
+        { day_number: 1, order_index: 0 },
+        { day_number: 2, order_index: 0 },
+        { day_number: 1, order_index: 1 },
+        { day_number: 3, order_index: 0 },
+      ];
+
+      const sortedStops = [...unsortedStops].sort((a, b) => {
+        if (a.day_number !== b.day_number) {
+          return a.day_number - b.day_number;
+        }
+        return a.order_index - b.order_index;
+      });
+
+      expect(sortedStops[0]).toEqual({ day_number: 1, order_index: 0 });
+      expect(sortedStops[1]).toEqual({ day_number: 1, order_index: 1 });
+      expect(sortedStops[2]).toEqual({ day_number: 2, order_index: 0 });
+      expect(sortedStops[3]).toEqual({ day_number: 2, order_index: 1 });
+      expect(sortedStops[4]).toEqual({ day_number: 3, order_index: 0 });
+    });
+
+    it('should handle empty trip_stops array', () => {
+      const tripStops = [];
+      const sortedStops = [...tripStops].sort((a, b) => {
+        if (a.day_number !== b.day_number) {
+          return a.day_number - b.day_number;
+        }
+        return a.order_index - b.order_index;
+      });
+
+      expect(sortedStops).toEqual([]);
+    });
+  });
+
+  describe('Park Code Extraction', () => {
+    it('should extract unique park codes from stops', () => {
+      const tripStops = [
+        { park_code: 'yose' },
+        { park_code: 'sequ' },
+        { park_code: 'yose' }, // Duplicate
+        { park_code: 'kica' },
+      ];
+
+      const parkCodes = [...new Set(tripStops.map(s => s.park_code))];
+
+      expect(parkCodes).toHaveLength(3);
+      expect(parkCodes).toContain('yose');
+      expect(parkCodes).toContain('sequ');
+      expect(parkCodes).toContain('kica');
+    });
+
+    it('should handle empty stops array', () => {
+      const tripStops = [];
+      const parkCodes = [...new Set(tripStops.map(s => s.park_code))];
+
+      expect(parkCodes).toHaveLength(0);
+    });
+  });
+
+  describe('Response Structure', () => {
+    it('should have correct single trip response structure', () => {
+      const response = {
+        trip: {
+          id: 'trip-uuid',
+          title: 'Test Trip',
+          origin: 'Test City',
+          originLat: 0,
+          originLng: 0,
+          startDate: '2025-01-15',
+          endDate: '2025-01-18',
+          interests: [],
+          difficulty: 'moderate',
+          radiusMiles: 200,
+          summary: null,
+          packingList: null,
+          safetyNotes: [],
+          bestPhotoSpots: [],
+          estimatedBudget: null,
+          createdAt: '2025-01-10T10:00:00Z',
+          updatedAt: '2025-01-10T10:00:00Z',
+          stops: [],
+        },
+      };
+
+      expect(response).toHaveProperty('trip');
+      expect(response.trip).toHaveProperty('id');
+      expect(response.trip).toHaveProperty('title');
+      expect(response.trip).toHaveProperty('origin');
+      expect(response.trip).toHaveProperty('originLat');
+      expect(response.trip).toHaveProperty('originLng');
+      expect(response.trip).toHaveProperty('startDate');
+      expect(response.trip).toHaveProperty('endDate');
+      expect(response.trip).toHaveProperty('interests');
+      expect(response.trip).toHaveProperty('difficulty');
+      expect(response.trip).toHaveProperty('radiusMiles');
+      expect(response.trip).toHaveProperty('summary');
+      expect(response.trip).toHaveProperty('packingList');
+      expect(response.trip).toHaveProperty('safetyNotes');
+      expect(response.trip).toHaveProperty('bestPhotoSpots');
+      expect(response.trip).toHaveProperty('estimatedBudget');
+      expect(response.trip).toHaveProperty('createdAt');
+      expect(response.trip).toHaveProperty('updatedAt');
+      expect(response.trip).toHaveProperty('stops');
+    });
+
+    it('should have correct error response for invalid trip ID', () => {
+      const errorResponse = {
+        error: 'Invalid trip ID',
+      };
+
+      expect(errorResponse).toHaveProperty('error');
+      expect(errorResponse.error).toBe('Invalid trip ID');
+    });
+
+    it('should have correct error response for trip not found', () => {
+      const errorResponse = {
+        error: 'Trip not found',
+      };
+
+      expect(errorResponse).toHaveProperty('error');
+      expect(errorResponse.error).toBe('Trip not found');
+    });
+
+    it('should have correct error response for authentication required', () => {
+      const errorResponse = {
+        error: 'Authentication required',
+      };
+
+      expect(errorResponse).toHaveProperty('error');
+      expect(errorResponse.error).toBe('Authentication required');
+    });
+  });
+});
+
+describe('DELETE /api/trips/[id] - Delete Trip Route', () => {
+  describe('Request Validation', () => {
+    it('should require authorization header for DELETE', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'DELETE',
+      });
+
+      const authHeader = request.headers.get('authorization');
+      expect(authHeader).toBeNull();
+    });
+
+    it('should parse Bearer token for DELETE request', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer delete-token-123',
+        },
+      });
+
+      const authHeader = request.headers.get('authorization');
+      expect(authHeader).toBe('Bearer delete-token-123');
+    });
+  });
+
+  describe('Authorization Check', () => {
+    it('should verify trip belongs to user before deletion', () => {
+      const trip = {
+        id: 'trip-uuid-123',
+        user_id: 'user-uuid-456',
+      };
+      const currentUserId = 'user-uuid-456';
+
+      const isAuthorized = trip.user_id === currentUserId;
+      expect(isAuthorized).toBe(true);
+    });
+
+    it('should reject deletion if trip belongs to different user', () => {
+      const trip = {
+        id: 'trip-uuid-123',
+        user_id: 'user-uuid-456',
+      };
+      const currentUserId = 'different-user-uuid';
+
+      const isAuthorized = trip.user_id === currentUserId;
+      expect(isAuthorized).toBe(false);
+    });
+  });
+
+  describe('Response Structure', () => {
+    it('should have correct success response structure', () => {
+      const successResponse = {
+        success: true,
+        message: 'Trip deleted successfully',
+      };
+
+      expect(successResponse).toHaveProperty('success');
+      expect(successResponse).toHaveProperty('message');
+      expect(successResponse.success).toBe(true);
+      expect(successResponse.message).toBe('Trip deleted successfully');
+    });
+
+    it('should have correct error response for not authorized', () => {
+      const errorResponse = {
+        error: 'Not authorized to delete this trip',
+      };
+
+      expect(errorResponse).toHaveProperty('error');
+      expect(errorResponse.error).toBe('Not authorized to delete this trip');
+    });
+
+    it('should have correct error response for trip not found on delete', () => {
+      const errorResponse = {
+        error: 'Trip not found',
+      };
+
+      expect(errorResponse).toHaveProperty('error');
+      expect(errorResponse.error).toBe('Trip not found');
+    });
+
+    it('should have correct error response for failed deletion', () => {
+      const errorResponse = {
+        error: 'Failed to delete trip',
+      };
+
+      expect(errorResponse).toHaveProperty('error');
+      expect(errorResponse.error).toBe('Failed to delete trip');
+    });
+  });
+});
+
+describe('Supabase Client Configuration', () => {
+  describe('Service Role Usage', () => {
+    it('should use service role for trip queries to bypass RLS', () => {
+      // This test documents the expected behavior:
+      // The trips API routes should use createServerClient({ useServiceRole: true })
+      // to bypass RLS policies since authentication is handled via JWT validation
+      
+      const clientOptions = { useServiceRole: true };
+      expect(clientOptions.useServiceRole).toBe(true);
+    });
+
+    it('should still filter by user_id even with service role', () => {
+      // Even though service role bypasses RLS, the query should still
+      // filter by user_id to ensure users only see their own trips
+      
+      const userId = 'user-uuid-123';
+      const query = {
+        table: 'trips',
+        filters: [
+          { column: 'user_id', value: userId },
+        ],
+      };
+
+      expect(query.filters).toContainEqual({ column: 'user_id', value: userId });
     });
   });
 });

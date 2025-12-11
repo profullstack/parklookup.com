@@ -69,7 +69,7 @@ export async function GET(request) {
       );
     }
 
-    const supabase = createServerClient();
+    const supabase = createServerClient({ useServiceRole: true });
 
     // Fetch trips with stop count
     const { data: trips, error, count } = await supabase
