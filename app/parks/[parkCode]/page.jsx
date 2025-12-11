@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic';
 import { FavoriteButton } from '@/components/parks/FavoriteButton';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import WeatherForecast from '@/components/weather/WeatherForecast';
+import WeatherAlerts from '@/components/weather/WeatherAlerts';
 import { ProductCarousel } from '@/components/products/ProductCard';
 import NearbyPlaces from '@/components/parks/NearbyPlaces';
 import ParkReviews from '@/components/parks/ParkReviews';
@@ -136,12 +137,7 @@ export default function ParkDetailPage() {
             href="/search"
             className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <svg
-              className="w-5 h-5 mr-2"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
+            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -156,7 +152,9 @@ export default function ParkDetailPage() {
     );
   }
 
-  if (!park) return null;
+  if (!park) {
+    return null;
+  }
 
   const hasCoordinates = park.latitude && park.longitude;
   const images = park.images || [];
@@ -223,9 +221,7 @@ export default function ParkDetailPage() {
         {/* Park name overlay */}
         <div className="absolute bottom-0 left-0 right-0 p-4 md:p-6">
           <div className="max-w-4xl mx-auto">
-            <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">
-              {park.full_name}
-            </h1>
+            <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">{park.full_name}</h1>
             <p className="text-white/90 text-sm md:text-base">
               {park.states} • {park.designation || 'National Park'}
             </p>
@@ -237,7 +233,7 @@ export default function ParkDetailPage() {
       <div className="max-w-4xl mx-auto px-4 py-6">
         {/* Tabs */}
         <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 mb-6 -mx-4 px-4">
-          {['overview', 'map', 'activities', 'reviews', 'info'].map((tab) => (
+          {['overview', 'map', 'weather', 'activities', 'reviews', 'info'].map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -247,7 +243,7 @@ export default function ParkDetailPage() {
                   : 'border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300'
               }`}
             >
-              {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              {tab === 'weather' ? 'Weather Events' : tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
@@ -257,12 +253,8 @@ export default function ParkDetailPage() {
           <div className="space-y-6">
             {/* Description */}
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                About
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">
-                {park.description}
-              </p>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">About</h2>
+              <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{park.description}</p>
             </div>
 
             {/* Quick Info */}
@@ -272,9 +264,7 @@ export default function ParkDetailPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                     Location
                   </p>
-                  <p className="text-gray-900 dark:text-white font-medium">
-                    {park.states}
-                  </p>
+                  <p className="text-gray-900 dark:text-white font-medium">{park.states}</p>
                 </div>
               )}
               {park.designation && (
@@ -282,9 +272,7 @@ export default function ParkDetailPage() {
                   <p className="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1">
                     Type
                   </p>
-                  <p className="text-gray-900 dark:text-white font-medium">
-                    {park.designation}
-                  </p>
+                  <p className="text-gray-900 dark:text-white font-medium">{park.designation}</p>
                 </div>
               )}
               {park.wikidata?.area && (
@@ -320,9 +308,7 @@ export default function ParkDetailPage() {
 
             {/* Weather */}
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
-                Weather
-              </h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">Weather</h2>
               {park.weather_info && (
                 <p className="text-gray-600 dark:text-gray-400 leading-relaxed mb-4">
                   {park.weather_info}
@@ -433,6 +419,51 @@ export default function ParkDetailPage() {
           </div>
         )}
 
+        {/* Weather Events Tab */}
+        {activeTab === 'weather' && (
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+              Weather Events & Alerts
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+              Active weather alerts and warnings from the National Weather Service for this park
+              area.
+            </p>
+            {hasCoordinates ? (
+              <WeatherAlerts
+                latitude={parseFloat(park.latitude)}
+                longitude={parseFloat(park.longitude)}
+                parkName={park.full_name}
+              />
+            ) : (
+              <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                <svg
+                  className="w-12 h-12 mx-auto text-gray-400 mb-4"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+                <p className="text-gray-600 dark:text-gray-400">
+                  Location coordinates not available for weather alerts
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Activities Tab */}
         {activeTab === 'activities' && (
           <div className="space-y-8">
@@ -494,22 +525,15 @@ export default function ParkDetailPage() {
                 </h2>
                 <div className="space-y-3">
                   {entranceFees.map((fee, index) => (
-                    <div
-                      key={index}
-                      className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm"
-                    >
+                    <div key={index} className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="font-medium text-gray-900 dark:text-white">
-                            {fee.title}
-                          </p>
+                          <p className="font-medium text-gray-900 dark:text-white">{fee.title}</p>
                           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                             {fee.description}
                           </p>
                         </div>
-                        <span className="text-green-600 font-semibold">
-                          ${fee.cost}
-                        </span>
+                        <span className="text-green-600 font-semibold">${fee.cost}</span>
                       </div>
                     </div>
                   ))}
@@ -526,9 +550,7 @@ export default function ParkDetailPage() {
                 <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
                   {operatingHours.map((hours, index) => (
                     <div key={index}>
-                      <p className="font-medium text-gray-900 dark:text-white mb-2">
-                        {hours.name}
-                      </p>
+                      <p className="font-medium text-gray-900 dark:text-white mb-2">{hours.name}</p>
                       {hours.description && (
                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
                           {hours.description}
@@ -536,18 +558,16 @@ export default function ParkDetailPage() {
                       )}
                       {hours.standardHours && (
                         <div className="grid grid-cols-2 gap-2 text-sm">
-                          {Object.entries(hours.standardHours).map(
-                            ([day, time]) => (
-                              <div key={day} className="flex justify-between">
-                                <span className="text-gray-500 dark:text-gray-400 capitalize">
-                                  {day}
-                                </span>
-                                <span className="text-gray-900 dark:text-white">
-                                  {time || 'Closed'}
-                                </span>
-                              </div>
-                            )
-                          )}
+                          {Object.entries(hours.standardHours).map(([day, time]) => (
+                            <div key={day} className="flex justify-between">
+                              <span className="text-gray-500 dark:text-gray-400 capitalize">
+                                {day}
+                              </span>
+                              <span className="text-gray-900 dark:text-white">
+                                {time || 'Closed'}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -624,15 +644,10 @@ export default function ParkDetailPage() {
         {/* Image Gallery */}
         {images.length > 1 && (
           <div className="mt-8">
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-              Photos
-            </h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Photos</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {images.slice(1, 7).map((image, index) => (
-                <div
-                  key={index}
-                  className="relative aspect-video rounded-lg overflow-hidden"
-                >
+                <div key={index} className="relative aspect-video rounded-lg overflow-hidden">
                   <Image
                     src={image.url}
                     alt={image.altText || `${park.full_name} photo ${index + 2}`}

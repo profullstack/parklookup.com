@@ -13,19 +13,20 @@ export function SearchBar({ initialQuery = '', onSearch, placeholder = 'Search p
   const [query, setQuery] = useState(initialQuery);
   const router = useRouter();
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const debouncedSearch = useCallback(
     debounce((searchQuery) => {
       if (onSearch) {
         onSearch(searchQuery);
       } else {
-        router.push(`/parks?q=${encodeURIComponent(searchQuery)}`);
+        router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
       }
     }, 300),
     [onSearch, router]
   );
 
   const handleChange = (e) => {
-    const value = e.target.value;
+    const { value } = e.target;
     setQuery(value);
     if (value.length >= 2 || value.length === 0) {
       debouncedSearch(value);
@@ -37,7 +38,7 @@ export function SearchBar({ initialQuery = '', onSearch, placeholder = 'Search p
     if (onSearch) {
       onSearch(query);
     } else {
-      router.push(`/parks?q=${encodeURIComponent(query)}`);
+      router.push(`/search?q=${encodeURIComponent(query)}`);
     }
   };
 
@@ -77,12 +78,24 @@ export function SearchBar({ initialQuery = '', onSearch, placeholder = 'Search p
             type="button"
             onClick={() => {
               setQuery('');
-              if (onSearch) onSearch('');
+              if (onSearch) {
+                onSearch('');
+              }
             }}
             className="absolute inset-y-0 right-0 pr-3 flex items-center"
           >
-            <svg className="h-5 w-5 text-gray-400 hover:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="h-5 w-5 text-gray-400 hover:text-gray-600"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         )}

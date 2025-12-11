@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 
 // Mock react-leaflet components
@@ -346,6 +346,101 @@ describe('ParkMap Component', () => {
       const popup = screen.getByTestId('popup');
       expect(popup).toHaveTextContent('CA');
     });
+  });
+});
+
+describe('ParkMap GPS Coordinates Copy Feature', () => {
+  beforeEach(() => {
+    // Mock clipboard API
+    Object.assign(navigator, {
+      clipboard: {
+        writeText: vi.fn(() => Promise.resolve()),
+      },
+    });
+  });
+
+  it('should display GPS coordinates in {lat,lon} format', async () => {
+    const ParkMap = (await import('@/components/parks/ParkMap')).default;
+    
+    render(
+      <ParkMap
+        latitude={37.8651}
+        longitude={-119.5383}
+        parkName="Yosemite National Park"
+      />
+    );
+
+    // Should show coordinates in the specified format
+    expect(screen.getByText('{37.8651,-119.5383}')).toBeInTheDocument();
+  });
+
+  it('should have a copy button for GPS coordinates', async () => {
+    const ParkMap = (await import('@/components/parks/ParkMap')).default;
+    
+    render(
+      <ParkMap
+        latitude={37.8651}
+        longitude={-119.5383}
+        parkName="Yosemite National Park"
+      />
+    );
+
+    const copyButton = screen.getByText('Copy');
+    expect(copyButton).toBeInTheDocument();
+  });
+
+  it('should copy coordinates to clipboard when copy button is clicked', async () => {
+    const ParkMap = (await import('@/components/parks/ParkMap')).default;
+    
+    render(
+      <ParkMap
+        latitude={37.8651}
+        longitude={-119.5383}
+        parkName="Yosemite National Park"
+      />
+    );
+
+    const copyButton = screen.getByText('Copy');
+    fireEvent.click(copyButton);
+
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('{37.8651,-119.5383}');
+  });
+
+  it('should show "Copied!" feedback after clicking copy button', async () => {
+    const ParkMap = (await import('@/components/parks/ParkMap')).default;
+    
+    render(
+      <ParkMap
+        latitude={37.8651}
+        longitude={-119.5383}
+        parkName="Yosemite National Park"
+      />
+    );
+
+    const copyButton = screen.getByText('Copy');
+    fireEvent.click(copyButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Copied!')).toBeInTheDocument();
+    });
+  });
+
+  it('should display coordinates alongside address when address is provided', async () => {
+    const ParkMap = (await import('@/components/parks/ParkMap')).default;
+    const testAddress = '9035 Village Dr, Yosemite Valley, CA 95389';
+    
+    render(
+      <ParkMap
+        latitude={37.8651}
+        longitude={-119.5383}
+        parkName="Yosemite National Park"
+        address={testAddress}
+      />
+    );
+
+    // Both address and coordinates should be visible
+    expect(screen.getByText(testAddress)).toBeInTheDocument();
+    expect(screen.getByText('{37.8651,-119.5383}')).toBeInTheDocument();
   });
 });
 
