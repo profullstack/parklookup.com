@@ -84,18 +84,31 @@ export async function GET(request) {
     let subscription = null;
     if (profile.stripe_subscription_id) {
       try {
-        const stripeSubscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id);
+        const stripeSubscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id, {
+          expand: ['latest_invoice', 'discount'],
+        });
         
-        // Safely convert timestamps - they might be undefined or invalid
-        const currentPeriodStart = stripeSubscription.current_period_start
+        // Safely convert timestamps - they must be valid positive numbers
+        const currentPeriodStart = stripeSubscription.current_period_start && stripeSubscription.current_period_start > 0
           ? new Date(stripeSubscription.current_period_start * 1000).toISOString()
           : null;
-        const currentPeriodEnd = stripeSubscription.current_period_end
+        const currentPeriodEnd = stripeSubscription.current_period_end && stripeSubscription.current_period_end > 0
           ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
           : null;
-        const canceledAt = stripeSubscription.canceled_at
+        const canceledAt = stripeSubscription.canceled_at && stripeSubscription.canceled_at > 0
           ? new Date(stripeSubscription.canceled_at * 1000).toISOString()
           : null;
+        
+        // Get the actual amount paid from the latest invoice (includes discounts)
+        const latestInvoice = stripeSubscription.latest_invoice;
+        const actualAmountPaid = latestInvoice?.amount_paid ?? stripeSubscription.items.data[0]?.price?.unit_amount ?? 0;
+        const baseAmount = stripeSubscription.items.data[0]?.price?.unit_amount || 0;
+        
+        // Check if there's an active discount/coupon
+        const discount = stripeSubscription.discount;
+        const hasDiscount = !!discount;
+        const discountPercent = discount?.coupon?.percent_off || null;
+        const discountAmount = discount?.coupon?.amount_off || null;
         
         subscription = {
           id: stripeSubscription.id,
@@ -105,10 +118,16 @@ export async function GET(request) {
           cancelAtPeriodEnd: stripeSubscription.cancel_at_period_end,
           canceledAt,
           plan: {
-            amount: stripeSubscription.items.data[0]?.price?.unit_amount || 0,
+            amount: actualAmountPaid, // Show actual amount paid (after discount)
+            baseAmount, // Original price before discount
             currency: stripeSubscription.items.data[0]?.price?.currency || 'usd',
             interval: stripeSubscription.items.data[0]?.price?.recurring?.interval || 'month',
           },
+          discount: hasDiscount ? {
+            percentOff: discountPercent,
+            amountOff: discountAmount,
+            couponName: discount?.coupon?.name || discount?.coupon?.id,
+          } : null,
         };
       } catch (subError) {
         console.error('Error fetching subscription:', subError);

@@ -80,23 +80,47 @@ export async function POST(request) {
       cancel_at_period_end: true,
     });
 
-    // Update profile with cancellation status
-    await supabase
+    // Verify the cancellation was successful before updating database
+    if (!subscription.cancel_at_period_end) {
+      console.error('Stripe did not confirm cancellation for subscription:', profile.stripe_subscription_id);
+      return NextResponse.json({ error: 'Failed to confirm subscription cancellation' }, { status: 500 });
+    }
+
+    // Update profile with cancellation status only after Stripe confirms
+    const { error: updateError } = await supabase
       .from('profiles')
       .update({
         subscription_status: 'canceling',
+        subscription_period_end: subscription.current_period_end
+          ? new Date(subscription.current_period_end * 1000).toISOString()
+          : null,
       })
       .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Error updating profile after cancellation:', updateError);
+      // Don't fail the request - Stripe cancellation succeeded
+    }
 
     console.log(`Subscription ${subscription.id} scheduled for cancellation for user ${user.id}`);
 
     return NextResponse.json({
       success: true,
       message: 'Subscription will be canceled at the end of the billing period',
-      cancelAt: new Date(subscription.current_period_end * 1000).toISOString(),
+      cancelAt: subscription.current_period_end
+        ? new Date(subscription.current_period_end * 1000).toISOString()
+        : null,
     });
   } catch (error) {
     console.error('Error canceling subscription:', error);
+    
+    // Provide more specific error messages
+    if (error.type === 'StripeInvalidRequestError') {
+      return NextResponse.json({
+        error: 'Invalid subscription. It may have already been canceled.'
+      }, { status: 400 });
+    }
+    
     return NextResponse.json({ error: 'Failed to cancel subscription' }, { status: 500 });
   }
 }

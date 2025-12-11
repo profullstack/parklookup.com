@@ -21,9 +21,18 @@ function formatCurrency(amount, currency = 'usd') {
 
 /**
  * Format date for display
+ * Returns 'N/A' if date is invalid or null
  */
 function formatDate(dateString) {
-  return new Date(dateString).toLocaleDateString('en-US', {
+  if (!dateString) return 'N/A';
+  
+  const date = new Date(dateString);
+  // Check for invalid date (epoch 0 or Invalid Date)
+  if (isNaN(date.getTime()) || date.getTime() === 0) {
+    return 'N/A';
+  }
+  
+  return date.toLocaleDateString('en-US', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
@@ -230,28 +239,44 @@ export default function PaymentsPage() {
                         /{paymentData.subscription.plan.interval}
                       </span>
                     </p>
-                  </div>
-                </div>
-
-                <div className="border-t border-gray-100 pt-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-500">Current Period</p>
-                      <p className="text-sm text-gray-900">
-                        {formatDate(paymentData.subscription.currentPeriodStart)} -{' '}
-                        {formatDate(paymentData.subscription.currentPeriodEnd)}
+                    {paymentData.subscription.discount && (
+                      <p className="text-xs text-green-600">
+                        {paymentData.subscription.discount.percentOff
+                          ? `${paymentData.subscription.discount.percentOff}% off`
+                          : paymentData.subscription.discount.amountOff
+                            ? `${formatCurrency(paymentData.subscription.discount.amountOff, paymentData.subscription.plan.currency)} off`
+                            : 'Discount applied'}
+                        {paymentData.subscription.plan.baseAmount && paymentData.subscription.plan.baseAmount !== paymentData.subscription.plan.amount && (
+                          <span className="ml-1 line-through text-gray-400">
+                            {formatCurrency(paymentData.subscription.plan.baseAmount, paymentData.subscription.plan.currency)}
+                          </span>
+                        )}
                       </p>
-                    </div>
-                    {paymentData.subscription.cancelAtPeriodEnd && (
-                      <div>
-                        <p className="text-sm text-gray-500">Cancels On</p>
-                        <p className="text-sm text-red-600">
-                          {formatDate(paymentData.subscription.currentPeriodEnd)}
-                        </p>
-                      </div>
                     )}
                   </div>
                 </div>
+
+                {(paymentData.subscription.currentPeriodStart || paymentData.subscription.currentPeriodEnd) && (
+                  <div className="border-t border-gray-100 pt-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-gray-500">Current Period</p>
+                        <p className="text-sm text-gray-900">
+                          {formatDate(paymentData.subscription.currentPeriodStart)} -{' '}
+                          {formatDate(paymentData.subscription.currentPeriodEnd)}
+                        </p>
+                      </div>
+                      {paymentData.subscription.cancelAtPeriodEnd && paymentData.subscription.currentPeriodEnd && (
+                        <div>
+                          <p className="text-sm text-gray-500">Cancels On</p>
+                          <p className="text-sm text-red-600">
+                            {formatDate(paymentData.subscription.currentPeriodEnd)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {!paymentData.subscription.cancelAtPeriodEnd && paymentData.subscription.status === 'active' && (
                   <div className="border-t border-gray-100 pt-4">

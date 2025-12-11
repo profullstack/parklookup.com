@@ -173,6 +173,7 @@ describe('Cancel Subscription API Route', () => {
 
         expect(mockSupabaseClient.update).toHaveBeenCalledWith({
           subscription_status: 'canceling',
+          subscription_period_end: new Date(mockCanceledSubscription.current_period_end * 1000).toISOString(),
         });
       });
 
