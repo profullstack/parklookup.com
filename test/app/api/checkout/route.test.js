@@ -263,6 +263,120 @@ describe('Checkout API Route', () => {
       });
     });
 
+    describe('Coupon Code Support', () => {
+      it('should apply valid coupon code to checkout session', async () => {
+        vi.resetModules();
+        vi.stubEnv('STRIPE_COUPON_50OFF', '50OFF');
+        const { POST } = await import('@/app/api/checkout/route.js');
+
+        const request = new Request('http://localhost:3000/api/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ priceId: 'price_123', couponCode: '50OFF' }),
+        });
+
+        await POST(request);
+
+        expect(mockStripeCheckoutSessionCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            discounts: [{ coupon: '50OFF' }],
+          })
+        );
+      });
+
+      it('should handle lowercase coupon codes', async () => {
+        vi.resetModules();
+        vi.stubEnv('STRIPE_COUPON_50OFF', '50OFF');
+        const { POST } = await import('@/app/api/checkout/route.js');
+
+        const request = new Request('http://localhost:3000/api/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ priceId: 'price_123', couponCode: '50off' }),
+        });
+
+        await POST(request);
+
+        expect(mockStripeCheckoutSessionCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            discounts: [{ coupon: '50OFF' }],
+          })
+        );
+      });
+
+      it('should not apply invalid coupon code', async () => {
+        vi.resetModules();
+        const { POST } = await import('@/app/api/checkout/route.js');
+
+        const request = new Request('http://localhost:3000/api/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ priceId: 'price_123', couponCode: 'INVALID' }),
+        });
+
+        await POST(request);
+
+        // Should not include discounts for invalid coupon
+        expect(mockStripeCheckoutSessionCreate).toHaveBeenCalledWith(
+          expect.not.objectContaining({
+            discounts: expect.anything(),
+          })
+        );
+      });
+
+      it('should create checkout session without coupon when not provided', async () => {
+        vi.resetModules();
+        const { POST } = await import('@/app/api/checkout/route.js');
+
+        const request = new Request('http://localhost:3000/api/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ priceId: 'price_123' }),
+        });
+
+        await POST(request);
+
+        // Should not include discounts when no coupon provided
+        const callArgs = mockStripeCheckoutSessionCreate.mock.calls[0][0];
+        expect(callArgs.discounts).toBeUndefined();
+      });
+
+      it('should use environment variable for coupon ID mapping', async () => {
+        vi.resetModules();
+        vi.stubEnv('STRIPE_COUPON_50OFF', 'custom_coupon_id_from_stripe');
+        const { POST } = await import('@/app/api/checkout/route.js');
+
+        const request = new Request('http://localhost:3000/api/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ priceId: 'price_123', couponCode: '50OFF' }),
+        });
+
+        await POST(request);
+
+        expect(mockStripeCheckoutSessionCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            discounts: [{ coupon: 'custom_coupon_id_from_stripe' }],
+          })
+        );
+      });
+    });
+
     describe('Error Handling', () => {
       it('should return 500 when Stripe API fails', async () => {
         vi.resetModules();

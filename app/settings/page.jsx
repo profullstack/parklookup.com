@@ -6,19 +6,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
+import DiscountOfferModal from '@/components/ui/DiscountOfferModal';
 
 export default function SettingsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
 
   // Form state
   const [displayName, setDisplayName] = useState('');
@@ -35,6 +38,26 @@ export default function SettingsPage() {
     }
   }, [authLoading, isAuthenticated, router]);
 
+  // Check for checkout cancellation and show discount modal
+  useEffect(() => {
+    const checkoutStatus = searchParams.get('checkout');
+    if (checkoutStatus === 'cancelled') {
+      // Show discount modal after a short delay for better UX
+      const timer = setTimeout(() => {
+        setShowDiscountModal(true);
+      }, 500);
+      
+      // Clean up the URL without triggering a navigation
+      window.history.replaceState({}, '', '/settings');
+      
+      return () => clearTimeout(timer);
+    } else if (checkoutStatus === 'success') {
+      setSuccess('🎉 Welcome to Pro! Your subscription is now active.');
+      // Clean up the URL
+      window.history.replaceState({}, '', '/settings');
+    }
+  }, [searchParams]);
+
   // eslint-disable-next-line no-undef
   const showAlert = (message) => window.alert(message);
   // eslint-disable-next-line no-undef
@@ -42,8 +65,9 @@ export default function SettingsPage() {
 
   /**
    * Handle upgrade to Pro - redirect to Stripe checkout
+   * @param {string} couponCode - Optional coupon code to apply
    */
-  const handleUpgrade = async () => {
+  const handleUpgrade = async (couponCode = null) => {
     const token = localStorage.getItem('parklookup_auth_token');
     if (!token) {
       router.push('/signin?redirect=/settings');
@@ -51,13 +75,18 @@ export default function SettingsPage() {
     }
 
     try {
+      const requestBody = {};
+      if (couponCode) {
+        requestBody.couponCode = couponCode;
+      }
+
       const response = await fetch('/api/checkout', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({}),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -73,6 +102,15 @@ export default function SettingsPage() {
       console.error('Checkout error:', err);
       setError(err.message);
     }
+  };
+
+  /**
+   * Handle accepting the discount offer
+   * @param {string} couponCode - The coupon code to apply
+   */
+  const handleAcceptDiscount = async (couponCode) => {
+    setShowDiscountModal(false);
+    await handleUpgrade(couponCode);
   };
 
   // Fetch profile
@@ -168,6 +206,15 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
+      {/* Discount Offer Modal */}
+      <DiscountOfferModal
+        isOpen={showDiscountModal}
+        onClose={() => setShowDiscountModal(false)}
+        onAccept={handleAcceptDiscount}
+        couponCode="50OFF"
+        discountText="50% off for the lifetime of your subscription"
+      />
+
       <div className="max-w-2xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
 

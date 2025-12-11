@@ -14,6 +14,12 @@ export const dynamic = 'force-dynamic';
 const DEFAULT_PRICE_ID =
   process.env.STRIPE_PRO_PRICE_ID || 'price_1SdCHcILlMKSylYEArIqU52v';
 
+// Valid coupon codes - in production, these should be created in Stripe Dashboard
+// and validated against Stripe's coupon API
+const VALID_COUPON_CODES = {
+  '50OFF': process.env.STRIPE_COUPON_50OFF || '50OFF', // Maps to Stripe coupon ID
+};
+
 /**
  * POST /api/checkout
  * Create a Stripe checkout session for subscription upgrade
@@ -54,7 +60,7 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
 
-  const { priceId = DEFAULT_PRICE_ID } = body;
+  const { priceId = DEFAULT_PRICE_ID, couponCode } = body;
 
   // Get user profile to check for existing Stripe customer
   const { data: profile } = await supabase
@@ -89,6 +95,24 @@ export async function POST(request) {
     },
   };
 
+  // Apply coupon if provided and valid
+  if (couponCode) {
+    const upperCouponCode = couponCode.toUpperCase();
+    const stripeCouponId = VALID_COUPON_CODES[upperCouponCode];
+    
+    if (stripeCouponId) {
+      // Use allow_promotion_codes for user-entered codes, or discounts for pre-applied
+      sessionParams.discounts = [
+        {
+          coupon: stripeCouponId,
+        },
+      ];
+      console.log(`Applying coupon ${stripeCouponId} for user ${user.id}`);
+    } else {
+      console.warn(`Invalid coupon code attempted: ${couponCode}`);
+    }
+  }
+
   // Use existing customer or create new one
   if (profile?.stripe_customer_id) {
     sessionParams.customer = profile.stripe_customer_id;
@@ -100,7 +124,7 @@ export async function POST(request) {
     // Create checkout session
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    console.log(`Checkout session created for user ${user.id}: ${session.id}`);
+    console.log(`Checkout session created for user ${user.id}: ${session.id}${couponCode ? ` with coupon ${couponCode}` : ''}`);
 
     return NextResponse.json({
       sessionId: session.id,
