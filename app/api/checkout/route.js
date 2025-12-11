@@ -10,8 +10,9 @@ import { createServerClient } from '@/lib/supabase/client';
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
 
-// Default price ID for Pro tier (from user's Stripe account)
-const DEFAULT_PRICE_ID = 'price_1SdCHcILlMKSylYEArIqU52v';
+// Default price ID for Pro tier - can be overridden via environment variable
+const DEFAULT_PRICE_ID =
+  process.env.STRIPE_PRO_PRICE_ID || 'price_1SdCHcILlMKSylYEArIqU52v';
 
 /**
  * POST /api/checkout
