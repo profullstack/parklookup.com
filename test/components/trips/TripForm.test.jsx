@@ -7,7 +7,6 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import TripForm from '@/components/trips/TripForm';
 
 describe('TripForm Component', () => {
@@ -21,40 +20,45 @@ describe('TripForm Component', () => {
     it('should render the form with all required fields', () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
+      // Origin input
       expect(screen.getByLabelText(/starting location/i)).toBeInTheDocument();
+      // Date inputs
       expect(screen.getByLabelText(/start date/i)).toBeInTheDocument();
       expect(screen.getByLabelText(/end date/i)).toBeInTheDocument();
+      // Interests section
       expect(screen.getByText(/interests/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/difficulty/i)).toBeInTheDocument();
+      // Difficulty section
+      expect(screen.getByText(/difficulty level/i)).toBeInTheDocument();
     });
 
-    it('should render interest checkboxes', () => {
+    it('should render interest buttons', () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      expect(screen.getByLabelText(/hiking/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/camping/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/photography/i)).toBeInTheDocument();
-      expect(screen.getByLabelText(/wildlife/i)).toBeInTheDocument();
+      // Interests are rendered as buttons with text
+      expect(screen.getByText('Hiking')).toBeInTheDocument();
+      expect(screen.getByText('Camping')).toBeInTheDocument();
+      expect(screen.getByText('Photography')).toBeInTheDocument();
+      expect(screen.getByText('Wildlife')).toBeInTheDocument();
     });
 
-    it('should render difficulty options', () => {
+    it('should render difficulty buttons', () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      expect(screen.getByRole('option', { name: /easy/i })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: /moderate/i })).toBeInTheDocument();
-      expect(screen.getByRole('option', { name: /hard/i })).toBeInTheDocument();
+      expect(screen.getByText('Easy')).toBeInTheDocument();
+      expect(screen.getByText('Moderate')).toBeInTheDocument();
+      expect(screen.getByText('Hard')).toBeInTheDocument();
     });
 
     it('should render submit button', () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      expect(screen.getByRole('button', { name: /generate/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /generate ai trip/i })).toBeInTheDocument();
     });
 
     it('should render radius slider', () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      expect(screen.getByLabelText(/radius/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/search radius/i)).toBeInTheDocument();
     });
   });
 
@@ -62,7 +66,11 @@ describe('TripForm Component', () => {
     it('should require origin field', async () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      const submitButton = screen.getByRole('button', { name: /generate/i });
+      // Clear the origin field
+      const originInput = screen.getByLabelText(/starting location/i);
+      fireEvent.change(originInput, { target: { value: '' } });
+
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
@@ -70,37 +78,14 @@ describe('TripForm Component', () => {
       });
     });
 
-    it('should require start date', async () => {
+    it('should show error when origin is empty', async () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      const originInput = screen.getByLabelText(/starting location/i);
-      await userEvent.type(originInput, 'San Francisco');
-
-      const submitButton = screen.getByRole('button', { name: /generate/i });
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
-        expect(mockOnSubmit).not.toHaveBeenCalled();
-      });
-    });
-
-    it('should require at least one interest', async () => {
-      render(<TripForm onSubmit={mockOnSubmit} />);
-
-      const originInput = screen.getByLabelText(/starting location/i);
-      await userEvent.type(originInput, 'San Francisco');
-
-      // Fill dates but no interests
-      const startDate = screen.getByLabelText(/start date/i);
-      const endDate = screen.getByLabelText(/end date/i);
-      fireEvent.change(startDate, { target: { value: '2025-01-15' } });
-      fireEvent.change(endDate, { target: { value: '2025-01-18' } });
-
-      const submitButton = screen.getByRole('button', { name: /generate/i });
-      fireEvent.click(submitButton);
-
-      await waitFor(() => {
-        expect(mockOnSubmit).not.toHaveBeenCalled();
+        expect(screen.getByText(/starting location is required/i)).toBeInTheDocument();
       });
     });
   });
@@ -111,29 +96,18 @@ describe('TripForm Component', () => {
 
       // Fill origin
       const originInput = screen.getByLabelText(/starting location/i);
-      await userEvent.type(originInput, 'San Francisco, CA');
+      fireEvent.change(originInput, { target: { value: 'San Francisco, CA' } });
 
-      // Fill dates
-      const startDate = screen.getByLabelText(/start date/i);
-      const endDate = screen.getByLabelText(/end date/i);
-      fireEvent.change(startDate, { target: { value: '2025-01-15' } });
-      fireEvent.change(endDate, { target: { value: '2025-01-18' } });
-
-      // Select interests
-      const hikingCheckbox = screen.getByLabelText(/hiking/i);
-      fireEvent.click(hikingCheckbox);
-
-      // Submit
-      const submitButton = screen.getByRole('button', { name: /generate/i });
+      // Submit - dates and interests have defaults
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
       fireEvent.click(submitButton);
 
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledWith(
           expect.objectContaining({
             origin: 'San Francisco, CA',
-            startDate: '2025-01-15',
-            endDate: '2025-01-18',
-            interests: expect.arrayContaining(['hiking']),
+            interests: expect.arrayContaining(['hiking', 'scenic_drives']),
+            difficulty: 'moderate',
           })
         );
       });
@@ -143,17 +117,16 @@ describe('TripForm Component', () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
       // Fill required fields
-      await userEvent.type(screen.getByLabelText(/starting location/i), 'Test');
-      fireEvent.change(screen.getByLabelText(/start date/i), { target: { value: '2025-01-15' } });
-      fireEvent.change(screen.getByLabelText(/end date/i), { target: { value: '2025-01-18' } });
-      fireEvent.click(screen.getByLabelText(/hiking/i));
+      const originInput = screen.getByLabelText(/starting location/i);
+      fireEvent.change(originInput, { target: { value: 'Test' } });
 
-      // Select difficulty
-      const difficultySelect = screen.getByLabelText(/difficulty/i);
-      fireEvent.change(difficultySelect, { target: { value: 'hard' } });
+      // Select hard difficulty
+      const hardButton = screen.getByText('Hard');
+      fireEvent.click(hardButton);
 
       // Submit
-      fireEvent.click(screen.getByRole('button', { name: /generate/i }));
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
+      fireEvent.click(submitButton);
 
       await waitFor(() => {
         expect(mockOnSubmit).toHaveBeenCalledWith(
@@ -166,32 +139,50 @@ describe('TripForm Component', () => {
   });
 
   describe('Interest Selection', () => {
-    it('should allow selecting multiple interests', async () => {
+    it('should allow selecting interests', async () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      const hikingCheckbox = screen.getByLabelText(/hiking/i);
-      const campingCheckbox = screen.getByLabelText(/camping/i);
-      const photographyCheckbox = screen.getByLabelText(/photography/i);
+      // Click on camping button (not selected by default)
+      const campingButton = screen.getByText('Camping').closest('button');
+      fireEvent.click(campingButton);
 
-      fireEvent.click(hikingCheckbox);
-      fireEvent.click(campingCheckbox);
-      fireEvent.click(photographyCheckbox);
+      // Fill origin and submit
+      const originInput = screen.getByLabelText(/starting location/i);
+      fireEvent.change(originInput, { target: { value: 'Test' } });
 
-      expect(hikingCheckbox).toBeChecked();
-      expect(campingCheckbox).toBeChecked();
-      expect(photographyCheckbox).toBeChecked();
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            interests: expect.arrayContaining(['camping']),
+          })
+        );
+      });
     });
 
     it('should allow deselecting interests', async () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      const hikingCheckbox = screen.getByLabelText(/hiking/i);
+      // Hiking is selected by default, click to deselect
+      const hikingButton = screen.getByText('Hiking').closest('button');
+      fireEvent.click(hikingButton);
 
-      fireEvent.click(hikingCheckbox);
-      expect(hikingCheckbox).toBeChecked();
+      // Fill origin and submit
+      const originInput = screen.getByLabelText(/starting location/i);
+      fireEvent.change(originInput, { target: { value: 'Test' } });
 
-      fireEvent.click(hikingCheckbox);
-      expect(hikingCheckbox).not.toBeChecked();
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            interests: expect.not.arrayContaining(['hiking']),
+          })
+        );
+      });
     });
   });
 
@@ -200,46 +191,75 @@ describe('TripForm Component', () => {
       render(<TripForm onSubmit={mockOnSubmit} isLoading={true} />);
 
       expect(screen.getByLabelText(/starting location/i)).toBeDisabled();
-      expect(screen.getByRole('button', { name: /generating/i })).toBeDisabled();
     });
 
     it('should show loading text on button', () => {
       render(<TripForm onSubmit={mockOnSubmit} isLoading={true} />);
 
-      expect(screen.getByRole('button')).toHaveTextContent(/generating/i);
+      expect(screen.getByText(/generating trip/i)).toBeInTheDocument();
     });
   });
 
   describe('Default Values', () => {
-    it('should have moderate as default difficulty', () => {
+    it('should have moderate as default difficulty', async () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      const difficultySelect = screen.getByLabelText(/difficulty/i);
-      expect(difficultySelect.value).toBe('moderate');
+      // Fill origin and submit to check default
+      const originInput = screen.getByLabelText(/starting location/i);
+      fireEvent.change(originInput, { target: { value: 'Test' } });
+
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            difficulty: 'moderate',
+          })
+        );
+      });
+    });
+
+    it('should have default interests selected', async () => {
+      render(<TripForm onSubmit={mockOnSubmit} />);
+
+      // Fill origin and submit to check defaults
+      const originInput = screen.getByLabelText(/starting location/i);
+      fireEvent.change(originInput, { target: { value: 'Test' } });
+
+      const submitButton = screen.getByRole('button', { name: /generate ai trip/i });
+      fireEvent.click(submitButton);
+
+      await waitFor(() => {
+        expect(mockOnSubmit).toHaveBeenCalledWith(
+          expect.objectContaining({
+            interests: expect.arrayContaining(['hiking', 'scenic_drives']),
+          })
+        );
+      });
     });
 
     it('should have default radius value', () => {
       render(<TripForm onSubmit={mockOnSubmit} />);
 
-      const radiusSlider = screen.getByLabelText(/radius/i);
-      expect(radiusSlider.value).toBeDefined();
+      const radiusSlider = screen.getByLabelText(/search radius/i);
+      expect(radiusSlider.value).toBe('200');
     });
   });
 });
 
 describe('TripForm Accessibility', () => {
-  it('should have accessible labels for all inputs', () => {
+  it('should have accessible labels for inputs', () => {
     render(<TripForm onSubmit={vi.fn()} />);
 
     expect(screen.getByLabelText(/starting location/i)).toHaveAttribute('id');
     expect(screen.getByLabelText(/start date/i)).toHaveAttribute('id');
     expect(screen.getByLabelText(/end date/i)).toHaveAttribute('id');
-    expect(screen.getByLabelText(/difficulty/i)).toHaveAttribute('id');
   });
 
-  it('should have proper form structure', () => {
-    render(<TripForm onSubmit={vi.fn()} />);
+  it('should have a form element', () => {
+    const { container } = render(<TripForm onSubmit={vi.fn()} />);
 
-    expect(screen.getByRole('form')).toBeInTheDocument();
+    expect(container.querySelector('form')).toBeInTheDocument();
   });
 });

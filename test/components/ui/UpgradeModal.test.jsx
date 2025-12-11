@@ -11,7 +11,6 @@ import UpgradeModal from '@/components/ui/UpgradeModal';
 
 describe('UpgradeModal Component', () => {
   const mockOnClose = vi.fn();
-  const mockOnUpgrade = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -23,7 +22,6 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
@@ -35,7 +33,6 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={false}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
@@ -47,11 +44,10 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      expect(screen.getByText(/upgrade/i)).toBeInTheDocument();
+      expect(screen.getByText('Upgrade to Pro')).toBeInTheDocument();
     });
 
     it('should render free tier limit message', () => {
@@ -59,11 +55,10 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      expect(screen.getByText(/free tier/i)).toBeInTheDocument();
+      expect(screen.getByText(/free tier limit/i)).toBeInTheDocument();
     });
 
     it('should render upgrade button', () => {
@@ -71,23 +66,32 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      expect(screen.getByRole('button', { name: /upgrade/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /upgrade to pro/i })).toBeInTheDocument();
     });
 
-    it('should render close button', () => {
+    it('should render close button with aria-label', () => {
       render(
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      expect(screen.getByRole('button', { name: /close|cancel|×/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /close modal/i })).toBeInTheDocument();
+    });
+
+    it('should render maybe later button', () => {
+      render(
+        <UpgradeModal
+          isOpen={true}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByRole('button', { name: /maybe later/i })).toBeInTheDocument();
     });
   });
 
@@ -97,29 +101,27 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      const closeButton = screen.getByRole('button', { name: /close|cancel|×/i });
+      const closeButton = screen.getByRole('button', { name: /close modal/i });
       fireEvent.click(closeButton);
 
       expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
-    it('should call onUpgrade when upgrade button is clicked', () => {
+    it('should call onClose when maybe later button is clicked', () => {
       render(
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      const upgradeButton = screen.getByRole('button', { name: /upgrade/i });
-      fireEvent.click(upgradeButton);
+      const maybeLaterButton = screen.getByRole('button', { name: /maybe later/i });
+      fireEvent.click(maybeLaterButton);
 
-      expect(mockOnUpgrade).toHaveBeenCalledTimes(1);
+      expect(mockOnClose).toHaveBeenCalledTimes(1);
     });
 
     it('should call onClose when clicking backdrop', () => {
@@ -127,11 +129,11 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      const backdrop = screen.getByTestId('modal-backdrop');
+      // The backdrop is the outer div with the fixed class
+      const backdrop = document.querySelector('.fixed.inset-0');
       fireEvent.click(backdrop);
 
       expect(mockOnClose).toHaveBeenCalledTimes(1);
@@ -142,7 +144,6 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
@@ -159,11 +160,11 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      expect(screen.getByText(/unlimited/i)).toBeInTheDocument();
+      // Check for "Unlimited trip creation" text
+      expect(screen.getByText('Unlimited trip creation')).toBeInTheDocument();
     });
 
     it('should display pricing information', () => {
@@ -171,13 +172,36 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      // Should show some pricing info
-      const priceText = screen.queryByText(/\$/);
-      // Price may or may not be shown depending on implementation
+      expect(screen.getByText('$9.99')).toBeInTheDocument();
+      expect(screen.getByText('/month')).toBeInTheDocument();
+    });
+
+    it('should display pro features list', () => {
+      render(
+        <UpgradeModal
+          isOpen={true}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText('Regenerate trips anytime')).toBeInTheDocument();
+      expect(screen.getByText('Export trips to PDF')).toBeInTheDocument();
+      expect(screen.getByText('Advanced AI recommendations')).toBeInTheDocument();
+      expect(screen.getByText('Priority support')).toBeInTheDocument();
+    });
+
+    it('should display Stripe security note', () => {
+      render(
+        <UpgradeModal
+          isOpen={true}
+          onClose={mockOnClose}
+        />
+      );
+
+      expect(screen.getByText(/secure payment powered by stripe/i)).toBeInTheDocument();
     });
   });
 
@@ -187,7 +211,6 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
@@ -199,24 +222,21 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
       expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'true');
     });
 
-    it('should trap focus within modal', () => {
+    it('should have aria-labelledby attribute', () => {
       render(
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
-      const buttons = screen.getAllByRole('button');
-      expect(buttons.length).toBeGreaterThan(0);
+      expect(screen.getByRole('dialog')).toHaveAttribute('aria-labelledby', 'upgrade-modal-title');
     });
 
     it('should close on Escape key', () => {
@@ -224,7 +244,6 @@ describe('UpgradeModal Component', () => {
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
         />
       );
 
@@ -234,60 +253,57 @@ describe('UpgradeModal Component', () => {
     });
   });
 
-  describe('Styling', () => {
-    it('should have overlay styling', () => {
+  describe('Custom Props', () => {
+    it('should render custom title', () => {
       render(
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
+          title="Custom Title"
         />
       );
 
-      const backdrop = screen.getByTestId('modal-backdrop');
-      expect(backdrop).toHaveClass('fixed');
+      expect(screen.getByText('Custom Title')).toBeInTheDocument();
     });
 
-    it('should center modal content', () => {
+    it('should render custom message', () => {
       render(
         <UpgradeModal
           isOpen={true}
           onClose={mockOnClose}
-          onUpgrade={mockOnUpgrade}
+          message="Custom message here"
         />
       );
 
-      const dialog = screen.getByRole('dialog');
-      expect(dialog).toHaveClass('bg-white');
+      expect(screen.getByText('Custom message here')).toBeInTheDocument();
     });
   });
 });
 
-describe('UpgradeModal Pro Features', () => {
-  it('should list pro features', () => {
+describe('UpgradeModal Styling', () => {
+  it('should have overlay styling', () => {
     render(
       <UpgradeModal
         isOpen={true}
         onClose={vi.fn()}
-        onUpgrade={vi.fn()}
       />
     );
 
-    // Should mention unlimited trips
-    expect(screen.getByText(/unlimited trips/i)).toBeInTheDocument();
+    const backdrop = document.querySelector('.fixed.inset-0');
+    expect(backdrop).toBeInTheDocument();
+    expect(backdrop).toHaveClass('bg-black/50');
   });
 
-  it('should highlight the value proposition', () => {
+  it('should have modal content styling', () => {
     render(
       <UpgradeModal
         isOpen={true}
         onClose={vi.fn()}
-        onUpgrade={vi.fn()}
       />
     );
 
-    // Should have compelling copy
-    const modal = screen.getByRole('dialog');
-    expect(modal.textContent).toMatch(/pro|premium|upgrade/i);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('bg-white');
+    expect(dialog).toHaveClass('rounded-2xl');
   });
 });
