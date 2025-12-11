@@ -150,7 +150,7 @@ describe('FavoriteButton', () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          favorites: [{ nps_park_id: 'park-123' }],
+          favorites: [{ park_id: 'park-123' }],
         }),
       });
 
@@ -219,7 +219,7 @@ describe('FavoriteButton', () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          favorites: [{ nps_park_id: 'park-123' }],
+          favorites: [{ park_id: 'park-123' }],
         }),
       });
 
@@ -300,7 +300,7 @@ describe('FavoriteButton', () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          favorites: [{ nps_park_id: 'park-123' }],
+          favorites: [{ park_id: 'park-123' }],
         }),
       });
 

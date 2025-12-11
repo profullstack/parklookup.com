@@ -72,27 +72,6 @@ export default function FavoritesPage() {
     fetchFavorites();
   }, [authLoading, isAuthenticated, session]);
 
-  // Handle removing a favorite
-  const handleRemoveFavorite = async (parkId) => {
-    try {
-      const response = await fetch(`/api/favorites/${parkId}`, {
-        method: 'DELETE',
-        headers: session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
-          : {},
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove favorite');
-      }
-
-      // Update local state
-      setFavorites((prev) => prev.filter((f) => f.park_id !== parkId));
-    } catch (err) {
-      console.error('Error removing favorite:', err);
-    }
-  };
-
   // Loading state (show while auth is loading or favorites are loading)
   if (authLoading || loading) {
     return (
@@ -225,22 +204,7 @@ export default function FavoritesPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {favorites.map((favorite) => (
-                <div key={favorite.id} className="relative">
-                  <ParkCard park={favorite.park} />
-                  <button
-                    onClick={() => handleRemoveFavorite(favorite.park_id)}
-                    className="absolute top-2 right-2 p-2 bg-white dark:bg-gray-800 rounded-full shadow-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors group"
-                    title="Remove from favorites"
-                  >
-                    <svg
-                      className="w-5 h-5 text-red-500 group-hover:text-red-600"
-                      fill="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                    </svg>
-                  </button>
-                </div>
+                <ParkCard key={favorite.id} park={favorite.park} />
               ))}
             </div>
           </>

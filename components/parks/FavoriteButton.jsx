@@ -40,7 +40,8 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
         });
         if (response.ok) {
           const data = await response.json();
-          setIsFavorite(data.favorites?.some((f) => f.nps_park_id === parkId));
+          // Use park_id which is the unified ID returned by the API for all park types
+          setIsFavorite(data.favorites?.some((f) => f.park_id === parkId));
         }
       } catch (error) {
         console.error('Error checking favorite status:', error);
