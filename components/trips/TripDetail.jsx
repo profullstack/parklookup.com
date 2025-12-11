@@ -43,6 +43,29 @@ const getDifficultyColor = (difficulty) => {
 };
 
 /**
+ * Get the appropriate link for a park based on its source
+ * @param {Object} stop - Trip stop with park data
+ * @returns {Object} Link info with href and isExternal flag
+ */
+const getParkLink = (stop) => {
+  if (!stop.parkCode) return null;
+  
+  // Check if this is a Wikidata park (Q-code format)
+  const isWikidataPark = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
+  
+  if (isWikidataPark) {
+    // For Wikidata parks, use external URL if available
+    if (stop.park?.url) {
+      return { href: stop.park.url, isExternal: true };
+    }
+    return null; // No link available for Wikidata parks without URL
+  }
+  
+  // NPS parks link to internal park detail page
+  return { href: `/parks/${stop.parkCode}`, isExternal: false };
+};
+
+/**
  * Day card component
  */
 function DayCard({ stop, tripStartDate }) {
@@ -62,6 +85,7 @@ function DayCard({ stop, tripStartDate }) {
 
   const dayDate = getDateForDay();
   const parkImage = stop.park?.images?.[0]?.url;
+  const parkLink = getParkLink(stop);
 
   return (
     <Card className="overflow-hidden">
@@ -179,14 +203,28 @@ function DayCard({ stop, tripStartDate }) {
             )}
 
             {/* Park Link */}
-            {stop.parkCode && (
-              <Link
-                href={`/parks/${stop.parkCode}`}
-                className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
-              >
-                View park details →
-              </Link>
+            {parkLink && (
+              parkLink.isExternal ? (
+                <a
+                  href={parkLink.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
+                >
+                  Visit park website ↗
+                </a>
+              ) : (
+                <Link
+                  href={parkLink.href}
+                  className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
+                >
+                  View park details →
+                </Link>
+              )
             )}
+
+            {/* Nearby Places */}
+            <NearbyPlacesSection nearbyPlaces={stop.nearbyPlaces} />
           </div>
         </CardContent>
       )}
@@ -320,6 +358,145 @@ function BudgetSection({ budget }) {
 }
 
 /**
+ * Nearby places section for a day card
+ */
+function NearbyPlacesSection({ nearbyPlaces }) {
+  if (!nearbyPlaces) return null;
+
+  const categories = [
+    { key: 'dining', label: 'Dining', icon: '🍽️', color: 'orange' },
+    { key: 'bars', label: 'Bars & Nightlife', icon: '🍺', color: 'amber' },
+    { key: 'lodging', label: 'Lodging', icon: '🏨', color: 'blue' },
+    { key: 'entertainment', label: 'Entertainment', icon: '🎭', color: 'purple' },
+    { key: 'shopping', label: 'Shopping', icon: '🛍️', color: 'pink' },
+    { key: 'attractions', label: 'Attractions', icon: '🎡', color: 'teal' },
+  ];
+
+  const hasPlaces = categories.some(cat => nearbyPlaces[cat.key]?.length > 0);
+  if (!hasPlaces) return null;
+
+  return (
+    <div className="mt-4 pt-4 border-t border-gray-200">
+      <h4 className="text-sm font-semibold text-gray-700 mb-3">📍 Nearby Places</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {categories.map(cat => {
+          const places = nearbyPlaces[cat.key];
+          if (!places || places.length === 0) return null;
+
+          return (
+            <div key={cat.key} className="space-y-2">
+              <p className="text-xs font-medium text-gray-600">
+                {cat.icon} {cat.label}
+              </p>
+              <div className="space-y-1">
+                {places.slice(0, 3).map((place, idx) => (
+                  <div key={place.id || idx} className="flex items-start gap-2 text-xs">
+                    {place.thumbnail && (
+                      <img
+                        src={place.thumbnail}
+                        alt={place.title}
+                        className="w-8 h-8 rounded object-cover flex-shrink-0"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      {place.website ? (
+                        <a
+                          href={place.website}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-medium text-gray-800 hover:text-green-600 truncate block"
+                        >
+                          {place.title}
+                        </a>
+                      ) : (
+                        <span className="font-medium text-gray-800 truncate block">
+                          {place.title}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-2 text-gray-500">
+                        {place.rating && (
+                          <span>⭐ {place.rating.toFixed(1)}</span>
+                        )}
+                        {place.price_level && (
+                          <span>{'$'.repeat(place.price_level)}</span>
+                        )}
+                        {place.distanceMiles && (
+                          <span>{place.distanceMiles.toFixed(1)} mi</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Recommended products section component
+ */
+function RecommendedProductsSection({ products }) {
+  if (!products || products.length === 0) return null;
+
+  return (
+    <Card className="border-indigo-200 bg-indigo-50">
+      <CardContent>
+        <h3 className="text-lg font-semibold text-indigo-900 mb-3">🛒 Recommended Gear</h3>
+        <p className="text-sm text-indigo-700 mb-4">
+          Essential gear for your adventure
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {products.slice(0, 10).map((product, index) => (
+            <a
+              key={product.id || index}
+              href={product.affiliateUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group bg-white rounded-lg p-2 shadow-sm hover:shadow-md transition-shadow"
+            >
+              {product.imageUrl && (
+                <div className="aspect-square mb-2 overflow-hidden rounded">
+                  <img
+                    src={product.imageUrl}
+                    alt={product.title}
+                    className="w-full h-full object-contain group-hover:scale-105 transition-transform"
+                  />
+                </div>
+              )}
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-gray-800 line-clamp-2 group-hover:text-indigo-600">
+                  {product.title}
+                </p>
+                <div className="flex items-center gap-1">
+                  {product.rating && (
+                    <span className="text-xs text-yellow-600">
+                      ⭐ {product.rating.toFixed(1)}
+                    </span>
+                  )}
+                  {product.isPrime && (
+                    <span className="text-xs text-blue-600 font-medium">Prime</span>
+                  )}
+                </div>
+                {product.price && (
+                  <p className="text-sm font-bold text-green-700">
+                    {product.currency === 'USD' ? '$' : product.currency}
+                    {product.price.toFixed(2)}
+                  </p>
+                )}
+              </div>
+            </a>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
  * TripDetail component
  * @param {Object} props - Component props
  * @param {Object} props.trip - Full trip data
@@ -342,6 +519,7 @@ export default function TripDetail({ trip, onRegenerate, onDelete, isRegeneratin
     safetyNotes,
     bestPhotoSpots,
     estimatedBudget,
+    recommendedProducts = [],
   } = trip;
 
   return (
@@ -426,6 +604,9 @@ export default function TripDetail({ trip, onRegenerate, onDelete, isRegeneratin
           ))}
         </div>
       </div>
+
+      {/* Recommended Products */}
+      <RecommendedProductsSection products={recommendedProducts} />
 
       {/* Additional Sections */}
       <div className="grid md:grid-cols-2 gap-4">

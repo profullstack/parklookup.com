@@ -1050,6 +1050,455 @@ describe('Trip Deletion - Comprehensive Tests', () => {
   });
 });
 
+describe('Park Source Detection', () => {
+  describe('NPS vs Wikidata Parks', () => {
+    it('should identify NPS parks by park_code format', () => {
+      const npsParkCodes = ['yose', 'sequ', 'kica', 'grca', 'zion'];
+      const wikidataPattern = /^Q\d+$/;
+      
+      npsParkCodes.forEach(code => {
+        expect(wikidataPattern.test(code)).toBe(false);
+      });
+    });
+
+    it('should identify Wikidata parks by Q-code format', () => {
+      const wikidataCodes = ['Q5719910', 'Q123456', 'Q999999'];
+      const wikidataPattern = /^Q\d+$/;
+      
+      wikidataCodes.forEach(code => {
+        expect(wikidataPattern.test(code)).toBe(true);
+      });
+    });
+
+    it('should determine source from park data', () => {
+      const npsPark = { park_code: 'yose', full_name: 'Yosemite National Park' };
+      const wikidataPark = { park_code: 'Q5719910', full_name: 'Some State Park', source: 'wikidata' };
+      
+      const getNpsSource = (park) => park.source || 'nps';
+      
+      expect(getNpsSource(npsPark)).toBe('nps');
+      expect(getNpsSource(wikidataPark)).toBe('wikidata');
+    });
+  });
+
+  describe('Park Link Generation', () => {
+    it('should generate internal link for NPS parks', () => {
+      const stop = { parkCode: 'yose', park: { source: 'nps' } };
+      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
+      
+      expect(isWikidata).toBe(false);
+      
+      const link = `/parks/${stop.parkCode}`;
+      expect(link).toBe('/parks/yose');
+    });
+
+    it('should generate external link for Wikidata parks with URL', () => {
+      const stop = {
+        parkCode: 'Q5719910',
+        park: {
+          source: 'wikidata',
+          url: 'https://example.com/park'
+        }
+      };
+      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
+      
+      expect(isWikidata).toBe(true);
+      expect(stop.park.url).toBe('https://example.com/park');
+    });
+
+    it('should return null for Wikidata parks without URL', () => {
+      const stop = {
+        parkCode: 'Q5719910',
+        park: { source: 'wikidata' }
+      };
+      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
+      const hasUrl = !!stop.park?.url;
+      
+      expect(isWikidata).toBe(true);
+      expect(hasUrl).toBe(false);
+    });
+
+    it('should detect Wikidata by Q-code even without source field', () => {
+      const stop = { parkCode: 'Q5719910', park: { full_name: 'Some Park' } };
+      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
+      
+      expect(isWikidata).toBe(true);
+    });
+  });
+
+  describe('Park Data Merging', () => {
+    it('should merge NPS parks into parksMap', () => {
+      const npsParks = [
+        { park_code: 'yose', full_name: 'Yosemite' },
+        { park_code: 'sequ', full_name: 'Sequoia' },
+      ];
+      
+      const parksMap = npsParks.reduce((acc, park) => {
+        acc[park.park_code] = park;
+        return acc;
+      }, {});
+      
+      expect(Object.keys(parksMap)).toHaveLength(2);
+      expect(parksMap['yose'].full_name).toBe('Yosemite');
+    });
+
+    it('should find missing park codes', () => {
+      const parkCodes = ['yose', 'Q5719910', 'sequ'];
+      const parksMap = { yose: {}, sequ: {} };
+      
+      const foundCodes = new Set(Object.keys(parksMap));
+      const missingCodes = parkCodes.filter(code => !foundCodes.has(code));
+      
+      expect(missingCodes).toEqual(['Q5719910']);
+    });
+
+    it('should merge Wikidata parks for missing codes', () => {
+      const parksMap = { yose: { full_name: 'Yosemite' } };
+      const wikidataParks = [
+        { park_code: 'Q5719910', full_name: 'State Park', source: 'wikidata' },
+      ];
+      
+      wikidataParks.forEach(park => {
+        parksMap[park.park_code] = park;
+      });
+      
+      expect(Object.keys(parksMap)).toHaveLength(2);
+      expect(parksMap['Q5719910'].source).toBe('wikidata');
+    });
+  });
+});
+
+describe('Product Recommendations', () => {
+  describe('Activity-Based Product Filtering', () => {
+    it('should extract unique activities from trip', () => {
+      const trip = {
+        interests: ['hiking', 'photography'],
+        trip_stops: [
+          { activities: ['hiking', 'camping'] },
+          { activities: ['photography', 'wildlife'] },
+        ],
+      };
+      
+      const allActivities = [...new Set([
+        ...(trip.interests || []),
+        ...trip.trip_stops.flatMap(s => s.activities || [])
+      ])];
+      
+      expect(allActivities).toContain('hiking');
+      expect(allActivities).toContain('photography');
+      expect(allActivities).toContain('camping');
+      expect(allActivities).toContain('wildlife');
+      expect(allActivities).toHaveLength(4);
+    });
+
+    it('should handle missing interests', () => {
+      const trip = {
+        interests: null,
+        trip_stops: [{ activities: ['hiking'] }],
+      };
+      
+      const allActivities = [...new Set([
+        ...(trip.interests || []),
+        ...trip.trip_stops.flatMap(s => s.activities || [])
+      ])];
+      
+      expect(allActivities).toEqual(['hiking']);
+    });
+
+    it('should handle missing activities in stops', () => {
+      const trip = {
+        interests: ['hiking'],
+        trip_stops: [
+          { activities: null },
+          { activities: ['camping'] },
+        ],
+      };
+      
+      const allActivities = [...new Set([
+        ...(trip.interests || []),
+        ...trip.trip_stops.flatMap(s => s.activities || [])
+      ])];
+      
+      expect(allActivities).toContain('hiking');
+      expect(allActivities).toContain('camping');
+    });
+
+    it('should handle empty trip_stops', () => {
+      const trip = {
+        interests: ['hiking'],
+        trip_stops: [],
+      };
+      
+      const allActivities = [...new Set([
+        ...(trip.interests || []),
+        ...trip.trip_stops.flatMap(s => s.activities || [])
+      ])];
+      
+      expect(allActivities).toEqual(['hiking']);
+    });
+  });
+
+  describe('Product Data Transformation', () => {
+    it('should transform product data correctly', () => {
+      const rawProduct = {
+        id: 'prod-1',
+        asin: 'B123456',
+        title: 'Hiking Boots',
+        brand: 'TrailMaster',
+        price: 129.99,
+        currency: 'USD',
+        original_price: 149.99,
+        rating: 4.5,
+        ratings_total: 1234,
+        main_image_url: 'https://example.com/image.jpg',
+        is_prime: true,
+        affiliate_url: 'https://amazon.com/dp/B123456',
+        product_categories: { name: 'Footwear', slug: 'footwear' },
+      };
+      
+      const transformed = {
+        id: rawProduct.id,
+        asin: rawProduct.asin,
+        title: rawProduct.title,
+        brand: rawProduct.brand,
+        price: rawProduct.price,
+        currency: rawProduct.currency,
+        originalPrice: rawProduct.original_price,
+        rating: rawProduct.rating,
+        ratingsTotal: rawProduct.ratings_total,
+        imageUrl: rawProduct.main_image_url,
+        isPrime: rawProduct.is_prime,
+        affiliateUrl: rawProduct.affiliate_url,
+        category: rawProduct.product_categories?.name || null,
+      };
+      
+      expect(transformed.id).toBe('prod-1');
+      expect(transformed.title).toBe('Hiking Boots');
+      expect(transformed.price).toBe(129.99);
+      expect(transformed.isPrime).toBe(true);
+      expect(transformed.category).toBe('Footwear');
+    });
+
+    it('should handle missing product_categories', () => {
+      const rawProduct = {
+        id: 'prod-1',
+        title: 'Hiking Boots',
+        product_categories: null,
+      };
+      
+      const category = rawProduct.product_categories?.name || null;
+      expect(category).toBeNull();
+    });
+  });
+
+  describe('Response Structure with Products', () => {
+    it('should include recommendedProducts in trip response', () => {
+      const response = {
+        trip: {
+          id: 'trip-uuid',
+          title: 'Test Trip',
+          stops: [],
+          recommendedProducts: [
+            { id: 'prod-1', title: 'Product 1' },
+            { id: 'prod-2', title: 'Product 2' },
+          ],
+        },
+      };
+      
+      expect(response.trip).toHaveProperty('recommendedProducts');
+      expect(response.trip.recommendedProducts).toHaveLength(2);
+    });
+
+    it('should handle empty recommendedProducts', () => {
+      const response = {
+        trip: {
+          id: 'trip-uuid',
+          recommendedProducts: [],
+        },
+      };
+      
+      expect(response.trip.recommendedProducts).toEqual([]);
+    });
+  });
+});
+
+describe('Nearby Places', () => {
+  describe('Nearby Places Data Structure', () => {
+    it('should group nearby places by category', () => {
+      const nearbyPlacesData = [
+        { park_id: 1, nearby_places: { id: 1, category: 'dining', title: 'Restaurant A' } },
+        { park_id: 1, nearby_places: { id: 2, category: 'bars', title: 'Bar B' } },
+        { park_id: 1, nearby_places: { id: 3, category: 'dining', title: 'Restaurant C' } },
+      ];
+      
+      const nearbyPlacesMap = {
+        dining: [],
+        bars: [],
+        lodging: [],
+        entertainment: [],
+        shopping: [],
+        attractions: [],
+      };
+      
+      nearbyPlacesData.forEach(item => {
+        if (!item.nearby_places) return;
+        const category = item.nearby_places.category?.toLowerCase() || 'attractions';
+        if (nearbyPlacesMap[category]) {
+          nearbyPlacesMap[category].push(item.nearby_places);
+        }
+      });
+      
+      expect(nearbyPlacesMap.dining).toHaveLength(2);
+      expect(nearbyPlacesMap.bars).toHaveLength(1);
+      expect(nearbyPlacesMap.lodging).toHaveLength(0);
+    });
+
+    it('should limit places per category', () => {
+      const places = Array(10).fill(null).map((_, i) => ({
+        id: i,
+        title: `Place ${i}`,
+        rating: Math.random() * 5,
+      }));
+      
+      const limited = places
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 5);
+      
+      expect(limited).toHaveLength(5);
+    });
+
+    it('should sort places by rating', () => {
+      const places = [
+        { id: 1, rating: 3.5 },
+        { id: 2, rating: 4.8 },
+        { id: 3, rating: 4.2 },
+      ];
+      
+      const sorted = [...places].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+      
+      expect(sorted[0].rating).toBe(4.8);
+      expect(sorted[1].rating).toBe(4.2);
+      expect(sorted[2].rating).toBe(3.5);
+    });
+  });
+
+  describe('Nearby Places Transformation', () => {
+    it('should transform nearby place data correctly', () => {
+      const rawPlace = {
+        id: 'place-1',
+        data_cid: '123456789',
+        title: 'Great Restaurant',
+        category: 'dining',
+        address: '123 Main St',
+        phone: '555-1234',
+        website: 'https://example.com',
+        latitude: 37.7749,
+        longitude: -122.4194,
+        rating: 4.5,
+        reviews_count: 500,
+        price_level: 2,
+        thumbnail: 'https://example.com/thumb.jpg',
+      };
+      const distanceMiles = 2.5;
+      
+      const transformed = {
+        ...rawPlace,
+        distanceMiles: distanceMiles,
+      };
+      
+      expect(transformed.title).toBe('Great Restaurant');
+      expect(transformed.rating).toBe(4.5);
+      expect(transformed.distanceMiles).toBe(2.5);
+    });
+
+    it('should handle missing optional fields', () => {
+      const rawPlace = {
+        id: 'place-1',
+        title: 'Basic Place',
+        category: 'dining',
+        rating: null,
+        website: null,
+        thumbnail: null,
+      };
+      
+      expect(rawPlace.rating).toBeNull();
+      expect(rawPlace.website).toBeNull();
+      expect(rawPlace.thumbnail).toBeNull();
+    });
+  });
+
+  describe('Response Structure with Nearby Places', () => {
+    it('should include nearbyPlaces in stop data', () => {
+      const stop = {
+        id: 'stop-1',
+        parkCode: 'yose',
+        nearbyPlaces: {
+          dining: [{ id: 1, title: 'Restaurant' }],
+          bars: [{ id: 2, title: 'Bar' }],
+          lodging: [],
+          entertainment: [],
+          shopping: [],
+          attractions: [],
+        },
+      };
+      
+      expect(stop).toHaveProperty('nearbyPlaces');
+      expect(stop.nearbyPlaces.dining).toHaveLength(1);
+      expect(stop.nearbyPlaces.bars).toHaveLength(1);
+    });
+
+    it('should handle null nearbyPlaces', () => {
+      const stop = {
+        id: 'stop-1',
+        parkCode: 'yose',
+        nearbyPlaces: null,
+      };
+      
+      expect(stop.nearbyPlaces).toBeNull();
+    });
+
+    it('should handle park with no nearby places', () => {
+      const nearbyPlacesMap = {};
+      const parkCode = 'remote-park';
+      
+      const nearbyPlaces = nearbyPlacesMap[parkCode] || null;
+      expect(nearbyPlaces).toBeNull();
+    });
+  });
+
+  describe('Category Handling', () => {
+    it('should handle all supported categories', () => {
+      const supportedCategories = ['dining', 'bars', 'lodging', 'entertainment', 'shopping', 'attractions'];
+      
+      const nearbyPlacesMap = {};
+      supportedCategories.forEach(cat => {
+        nearbyPlacesMap[cat] = [];
+      });
+      
+      expect(Object.keys(nearbyPlacesMap)).toHaveLength(6);
+      supportedCategories.forEach(cat => {
+        expect(nearbyPlacesMap).toHaveProperty(cat);
+      });
+    });
+
+    it('should default unknown categories to attractions', () => {
+      const place = { category: 'unknown_category' };
+      const category = place.category?.toLowerCase() || 'attractions';
+      const supportedCategories = ['dining', 'bars', 'lodging', 'entertainment', 'shopping', 'attractions'];
+      
+      const finalCategory = supportedCategories.includes(category) ? category : 'attractions';
+      expect(finalCategory).toBe('attractions');
+    });
+
+    it('should handle null category', () => {
+      const place = { category: null };
+      const category = place.category?.toLowerCase() || 'attractions';
+      
+      expect(category).toBe('attractions');
+    });
+  });
+});
+
 describe('Trip Deletion - Edge Cases', () => {
   it('should handle concurrent deletion attempts', () => {
     // If two requests try to delete the same trip simultaneously,

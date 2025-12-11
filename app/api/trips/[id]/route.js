@@ -120,12 +120,13 @@ export async function GET(request, { params }) {
       );
     }
 
-    // Fetch park details for each stop
+    // Fetch park details for each stop from all_parks view (includes NPS and Wikidata parks)
     const parkCodes = [...new Set(trip.trip_stops.map(s => s.park_code))];
     
     let parksMap = {};
     if (parkCodes.length > 0) {
-      const { data: parks } = await supabase
+      // First try NPS parks
+      const { data: npsParks } = await supabase
         .from('nps_parks')
         .select(`
           park_code,
@@ -141,11 +142,41 @@ export async function GET(request, { params }) {
         `)
         .in('park_code', parkCodes);
 
-      if (parks) {
-        parksMap = parks.reduce((acc, park) => {
+      if (npsParks) {
+        parksMap = npsParks.reduce((acc, park) => {
           acc[park.park_code] = park;
           return acc;
         }, {});
+      }
+
+      // Find any park codes not found in NPS (likely Wikidata parks)
+      const foundCodes = new Set(Object.keys(parksMap));
+      const missingCodes = parkCodes.filter(code => !foundCodes.has(code));
+
+      // Fetch missing parks from all_parks view (includes Wikidata parks)
+      if (missingCodes.length > 0) {
+        const { data: allParks } = await supabase
+          .from('all_parks')
+          .select(`
+            park_code,
+            full_name,
+            description,
+            states,
+            latitude,
+            longitude,
+            designation,
+            url,
+            images,
+            activities,
+            source
+          `)
+          .in('park_code', missingCodes);
+
+        if (allParks) {
+          allParks.forEach(park => {
+            parksMap[park.park_code] = park;
+          });
+        }
       }
     }
 
@@ -156,6 +187,166 @@ export async function GET(request, { params }) {
       }
       return a.order_index - b.order_index;
     });
+
+    // Fetch products based on trip interests/activities
+    let recommendedProducts = [];
+    const allActivities = [...new Set([
+      ...(trip.interests || []),
+      ...trip.trip_stops.flatMap(s => s.activities || [])
+    ])];
+
+    if (allActivities.length > 0) {
+      // Try to get products for each activity
+      const { data: activityProducts } = await supabase
+        .from('activity_products')
+        .select('product_id, activity_name')
+        .in('activity_name', allActivities);
+
+      if (activityProducts && activityProducts.length > 0) {
+        const productIds = [...new Set(activityProducts.map(ap => ap.product_id))];
+        const { data: products } = await supabase
+          .from('products')
+          .select(`
+            id,
+            asin,
+            title,
+            brand,
+            price,
+            currency,
+            original_price,
+            rating,
+            ratings_total,
+            main_image_url,
+            is_prime,
+            affiliate_url,
+            product_categories (
+              name,
+              slug
+            )
+          `)
+          .in('id', productIds)
+          .eq('is_active', true)
+          .order('rating', { ascending: false })
+          .limit(10);
+
+        if (products) {
+          recommendedProducts = products;
+        }
+      }
+    }
+
+    // If no activity-specific products, get general outdoor products
+    if (recommendedProducts.length === 0) {
+      const { data: generalProducts } = await supabase
+        .from('products')
+        .select(`
+          id,
+          asin,
+          title,
+          brand,
+          price,
+          currency,
+          original_price,
+          rating,
+          ratings_total,
+          main_image_url,
+          is_prime,
+          affiliate_url,
+          product_categories (
+            name,
+            slug
+          )
+        `)
+        .eq('is_active', true)
+        .order('rating', { ascending: false })
+        .limit(10);
+
+      if (generalProducts) {
+        recommendedProducts = generalProducts;
+      }
+    }
+
+    // Fetch nearby places for each park (dining, bars, etc.)
+    const nearbyPlacesMap = {};
+    if (parkCodes.length > 0) {
+      // Get park IDs from all_parks view
+      const { data: parkIds } = await supabase
+        .from('all_parks')
+        .select('id, park_code')
+        .in('park_code', parkCodes);
+
+      if (parkIds && parkIds.length > 0) {
+        const parkIdMap = parkIds.reduce((acc, p) => {
+          acc[p.id] = p.park_code;
+          return acc;
+        }, {});
+
+        // Fetch nearby places for all parks at once
+        const { data: nearbyPlacesData } = await supabase
+          .from('park_nearby_places')
+          .select(`
+            park_id,
+            distance_miles,
+            nearby_places (
+              id,
+              data_cid,
+              title,
+              category,
+              address,
+              phone,
+              website,
+              latitude,
+              longitude,
+              rating,
+              reviews_count,
+              price_level,
+              thumbnail
+            )
+          `)
+          .in('park_id', Object.keys(parkIdMap))
+          .limit(100);
+
+        if (nearbyPlacesData) {
+          // Group by park_code and category
+          nearbyPlacesData.forEach(item => {
+            if (!item.nearby_places) return;
+            
+            const parkCode = parkIdMap[item.park_id];
+            if (!parkCode) return;
+
+            if (!nearbyPlacesMap[parkCode]) {
+              nearbyPlacesMap[parkCode] = {
+                dining: [],
+                bars: [],
+                lodging: [],
+                entertainment: [],
+                shopping: [],
+                attractions: []
+              };
+            }
+
+            const place = {
+              ...item.nearby_places,
+              distanceMiles: item.distance_miles
+            };
+
+            const category = item.nearby_places.category?.toLowerCase() || 'attractions';
+            if (nearbyPlacesMap[parkCode][category]) {
+              nearbyPlacesMap[parkCode][category].push(place);
+            }
+          });
+
+          // Limit each category to 5 places per park
+          Object.keys(nearbyPlacesMap).forEach(parkCode => {
+            Object.keys(nearbyPlacesMap[parkCode]).forEach(category => {
+              nearbyPlacesMap[parkCode][category] = nearbyPlacesMap[parkCode][category]
+                .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+                .slice(0, 5);
+            });
+          });
+        }
+      }
+    }
 
     // Transform trip data
     const transformedTrip = {
@@ -176,28 +367,50 @@ export async function GET(request, { params }) {
       estimatedBudget: trip.ai_summary?.estimated_budget || null,
       createdAt: trip.created_at,
       updatedAt: trip.updated_at,
-      stops: sortedStops.map(stop => ({
-        id: stop.id,
-        dayNumber: stop.day_number,
-        parkCode: stop.park_code,
-        park: parksMap[stop.park_code] ? {
-          name: parksMap[stop.park_code].full_name,
-          description: parksMap[stop.park_code].description,
-          states: parksMap[stop.park_code].states,
-          latitude: parksMap[stop.park_code].latitude,
-          longitude: parksMap[stop.park_code].longitude,
-          designation: parksMap[stop.park_code].designation,
-          url: parksMap[stop.park_code].url,
-          images: parksMap[stop.park_code].images,
-          activities: parksMap[stop.park_code].activities,
-        } : null,
-        activities: stop.activities,
-        morningPlan: stop.morning_plan,
-        afternoonPlan: stop.afternoon_plan,
-        eveningPlan: stop.evening_plan,
-        drivingNotes: stop.driving_notes,
-        highlights: stop.highlights,
-        notes: stop.notes,
+      stops: sortedStops.map(stop => {
+        const parkData = parksMap[stop.park_code];
+        // Determine source: NPS parks don't have source field, Wikidata parks have source='wikidata'
+        const source = parkData?.source || 'nps';
+        return {
+          id: stop.id,
+          dayNumber: stop.day_number,
+          parkCode: stop.park_code,
+          park: parkData ? {
+            name: parkData.full_name,
+            description: parkData.description,
+            states: parkData.states,
+            latitude: parkData.latitude,
+            longitude: parkData.longitude,
+            designation: parkData.designation,
+            url: parkData.url,
+            images: parkData.images,
+            activities: parkData.activities,
+            source: source,
+          } : null,
+          activities: stop.activities,
+          morningPlan: stop.morning_plan,
+          afternoonPlan: stop.afternoon_plan,
+          eveningPlan: stop.evening_plan,
+          drivingNotes: stop.driving_notes,
+          highlights: stop.highlights,
+          notes: stop.notes,
+          nearbyPlaces: nearbyPlacesMap[stop.park_code] || null,
+        };
+      }),
+      recommendedProducts: recommendedProducts.map(p => ({
+        id: p.id,
+        asin: p.asin,
+        title: p.title,
+        brand: p.brand,
+        price: p.price,
+        currency: p.currency,
+        originalPrice: p.original_price,
+        rating: p.rating,
+        ratingsTotal: p.ratings_total,
+        imageUrl: p.main_image_url,
+        isPrime: p.is_prime,
+        affiliateUrl: p.affiliate_url,
+        category: p.product_categories?.name || null,
       })),
     };
 
