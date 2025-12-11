@@ -18,6 +18,7 @@ export async function GET(request) {
 
     const q = searchParams.get('q');
     const state = searchParams.get('state');
+    const hasImages = searchParams.get('hasImages') === 'true';
     const page = parseInt(searchParams.get('page') || '1', 10);
     const limit = Math.min(parseInt(searchParams.get('limit') || '20', 10), 100);
     const offsetParam = searchParams.get('offset');
@@ -59,26 +60,56 @@ export async function GET(request) {
       query = query.ilike('states', `%${state}%`);
     }
 
+    // If filtering for images, we need to fetch more and filter server-side
+    // because JSONB array emptiness can't be easily checked in PostgREST
+    const fetchLimit = hasImages ? Math.max(limit * 3, 100) : limit;
+
     const { data: parks, error, count } = await query
       .order('full_name')
-      .range(offset, offset + limit - 1);
+      .range(offset, offset + fetchLimit - 1);
 
     if (error) {
       console.error('Database error:', error);
       return NextResponse.json({ error: 'Failed to search parks' }, { status: 500 });
     }
 
+    // Helper function to check if a park has a valid image
+    const hasValidImage = (park) => {
+      // Check NPS images array - must have at least one image with a valid URL
+      if (Array.isArray(park.images) && park.images.length > 0) {
+        const firstImage = park.images[0];
+        if (firstImage?.url && typeof firstImage.url === 'string' && firstImage.url.trim().length > 0) {
+          return true;
+        }
+      }
+      // Check wikidata_image - must be a non-empty string
+      if (park.wikidata_image && typeof park.wikidata_image === 'string' && park.wikidata_image.trim().length > 0) {
+        return true;
+      }
+      return false;
+    };
+
+    // Filter parks if hasImages is requested
+    let filteredParks = parks || [];
+    if (hasImages) {
+      filteredParks = filteredParks.filter(hasValidImage).slice(0, limit);
+    }
+
+    // Adjust count for filtered results
+    const adjustedCount = hasImages ? filteredParks.length : (count || 0);
+
     return NextResponse.json({
-      parks: parks || [],
-      total: count || 0,
+      parks: filteredParks,
+      total: adjustedCount,
       query: q,
       state,
+      hasImages,
       pagination: {
         page,
         limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit),
-        hasMore: offset + limit < (count || 0),
+        total: adjustedCount,
+        totalPages: Math.ceil(adjustedCount / limit),
+        hasMore: hasImages ? false : offset + limit < (count || 0),
       },
     });
   } catch (error) {

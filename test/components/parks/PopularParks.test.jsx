@@ -265,10 +265,12 @@ describe('PopularParks', () => {
       });
     });
 
-    it('should not render section when no parks have images', async () => {
+    it('should not render section when API returns empty array (no parks with images)', async () => {
+      // The API filters for parks with images server-side
+      // If no parks have images, the API returns an empty array
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockParksWithoutImages }),
+        json: () => Promise.resolve({ parks: [] }),
       });
 
       render(<PopularParks />);
@@ -322,16 +324,16 @@ describe('PopularParks', () => {
   });
 
   describe('API Calls', () => {
-    it('should fetch data from search API with limit of 30', async () => {
+    it('should fetch data from search API with limit of 8 and hasImages=true', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockAllParks }),
+        json: () => Promise.resolve({ parks: mockParksWithImages }),
       });
 
       render(<PopularParks />);
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/search?limit=30');
+        expect(global.fetch).toHaveBeenCalledWith('/api/parks/search?limit=8&hasImages=true');
       });
     });
 
@@ -349,30 +351,31 @@ describe('PopularParks', () => {
     });
   });
 
-  describe('Image Filtering', () => {
-    it('should only display parks with images', async () => {
+  describe('Image Filtering (Server-side)', () => {
+    it('should display all parks returned by API (API filters for images)', async () => {
+      // The API now filters for parks with images server-side using hasImages=true
+      // The component trusts the API to return only parks with valid images
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockAllParks }),
+        json: () => Promise.resolve({ parks: mockParksWithImages }),
       });
 
       render(<PopularParks />);
 
       await waitFor(() => {
-        // Parks with images should be displayed
+        // All parks returned by API should be displayed
         expect(screen.getByText('Yellowstone National Park')).toBeInTheDocument();
         expect(screen.getByText('Grand Canyon National Park')).toBeInTheDocument();
+        expect(screen.getByText('Yosemite National Park')).toBeInTheDocument();
+        expect(screen.getByText('Zion National Park')).toBeInTheDocument();
       });
-
-      // Parks without images should NOT be displayed
-      expect(screen.queryByText('Park Without Image 1')).not.toBeInTheDocument();
-      expect(screen.queryByText('Park Without Image 2')).not.toBeInTheDocument();
     });
 
-    it('should include parks with wikidata_image', async () => {
+    it('should display parks with wikidata_image', async () => {
+      // Parks with wikidata_image should be included by the API
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockAllParks }),
+        json: () => Promise.resolve({ parks: [mockParkWithWikidataImage] }),
       });
 
       render(<PopularParks />);
@@ -383,8 +386,9 @@ describe('PopularParks', () => {
       });
     });
 
-    it('should limit displayed parks to 8', async () => {
+    it('should display up to 8 parks when API returns more', async () => {
       // Create more than 8 parks with images
+      // The API limits to 8 with hasImages=true, but test the component handles more
       const manyParksWithImages = Array.from({ length: 15 }, (_, i) => ({
         id: `park-${i}`,
         park_code: `park${i}`,
@@ -402,11 +406,24 @@ describe('PopularParks', () => {
       render(<PopularParks />);
 
       await waitFor(() => {
-        // Should only show 8 parks
-        const parkLinks = document.querySelectorAll('a[href^="/parks/"]');
-        // Each park card has multiple links, so we check for park names instead
-        const parkNames = screen.getAllByText(/Park Number \d/);
-        expect(parkNames.length).toBeLessThanOrEqual(8);
+        // Component displays all parks returned by API
+        // The API is responsible for limiting to 8
+        const parkNames = screen.getAllByText(/Park Number \d+/);
+        expect(parkNames.length).toBe(15); // Component shows all returned parks
+      });
+    });
+
+    it('should use hasImages=true parameter in API call', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockParksWithImages }),
+      });
+
+      render(<PopularParks />);
+
+      await waitFor(() => {
+        // Verify the API is called with hasImages=true
+        expect(global.fetch).toHaveBeenCalledWith('/api/parks/search?limit=8&hasImages=true');
       });
     });
   });

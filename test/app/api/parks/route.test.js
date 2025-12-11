@@ -410,6 +410,176 @@ describe('Parks Search API', () => {
         expect(['nps', 'wikidata']).toContain(park.source);
       });
     });
+
+    it('should support hasImages parameter to filter parks with images', async () => {
+      vi.resetModules();
+      // Mock data with parks that have images and some without
+      const parksWithMixedImages = {
+        data: [
+          {
+            id: '1',
+            park_code: 'yell',
+            full_name: 'Yellowstone National Park',
+            images: [{ url: 'https://example.com/yellowstone.jpg', title: 'Yellowstone' }],
+            wikidata_image: null,
+            source: 'nps',
+          },
+          {
+            id: '2',
+            park_code: 'noimg',
+            full_name: 'Park Without Image',
+            images: null,
+            wikidata_image: null,
+            source: 'nps',
+          },
+          {
+            id: '3',
+            park_code: 'emptyimg',
+            full_name: 'Park With Empty Images',
+            images: [],
+            wikidata_image: null,
+            source: 'nps',
+          },
+          {
+            id: '4',
+            park_code: 'wiki1',
+            full_name: 'State Park With Wikidata Image',
+            images: null,
+            wikidata_image: 'https://example.com/wikidata.jpg',
+            source: 'wikidata',
+          },
+        ],
+        error: null,
+        count: 4,
+      };
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(parksWithMixedImages)),
+      };
+
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search?hasImages=true&limit=10');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.hasImages).toBe(true);
+      // Should only return parks with valid images
+      expect(data.parks.length).toBe(2);
+      // Verify all returned parks have images
+      data.parks.forEach((park) => {
+        const hasNpsImage = Array.isArray(park.images) && park.images.length > 0 && !!park.images[0]?.url;
+        const hasWikidataImage = !!park.wikidata_image && park.wikidata_image.trim().length > 0;
+        expect(hasNpsImage || hasWikidataImage).toBe(true);
+      });
+    });
+
+    it('should include parks with wikidata_image when hasImages=true', async () => {
+      vi.resetModules();
+      const parksWithWikidataImage = {
+        data: [
+          {
+            id: '1',
+            park_code: 'wiki1',
+            full_name: 'State Park With Wikidata Image',
+            images: null,
+            wikidata_image: 'https://example.com/wikidata.jpg',
+            source: 'wikidata',
+          },
+        ],
+        error: null,
+        count: 1,
+      };
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(parksWithWikidataImage)),
+      };
+
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search?hasImages=true');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.parks.length).toBe(1);
+      expect(data.parks[0].wikidata_image).toBe('https://example.com/wikidata.jpg');
+    });
+
+    it('should filter out parks with empty images array when hasImages=true', async () => {
+      vi.resetModules();
+      const parksWithEmptyImages = {
+        data: [
+          {
+            id: '1',
+            park_code: 'empty1',
+            full_name: 'Park With Empty Images Array',
+            images: [],
+            wikidata_image: null,
+            source: 'nps',
+          },
+          {
+            id: '2',
+            park_code: 'valid1',
+            full_name: 'Park With Valid Image',
+            images: [{ url: 'https://example.com/valid.jpg', title: 'Valid' }],
+            wikidata_image: null,
+            source: 'nps',
+          },
+        ],
+        error: null,
+        count: 2,
+      };
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(parksWithEmptyImages)),
+      };
+
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search?hasImages=true');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.parks.length).toBe(1);
+      expect(data.parks[0].park_code).toBe('valid1');
+    });
+
+    it('should not filter images when hasImages is not provided', async () => {
+      vi.resetModules();
+      const parksWithMixedImages = {
+        data: [
+          {
+            id: '1',
+            park_code: 'yell',
+            full_name: 'Yellowstone',
+            images: [{ url: 'https://example.com/yellowstone.jpg' }],
+            source: 'nps',
+          },
+          {
+            id: '2',
+            park_code: 'noimg',
+            full_name: 'No Image Park',
+            images: null,
+            source: 'nps',
+          },
+        ],
+        error: null,
+        count: 2,
+      };
+      mockSupabaseClient = {
+        from: vi.fn(() => createChainableMock(parksWithMixedImages)),
+      };
+
+      const { GET } = await import('@/app/api/parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/parks/search');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      // Should return all parks without filtering
+      expect(data.parks.length).toBe(2);
+    });
   });
 });
 

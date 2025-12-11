@@ -18,9 +18,9 @@ export default function PopularParks() {
   useEffect(() => {
     const fetchPopularParks = async () => {
       try {
-        // Fetch more parks than needed so we can filter for those with images
-        // We fetch 30 to ensure we get at least 8 with images after filtering
-        const response = await fetch('/api/parks/search?limit=30');
+        // Fetch parks with images using the hasImages filter
+        // The API will filter for parks with valid images server-side
+        const response = await fetch('/api/parks/search?limit=8&hasImages=true');
         
         if (!response.ok) {
           throw new Error('Failed to fetch parks');
@@ -28,56 +28,29 @@ export default function PopularParks() {
         
         const data = await response.json();
         
-        // Helper function to validate a URL string
-        const isValidUrl = (url) => {
-          if (!url || typeof url !== 'string') return false;
-          const trimmed = url.trim();
-          // Must be a non-empty string starting with http:// or https://
-          return trimmed.length > 0 && (trimmed.startsWith('http://') || trimmed.startsWith('https://'));
-        };
-        
         // Helper function to get the image URL from a park
+        // The API already filtered for parks with images, but we still need to extract the URL
         const getImageUrl = (park) => {
           // Check for NPS images array first
-          if (Array.isArray(park.images) && park.images.length > 0) {
-            const firstImage = park.images[0];
-            if (firstImage && isValidUrl(firstImage.url)) {
-              return firstImage.url;
-            }
+          if (Array.isArray(park.images) && park.images.length > 0 && park.images[0]?.url) {
+            return park.images[0].url;
           }
           // Fall back to wikidata_image
-          if (isValidUrl(park.wikidata_image)) {
+          if (park.wikidata_image) {
             return park.wikidata_image;
           }
           return null;
         };
         
-        // Helper function to check if a park has a valid image URL
-        const hasValidImage = (park) => {
-          return getImageUrl(park) !== null;
-        };
+        // Add the image URL to each park for rendering
+        const parksWithImageUrls = (data.parks || []).map(park => ({
+          ...park,
+          validatedImageUrl: getImageUrl(park)
+        }));
         
-        // Filter to only parks that have valid images, add the validated URL, then take first 8
-        const parksWithImages = (data.parks || [])
-          .map(park => ({
-            ...park,
-            validatedImageUrl: getImageUrl(park)
-          }))
-          .filter(park => park.validatedImageUrl !== null)
-          .slice(0, 8);
+        console.log('PopularParks: Received', parksWithImageUrls.length, 'parks with images from API');
         
-        console.log('PopularParks: Found', parksWithImages.length, 'parks with valid images out of', data.parks?.length || 0, 'total');
-        if (parksWithImages.length < 8) {
-          console.log('PopularParks: Parks without valid images:',
-            (data.parks || []).filter(p => !hasValidImage(p)).map(p => ({
-              name: p.full_name,
-              images: p.images,
-              wikidata_image: p.wikidata_image
-            })).slice(0, 5)
-          );
-        }
-        
-        setParks(parksWithImages);
+        setParks(parksWithImageUrls);
       } catch (err) {
         console.error('Error fetching popular parks:', err);
         setError(err.message);
