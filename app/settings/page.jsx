@@ -62,25 +62,34 @@ function SettingsContent() {
   }, [authLoading, isAuthenticated, router]);
 
   // Check for checkout cancellation and show discount modal
+  // Using window.location.search directly to avoid issues with Suspense boundary
   useEffect(() => {
     // Only process once to prevent issues with re-renders
     if (checkoutProcessedRef.current) {
       return;
     }
     
-    const checkoutStatus = searchParams.get('checkout');
+    // Check both useSearchParams and window.location.search for the checkout parameter
+    // This handles cases where the Suspense boundary might delay the searchParams
+    let checkoutStatus = searchParams.get('checkout');
+    
+    // Fallback to window.location.search if searchParams doesn't have the value
+    if (!checkoutStatus && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      checkoutStatus = urlParams.get('checkout');
+    }
     
     if (checkoutStatus === 'cancelled') {
       checkoutProcessedRef.current = true;
       
-      // Clean up the URL first
-      if (typeof window !== 'undefined') {
-        window.history.replaceState({}, '', '/settings');
-      }
-      
       // Show discount modal after a short delay for better UX
+      // Do this BEFORE cleaning up the URL
       const timer = setTimeout(() => {
         setShowDiscountModal(true);
+        // Clean up the URL after showing the modal
+        if (typeof window !== 'undefined') {
+          window.history.replaceState({}, '', '/settings');
+        }
       }, 500);
       
       return () => clearTimeout(timer);
