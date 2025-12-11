@@ -28,10 +28,54 @@ export default function PopularParks() {
         
         const data = await response.json();
         
-        // Filter to only parks that have images, then take first 8
+        // Helper function to validate a URL string
+        const isValidUrl = (url) => {
+          if (!url || typeof url !== 'string') return false;
+          const trimmed = url.trim();
+          // Must be a non-empty string starting with http:// or https://
+          return trimmed.length > 0 && (trimmed.startsWith('http://') || trimmed.startsWith('https://'));
+        };
+        
+        // Helper function to get the image URL from a park
+        const getImageUrl = (park) => {
+          // Check for NPS images array first
+          if (Array.isArray(park.images) && park.images.length > 0) {
+            const firstImage = park.images[0];
+            if (firstImage && isValidUrl(firstImage.url)) {
+              return firstImage.url;
+            }
+          }
+          // Fall back to wikidata_image
+          if (isValidUrl(park.wikidata_image)) {
+            return park.wikidata_image;
+          }
+          return null;
+        };
+        
+        // Helper function to check if a park has a valid image URL
+        const hasValidImage = (park) => {
+          return getImageUrl(park) !== null;
+        };
+        
+        // Filter to only parks that have valid images, add the validated URL, then take first 8
         const parksWithImages = (data.parks || [])
-          .filter((park) => park.images?.[0]?.url || park.wikidata_image)
+          .map(park => ({
+            ...park,
+            validatedImageUrl: getImageUrl(park)
+          }))
+          .filter(park => park.validatedImageUrl !== null)
           .slice(0, 8);
+        
+        console.log('PopularParks: Found', parksWithImages.length, 'parks with valid images out of', data.parks?.length || 0, 'total');
+        if (parksWithImages.length < 8) {
+          console.log('PopularParks: Parks without valid images:',
+            (data.parks || []).filter(p => !hasValidImage(p)).map(p => ({
+              name: p.full_name,
+              images: p.images,
+              wikidata_image: p.wikidata_image
+            })).slice(0, 5)
+          );
+        }
         
         setParks(parksWithImages);
       } catch (err) {
@@ -96,7 +140,7 @@ export default function PopularParks() {
             >
               <div className="relative h-48 overflow-hidden">
                 <Image
-                  src={park.images?.[0]?.url || park.wikidata_image}
+                  src={park.validatedImageUrl}
                   alt={park.full_name}
                   fill
                   className="object-cover group-hover:scale-105 transition-transform duration-300"
