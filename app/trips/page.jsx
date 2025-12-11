@@ -12,6 +12,40 @@ import { useAuth } from '@/hooks/useAuth';
 import TripCard, { TripCardSkeleton } from '@/components/trips/TripCard';
 import Button from '@/components/ui/Button';
 
+/**
+ * Handle upgrade to Pro - redirect to Stripe checkout
+ */
+const handleUpgrade = async (session, setError) => {
+  if (!session?.access_token) {
+    window.location.href = '/signin?redirect=/trips';
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to start checkout');
+    }
+
+    const { url } = await response.json();
+    if (url) {
+      window.location.href = url;
+    }
+  } catch (err) {
+    console.error('Checkout error:', err);
+    setError(err.message);
+  }
+};
+
 export default function TripsPage() {
   const router = useRouter();
   const { session, loading: authLoading, isAuthenticated } = useAuth();
@@ -259,7 +293,10 @@ export default function TripsPage() {
                   Upgrade to Pro for unlimited trip creation and premium features
                 </p>
               </div>
-              <Button className="flex-shrink-0 bg-green-600 hover:bg-green-700">
+              <Button
+                className="flex-shrink-0 bg-green-600 hover:bg-green-700"
+                onClick={() => handleUpgrade(session, setError)}
+              >
                 Upgrade
               </Button>
             </div>

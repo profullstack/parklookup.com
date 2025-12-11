@@ -40,6 +40,41 @@ export default function SettingsPage() {
   // eslint-disable-next-line no-undef
   const showConfirm = (message) => window.confirm(message);
 
+  /**
+   * Handle upgrade to Pro - redirect to Stripe checkout
+   */
+  const handleUpgrade = async () => {
+    const token = localStorage.getItem('parklookup_auth_token');
+    if (!token) {
+      router.push('/signin?redirect=/settings');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to start checkout');
+      }
+
+      const { url } = await response.json();
+      if (url) {
+        window.location.href = url;
+      }
+    } catch (err) {
+      console.error('Checkout error:', err);
+      setError(err.message);
+    }
+  };
+
   // Fetch profile
   useEffect(() => {
     const fetchProfile = async () => {
@@ -192,10 +227,7 @@ export default function SettingsPage() {
                   ) : (
                     <Button
                       type="button"
-                      onClick={() => {
-                        // TODO: Implement upgrade flow
-                        showAlert('Upgrade functionality coming soon!');
-                      }}
+                      onClick={handleUpgrade}
                       className="bg-gradient-to-r from-green-600 to-green-700"
                     >
                       Upgrade to Pro

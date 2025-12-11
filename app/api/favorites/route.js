@@ -72,12 +72,13 @@ export async function GET(request) {
         )
       `
       )
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
+      .eq('user_id', user.id);
 
     if (visitedOnly) {
       query = query.eq('visited', true);
     }
+
+    query = query.order('created_at', { ascending: false });
 
     const { data: favorites, error } = await query;
 
