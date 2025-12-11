@@ -179,7 +179,7 @@ describe('Settings Page', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          profile: { ...mockProfile, is_pro: true },
+          profile: { ...mockProfile, subscription_tier: 'pro', subscription_status: 'active' },
         }),
       });
 
@@ -612,7 +612,7 @@ describe('Settings Page', () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
-          profile: { ...mockProfile, is_pro: true },
+          profile: { ...mockProfile, subscription_tier: 'pro', subscription_status: 'active' },
         }),
       });
 
