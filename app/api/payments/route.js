@@ -67,8 +67,17 @@ export async function GET(request) {
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
   }
 
+  console.log('Profile data for payments:', {
+    userId: user.id,
+    stripeCustomerId: profile?.stripe_customer_id,
+    stripeSubscriptionId: profile?.stripe_subscription_id,
+    subscriptionStatus: profile?.subscription_status,
+    subscriptionTier: profile?.subscription_tier,
+  });
+
   // If no Stripe customer ID, return empty data
   if (!profile?.stripe_customer_id) {
+    console.log('No Stripe customer ID found for user:', user.id);
     return NextResponse.json({
       subscription: null,
       payments: [],

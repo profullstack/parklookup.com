@@ -394,6 +394,77 @@ describe('Stripe Webhook API Route', () => {
         // Should NOT have called update since user wasn't found
         expect(mockSupabaseClient.update).not.toHaveBeenCalled();
       });
+
+      it('should handle race condition: invoice.paid before checkout.session.completed', async () => {
+        // This test simulates the real-world scenario where:
+        // 1. invoice.paid arrives first (user not found by stripe_customer_id)
+        // 2. checkout.session.completed arrives second (finds user by metadata.user_id)
+        // Both should succeed without errors
+
+        vi.resetModules();
+        mockSupabaseClient = createMockSupabaseClient();
+
+        const { POST } = await import('@/app/api/webhooks/payments/stripe/route.js');
+
+        // Step 1: invoice.paid arrives first - user not found by stripe_customer_id
+        mockSupabaseClient.single.mockResolvedValue({
+          data: null,
+          error: { code: 'PGRST116', message: 'No rows returned' },
+        });
+
+        const invoicePayload = JSON.stringify(mockInvoicePaid);
+        const invoiceSignature = generateStripeSignature(invoicePayload, WEBHOOK_SECRET);
+
+        const invoiceRequest = new Request('http://localhost:3000/api/webhooks/payments/stripe', {
+          method: 'POST',
+          body: invoicePayload,
+          headers: {
+            'Content-Type': 'application/json',
+            'stripe-signature': invoiceSignature,
+          },
+        });
+
+        const invoiceResponse = await POST(invoiceRequest);
+        expect(invoiceResponse.status).toBe(200);
+        expect(mockSupabaseClient.update).not.toHaveBeenCalled();
+
+        // Step 2: checkout.session.completed arrives - finds user by metadata.user_id
+        vi.clearAllMocks();
+        mockSupabaseClient = createMockSupabaseClient();
+        mockSupabaseClient.single.mockResolvedValue({
+          data: { id: 'user-uuid-123' },
+          error: null,
+        });
+
+        // Re-import to get fresh module with new mock
+        vi.resetModules();
+        const { POST: POST2 } = await import('@/app/api/webhooks/payments/stripe/route.js');
+
+        const checkoutPayload = JSON.stringify(mockCheckoutSessionCompleted);
+        const checkoutSignature = generateStripeSignature(checkoutPayload, WEBHOOK_SECRET);
+
+        const checkoutRequest = new Request('http://localhost:3000/api/webhooks/payments/stripe', {
+          method: 'POST',
+          body: checkoutPayload,
+          headers: {
+            'Content-Type': 'application/json',
+            'stripe-signature': checkoutSignature,
+          },
+        });
+
+        const checkoutResponse = await POST2(checkoutRequest);
+        expect(checkoutResponse.status).toBe(200);
+
+        // Verify user was updated with subscription info
+        expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            stripe_customer_id: 'cus_test_customer_123',
+            stripe_subscription_id: 'sub_test_subscription_123',
+            subscription_status: 'active',
+            subscription_tier: 'pro',
+          })
+        );
+      });
     });
 
     describe('Event: invoice.payment_failed', () => {

@@ -185,6 +185,9 @@ const handleCheckoutSessionCompleted = async (supabase, session) => {
 
 /**
  * Handles invoice.paid event
+ * This is primarily for subscription renewals. For new subscriptions,
+ * checkout.session.completed handles everything, so we silently skip
+ * if the user isn't found (race condition with checkout.session.completed).
  * @param {object} supabase - Supabase client
  * @param {object} invoice - Invoice object
  */
@@ -196,10 +199,8 @@ const handleInvoicePaid = async (supabase, invoice) => {
   const user = await findUserByStripeCustomerId(supabase, customer);
 
   if (!user) {
-    // This can happen when invoice.paid fires before checkout.session.completed
-    // has finished processing. The checkout.session.completed handler will
-    // set up the user's subscription, so we can safely skip this event.
-    console.log(`User not found for invoice ${invoice.id}, skipping (will be handled by checkout.session.completed)`);
+    // For new subscriptions, checkout.session.completed handles everything.
+    // Silently skip - no need to log since this is expected behavior.
     return;
   }
 
