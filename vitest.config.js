@@ -36,6 +36,8 @@ export default defineConfig({
       '@/lib': path.resolve(import.meta.dirname, './lib'),
       '@/components': path.resolve(import.meta.dirname, './components'),
       '@/app': path.resolve(import.meta.dirname, './app'),
+      // Mock server-only for Vitest (Next.js-specific package)
+      'server-only': path.resolve(import.meta.dirname, './test/__mocks__/server-only.js'),
     },
   },
 });
