@@ -245,6 +245,54 @@ describe('Payments API Route', () => {
         expect(data.payments[0].status).toBe('paid');
         expect(data.payments[0].invoicePdf).toBe('https://stripe.com/invoice.pdf');
       });
+
+      it('should return cancelAtPeriodEnd when subscription is scheduled for cancellation', async () => {
+        vi.resetModules();
+        
+        // Mock a subscription that's cancelled at period end
+        const cancelledSubscription = {
+          ...mockSubscription,
+          cancel_at_period_end: true,
+          canceled_at: 1705000000, // When the user clicked cancel
+        };
+        mockStripeSubscriptionsRetrieve.mockResolvedValue(cancelledSubscription);
+
+        const { GET } = await import('@/app/api/payments/route.js');
+
+        const request = new Request('http://localhost:3000/api/payments', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.subscription.cancelAtPeriodEnd).toBe(true);
+        expect(data.subscription.canceledAt).toBeDefined();
+        expect(data.subscription.currentPeriodEnd).toBeDefined();
+      });
+
+      it('should return cancelAtPeriodEnd as false for active subscriptions', async () => {
+        vi.resetModules();
+        const { GET } = await import('@/app/api/payments/route.js');
+
+        const request = new Request('http://localhost:3000/api/payments', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.subscription.cancelAtPeriodEnd).toBe(false);
+        expect(data.subscription.canceledAt).toBeNull();
+      });
     });
 
     describe('Error Handling', () => {

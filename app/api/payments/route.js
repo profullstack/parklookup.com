@@ -119,6 +119,14 @@ export async function GET(request) {
         const discountPercent = discount?.coupon?.percent_off || null;
         const discountAmount = discount?.coupon?.amount_off || null;
         
+        console.log('Stripe subscription data:', {
+          id: stripeSubscription.id,
+          status: stripeSubscription.status,
+          cancel_at_period_end: stripeSubscription.cancel_at_period_end,
+          canceled_at: stripeSubscription.canceled_at,
+          current_period_end: stripeSubscription.current_period_end,
+        });
+
         subscription = {
           id: stripeSubscription.id,
           status: stripeSubscription.status,
