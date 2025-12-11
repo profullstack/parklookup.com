@@ -5,14 +5,34 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import DiscountOfferModal from '@/components/ui/DiscountOfferModal';
 
-export default function SettingsPage() {
+/**
+ * Loading fallback for the settings page
+ */
+function SettingsLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-2xl mx-auto px-4">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/3" />
+          <div className="h-64 bg-gray-200 rounded" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Settings page content component
+ * Separated to allow Suspense boundary for useSearchParams
+ */
+function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -188,16 +208,7 @@ export default function SettingsPage() {
   };
 
   if (authLoading || loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 py-8">
-        <div className="max-w-2xl mx-auto px-4">
-          <div className="animate-pulse space-y-4">
-            <div className="h-8 bg-gray-200 rounded w-1/3" />
-            <div className="h-64 bg-gray-200 rounded" />
-          </div>
-        </div>
-      </div>
-    );
+    return <SettingsLoading />;
   }
 
   if (!isAuthenticated) {
@@ -274,7 +285,7 @@ export default function SettingsPage() {
                   ) : (
                     <Button
                       type="button"
-                      onClick={handleUpgrade}
+                      onClick={() => handleUpgrade()}
                       className="bg-gradient-to-r from-green-600 to-green-700"
                     >
                       Upgrade to Pro
@@ -415,5 +426,17 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+/**
+ * Settings page wrapper with Suspense boundary
+ * Required for useSearchParams to work during static generation
+ */
+export default function SettingsPage() {
+  return (
+    <Suspense fallback={<SettingsLoading />}>
+      <SettingsContent />
+    </Suspense>
   );
 }

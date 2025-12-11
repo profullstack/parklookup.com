@@ -11,10 +11,12 @@ import SettingsPage from '@/app/settings/page';
 
 // Mock Next.js router
 const mockPush = vi.fn();
+const mockSearchParams = new URLSearchParams();
 vi.mock('next/navigation', () => ({
   useRouter: () => ({
     push: mockPush,
   }),
+  useSearchParams: () => mockSearchParams,
 }));
 
 // Mock useAuth hook
