@@ -1,6 +1,7 @@
 /**
  * PopularParks Component
- * Displays a curated list of popular national parks on the homepage
+ * Displays popular national parks on the homepage
+ * Fetches real data from the parks API
  */
 
 'use client';
@@ -8,18 +9,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-
-// Curated list of popular park codes
-const POPULAR_PARK_CODES = [
-  'yell', // Yellowstone
-  'grca', // Grand Canyon
-  'yose', // Yosemite
-  'zion', // Zion
-  'romo', // Rocky Mountain
-  'acad', // Acadia
-  'glac', // Glacier
-  'jotr', // Joshua Tree
-];
 
 export default function PopularParks() {
   const [parks, setParks] = useState([]);
@@ -29,18 +18,16 @@ export default function PopularParks() {
   useEffect(() => {
     const fetchPopularParks = async () => {
       try {
-        // Fetch parks data for each popular park code
-        const parkPromises = POPULAR_PARK_CODES.map(async (code) => {
-          const response = await fetch(`/api/parks/${code}`);
-          if (!response.ok) {
-            return null;
-          }
-          return response.json();
-        });
-
-        const results = await Promise.all(parkPromises);
-        const validParks = results.filter((park) => park !== null);
-        setParks(validParks);
+        // Fetch parks from the search API - get first 8 parks sorted by name
+        // This uses the public all_parks view which includes both NPS and state parks
+        const response = await fetch('/api/parks/search?limit=8');
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch parks');
+        }
+        
+        const data = await response.json();
+        setParks(data.parks || []);
       } catch (err) {
         console.error('Error fetching popular parks:', err);
         setError(err.message);

@@ -20,65 +20,41 @@ vi.mock('next/link', () => ({
 // Mock fetch
 global.fetch = vi.fn();
 
-// Sample park data for testing - each park has unique data
-const mockParksData = {
-  yell: {
+// Sample park data for testing
+const mockParks = [
+  {
+    id: 'park-1',
     park_code: 'yell',
     full_name: 'Yellowstone National Park',
     description: 'Yellowstone National Park is a nearly 3,500-sq.-mile wilderness recreation area.',
     states: 'WY,MT,ID',
     images: [{ url: 'https://example.com/yellowstone.jpg', title: 'Yellowstone' }],
   },
-  grca: {
+  {
+    id: 'park-2',
     park_code: 'grca',
     full_name: 'Grand Canyon National Park',
     description: 'Grand Canyon National Park is a stunning natural wonder.',
     states: 'AZ',
     images: [{ url: 'https://example.com/grandcanyon.jpg', title: 'Grand Canyon' }],
   },
-  yose: {
+  {
+    id: 'park-3',
     park_code: 'yose',
     full_name: 'Yosemite National Park',
     description: 'Yosemite National Park is known for its waterfalls and granite cliffs.',
     states: 'CA',
     images: [{ url: 'https://example.com/yosemite.jpg', title: 'Yosemite' }],
   },
-  zion: {
+  {
+    id: 'park-4',
     park_code: 'zion',
     full_name: 'Zion National Park',
     description: 'Zion National Park features stunning red cliffs and canyons.',
     states: 'UT',
     images: [{ url: 'https://example.com/zion.jpg', title: 'Zion' }],
   },
-  romo: {
-    park_code: 'romo',
-    full_name: 'Rocky Mountain National Park',
-    description: 'Rocky Mountain National Park offers alpine lakes and mountain peaks.',
-    states: 'CO',
-    images: [{ url: 'https://example.com/rockymountain.jpg', title: 'Rocky Mountain' }],
-  },
-  acad: {
-    park_code: 'acad',
-    full_name: 'Acadia National Park',
-    description: 'Acadia National Park features rugged Atlantic coastline.',
-    states: 'ME',
-    images: [{ url: 'https://example.com/acadia.jpg', title: 'Acadia' }],
-  },
-  glac: {
-    park_code: 'glac',
-    full_name: 'Glacier National Park',
-    description: 'Glacier National Park has pristine forests and alpine meadows.',
-    states: 'MT',
-    images: [{ url: 'https://example.com/glacier.jpg', title: 'Glacier' }],
-  },
-  jotr: {
-    park_code: 'jotr',
-    full_name: 'Joshua Tree National Park',
-    description: 'Joshua Tree National Park features unique desert landscapes.',
-    states: 'CA',
-    images: [{ url: 'https://example.com/joshuatree.jpg', title: 'Joshua Tree' }],
-  },
-};
+];
 
 describe('PopularParks', () => {
   beforeEach(() => {
@@ -107,14 +83,10 @@ describe('PopularParks', () => {
 
   describe('Successful Data Fetch', () => {
     beforeEach(() => {
-      // Mock successful fetch for each park - return unique data for each park code
-      global.fetch.mockImplementation((url) => {
-        const parkCode = url.split('/').pop();
-        const park = mockParksData[parkCode] || mockParksData.yell;
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(park),
-        });
+      // Mock successful fetch from search API
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockParks }),
       });
     });
 
@@ -141,6 +113,8 @@ describe('PopularParks', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Yellowstone National Park')).toBeInTheDocument();
+        expect(screen.getByText('Grand Canyon National Park')).toBeInTheDocument();
+        expect(screen.getByText('Yosemite National Park')).toBeInTheDocument();
       });
     });
 
@@ -158,7 +132,7 @@ describe('PopularParks', () => {
 
       await waitFor(() => {
         // Check that at least one state is rendered
-        const stateElements = screen.getAllByText(/WY|AZ|CA|UT|CO|ME|MT/);
+        const stateElements = screen.getAllByText(/WY|AZ|CA|UT/);
         expect(stateElements.length).toBeGreaterThan(0);
       });
     });
@@ -203,7 +177,7 @@ describe('PopularParks', () => {
   });
 
   describe('Error Handling', () => {
-    it('should not render section when all fetches fail', async () => {
+    it('should not render section when fetch fails', async () => {
       global.fetch.mockRejectedValue(new Error('Network error'));
 
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -219,36 +193,30 @@ describe('PopularParks', () => {
       consoleSpy.mockRestore();
     });
 
-    it('should handle partial fetch failures gracefully', async () => {
-      const parkCodes = ['yell', 'grca', 'yose', 'zion', 'romo', 'acad', 'glac', 'jotr'];
-      let callIndex = 0;
-      global.fetch.mockImplementation((url) => {
-        const parkCode = url.split('/').pop();
-        callIndex++;
-        // Only first 2 calls succeed
-        if (callIndex <= 2) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve(mockParksData[parkCode] || mockParksData.yell),
-          });
-        }
-        return Promise.resolve({ ok: false });
+    it('should not render section when API returns error', async () => {
+      global.fetch.mockResolvedValue({
+        ok: false,
+        status: 500,
       });
+
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(<PopularParks />);
 
       await waitFor(() => {
-        // Should still render with partial data - at least one park should be visible
-        const parkLinks = document.querySelectorAll('a[href^="/parks/"]');
-        expect(parkLinks.length).toBeGreaterThan(0);
+        const section = document.querySelector('section');
+        expect(section).toBeNull();
       });
+
+      consoleSpy.mockRestore();
     });
   });
 
   describe('Empty State', () => {
     it('should not render section when no parks are returned', async () => {
       global.fetch.mockResolvedValue({
-        ok: false,
+        ok: true,
+        json: () => Promise.resolve({ parks: [] }),
       });
 
       render(<PopularParks />);
@@ -262,12 +230,9 @@ describe('PopularParks', () => {
 
   describe('Accessibility', () => {
     beforeEach(() => {
-      global.fetch.mockImplementation((url) => {
-        const parkCode = url.split('/').pop();
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockParksData[parkCode] || mockParksData.yell),
-        });
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockParks }),
       });
     });
 
@@ -305,27 +270,29 @@ describe('PopularParks', () => {
   });
 
   describe('API Calls', () => {
-    it('should fetch data for all popular park codes', async () => {
-      global.fetch.mockImplementation((url) => {
-        const parkCode = url.split('/').pop();
-        return Promise.resolve({
-          ok: true,
-          json: () => Promise.resolve(mockParksData[parkCode] || mockParksData.yell),
-        });
+    it('should fetch data from search API with limit', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockParks }),
       });
 
       render(<PopularParks />);
 
       await waitFor(() => {
-        // Should have called fetch for each popular park
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/yell');
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/grca');
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/yose');
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/zion');
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/romo');
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/acad');
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/glac');
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/jotr');
+        expect(global.fetch).toHaveBeenCalledWith('/api/parks/search?limit=8');
+      });
+    });
+
+    it('should only make one API call', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockParks }),
+      });
+
+      render(<PopularParks />);
+
+      await waitFor(() => {
+        expect(global.fetch).toHaveBeenCalledTimes(1);
       });
     });
   });

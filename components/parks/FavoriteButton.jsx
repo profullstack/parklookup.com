@@ -9,7 +9,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
-  const { user } = useAuth();
+  const { user, session, loading: authLoading } = useAuth();
   const [isFavorite, setIsFavorite] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -21,27 +21,30 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
 
   useEffect(() => {
     const checkFavoriteStatus = async () => {
-      // Only check if we have user and parkId
-      if (!user || !parkId) {
+      // Wait for auth to finish loading
+      if (authLoading) {
         return;
       }
 
-      // Get token from localStorage
-      const token = localStorage.getItem('parklookup_auth_token');
-      if (!token) {
+      // Only check if we have authenticated user, session with token, and parkId
+      if (!user || !session?.access_token || !parkId) {
+        setIsFavorite(false);
         return;
       }
 
       try {
         const response = await fetch(`/api/favorites?parkId=${parkId}`, {
           headers: {
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${session.access_token}`,
           },
         });
         if (response.ok) {
           const data = await response.json();
           // Use park_id which is the unified ID returned by the API for all park types
           setIsFavorite(data.favorites?.some((f) => f.park_id === parkId));
+        } else if (response.status === 401) {
+          // Token is invalid, reset favorite state
+          setIsFavorite(false);
         }
       } catch (error) {
         console.error('Error checking favorite status:', error);
@@ -49,21 +52,14 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
     };
 
     checkFavoriteStatus();
-  }, [user, parkId]);
+  }, [user, session, authLoading, parkId]);
 
   const toggleFavorite = async (e) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!user) {
+    if (!user || !session?.access_token) {
       // Redirect to login or show login modal
-      window.location.href = '/signin';
-      return;
-    }
-
-    // Get token from localStorage
-    const token = localStorage.getItem('parklookup_auth_token');
-    if (!token) {
       window.location.href = '/signin';
       return;
     }
@@ -72,7 +68,7 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
 
     try {
       const authHeaders = {
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${session.access_token}`,
       };
 
       if (isFavorite) {
@@ -83,6 +79,9 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
         });
         if (response.ok) {
           setIsFavorite(false);
+        } else if (response.status === 401) {
+          // Token expired, redirect to login
+          window.location.href = '/signin';
         }
       } else {
         // Add to favorites
@@ -93,6 +92,9 @@ export function FavoriteButton({ parkId, parkCode, size = 'md' }) {
         });
         if (response.ok) {
           setIsFavorite(true);
+        } else if (response.status === 401) {
+          // Token expired, redirect to login
+          window.location.href = '/signin';
         }
       }
     } catch (error) {
