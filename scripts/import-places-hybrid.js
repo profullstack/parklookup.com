@@ -316,8 +316,9 @@ async function checkExistingPlaces(parkId, categories) {
 
 /**
  * Batch insert places and link to park using upsert
+ * @param {Array} log - Array to collect log messages
  */
-async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
+async function batchInsertPlaces(places, parkId, searchLocation, dryRun, log = []) {
   if (dryRun || places.length === 0) {
     return { success: places.length, failed: 0, updated: 0, inserted: 0 };
   }
@@ -342,7 +343,7 @@ async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
     .select('id, title, category, data_cid');
 
   if (upsertError) {
-    console.error(`    Error upserting places:`, upsertError.message);
+    log.push(`    ❌ Error upserting places: ${upsertError.message}`);
     results.failed += places.length;
     return results;
   }
@@ -354,13 +355,12 @@ async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
       const wasExisting = existingCids.has(place.data_cid);
       if (wasExisting) {
         results.updated++;
-        console.log(`    ↻ Updated: ${place.title} (${place.category})`);
+        log.push(`      ↻ Updated: ${place.title} (${place.category})`);
       } else {
         results.inserted++;
-        console.log(`    ✓ Inserted: ${place.title} (${place.category})`);
+        log.push(`      ✓ Inserted: ${place.title} (${place.category})`);
       }
     }
-    console.log(`    Total: ${results.inserted} inserted, ${results.updated} updated`);
   }
 
   // Batch link all places to park
@@ -376,7 +376,7 @@ async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
     });
 
     if (linkError) {
-      console.error(`    Error linking places to park:`, linkError.message);
+      log.push(`    ❌ Error linking places to park: ${linkError.message}`);
     }
   }
 
@@ -385,6 +385,7 @@ async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
 
 /**
  * Import places for a single park using hybrid approach
+ * @returns {Object} Results with log array for deferred output
  */
 async function importPlacesForPark(park, categories, options = {}) {
   const { dryRun, skipPhotos, placesPerCategory, skipExisting } = options;
@@ -397,6 +398,7 @@ async function importPlacesForPark(park, categories, options = {}) {
     skipped: 0,
     updated: 0,
     inserted: 0,
+    log: [], // Collect all log messages for atomic output
   };
 
   // Check if park already has places for these categories
@@ -405,11 +407,11 @@ async function importPlacesForPark(park, categories, options = {}) {
     if (existing.hasPlaces) {
       const missingCategories = categories.filter(c => !existing.categoriesWithPlaces.includes(c));
       if (missingCategories.length === 0) {
-        console.log(`    ⏭️ Skipping - already has ${existing.totalPlaces} places for all categories`);
+        results.log.push(`    ⏭️ Skipping - already has ${existing.totalPlaces} places for all categories`);
         results.skipped = categories.length;
         return results;
       } else if (missingCategories.length < categories.length) {
-        console.log(`    ℹ️ Has ${existing.totalPlaces} places, importing missing: ${missingCategories.join(', ')}`);
+        results.log.push(`    ℹ️ Has ${existing.totalPlaces} places, importing missing: ${missingCategories.join(', ')}`);
         categories = missingCategories;
       }
     }
@@ -427,12 +429,16 @@ async function importPlacesForPark(park, categories, options = {}) {
       // Limit places per category
       const limitedPlaces = places.slice(0, placesPerCategory);
 
-      console.log(`    ${category}: ${places.length} found, processing ${limitedPlaces.length}`);
+      const placesWithCid = limitedPlaces.filter((place) => place.data_cid);
+      results.log.push(`    ${category}: ${places.length} found, ${placesWithCid.length} with data_cid`);
+
+      if (placesWithCid.length === 0) {
+        results.log.push(`      ⚠️ No places with data_cid to process`);
+        continue;
+      }
 
       // Transform places to database format
-      const placeDataPromises = limitedPlaces
-        .filter((place) => place.data_cid)
-        .map(async (place) => {
+      const placeDataPromises = placesWithCid.map(async (place) => {
           const placeData = {
             data_cid: String(place.data_cid),
             data_id: null,
@@ -467,7 +473,7 @@ async function importPlacesForPark(park, categories, options = {}) {
 
             await sleep(150);
           } catch (err) {
-            console.error(`      Error fetching details for ${place.title}:`, err.message);
+            // Silently continue - details are optional
           }
 
           // Step 3: Use ScaleSERP for photos (requires data_id)
@@ -483,12 +489,11 @@ async function importPlacesForPark(park, categories, options = {}) {
                   title: p.title,
                 }));
                 placeData.thumbnail = photos[0].thumbnail || photos[0].image;
-                console.log(`      📷 ${place.title}: ${photos.length} photos`);
               }
 
               await sleep(150);
             } catch (err) {
-              console.error(`      Error fetching photos for ${place.title}:`, err.message);
+              // Silently continue - photos are optional
             }
           }
 
@@ -497,11 +502,13 @@ async function importPlacesForPark(park, categories, options = {}) {
 
       const placeData = await Promise.all(placeDataPromises);
 
-      if (dryRun) {
-        console.log(`    [DRY RUN] Would insert ${placeData.length} ${category} places`);
+      if (placeData.length === 0) {
+        results.log.push(`      ⚠️ No valid place data after processing`);
+      } else if (dryRun) {
+        results.log.push(`    [DRY RUN] Would insert ${placeData.length} ${category} places`);
         results.success += placeData.length;
-      } else if (placeData.length > 0) {
-        const batchResults = await batchInsertPlaces(placeData, park.id, searchLocation, dryRun);
+      } else {
+        const batchResults = await batchInsertPlaces(placeData, park.id, searchLocation, dryRun, results.log);
         results.success += batchResults.success;
         results.failed += batchResults.failed;
         results.updated += batchResults.updated || 0;
@@ -511,9 +518,16 @@ async function importPlacesForPark(park, categories, options = {}) {
       // Delay between categories
       await sleep(300);
     } catch (err) {
-      console.error(`    Error searching ${category}:`, err.message);
+      results.log.push(`    ❌ Error searching ${category}: ${err.message}`);
       results.failed++;
     }
+  }
+
+  // Add summary line
+  if (results.inserted > 0 || results.updated > 0) {
+    results.log.push(`    📊 Total: ${results.inserted} inserted, ${results.updated} updated`);
+  } else if (results.success === 0 && results.failed === 0 && results.skipped === 0) {
+    results.log.push(`    ⚠️ No places processed`);
   }
 
   return results;
@@ -521,11 +535,12 @@ async function importPlacesForPark(park, categories, options = {}) {
 
 /**
  * Process a single park and return results with park info for logging
+ * Returns results with log for deferred atomic output
  */
 async function processSinglePark(park, index, total, categories, options) {
   const { dryRun, skipPhotos, placesPerCategory, skipExisting } = options;
 
-  console.log(`\n[${index + 1}/${total}] ${park.full_name}`);
+  const parkHeader = `[${index + 1}/${total}] ${park.full_name}`;
 
   try {
     const results = await importPlacesForPark(park, [...categories], {
@@ -540,15 +555,25 @@ async function processSinglePark(park, index, total, categories, options) {
       skipped: results.skipped,
       updated: results.updated || 0,
       inserted: results.inserted || 0,
+      parkHeader,
+      log: results.log || [],
     };
   } catch (err) {
-    console.error(`  Error processing ${park.full_name}:`, err.message);
-    return { success: 0, failed: 1, skipped: 0, updated: 0, inserted: 0 };
+    return {
+      success: 0,
+      failed: 1,
+      skipped: 0,
+      updated: 0,
+      inserted: 0,
+      parkHeader,
+      log: [`    ❌ Error: ${err.message}`],
+    };
   }
 }
 
 /**
  * Process parks in parallel batches
+ * Output is collected and printed atomically per park to avoid interleaving
  */
 async function processParks(parks, categories, options) {
   const { concurrency = 1 } = options;
@@ -572,8 +597,22 @@ async function processParks(parks, categories, options) {
 
     const batchResults = await Promise.all(batchPromises);
 
-    // Aggregate results
+    // Print results atomically (all output for each park together)
+    // Sort by index to maintain order
+    batchResults.sort((a, b) => {
+      const indexA = parseInt(a.parkHeader.match(/\[(\d+)/)?.[1] || '0', 10);
+      const indexB = parseInt(b.parkHeader.match(/\[(\d+)/)?.[1] || '0', 10);
+      return indexA - indexB;
+    });
+
     for (const result of batchResults) {
+      // Print park header and all its log messages together
+      console.log(`\n${result.parkHeader}`);
+      if (result.log && result.log.length > 0) {
+        console.log(result.log.join('\n'));
+      }
+
+      // Aggregate totals
       totals.success += result.success;
       totals.failed += result.failed;
       totals.skipped += result.skipped;
