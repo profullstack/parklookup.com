@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -27,6 +27,46 @@ const formatDate = (dateString) => {
 };
 
 /**
+ * Get weather emoji based on forecast description
+ * @param {string} shortForecast - Short forecast description
+ * @param {boolean} isDaytime - Whether it's daytime
+ * @returns {string} Weather emoji
+ */
+function getWeatherEmoji(shortForecast, isDaytime = true) {
+  const forecast = shortForecast?.toLowerCase() || '';
+
+  if (forecast.includes('thunder') || forecast.includes('storm')) return '⛈️';
+  if (forecast.includes('rain') && forecast.includes('snow')) return '🌨️';
+  if (forecast.includes('rain') || forecast.includes('shower')) return '🌧️';
+  if (forecast.includes('snow') || forecast.includes('flurr')) return '❄️';
+  if (forecast.includes('sleet') || forecast.includes('ice')) return '🌨️';
+  if (forecast.includes('fog') || forecast.includes('mist')) return '🌫️';
+  if (forecast.includes('cloud') && forecast.includes('sun')) return '⛅';
+  if (forecast.includes('partly') || forecast.includes('mostly cloudy')) return isDaytime ? '⛅' : '☁️';
+  if (forecast.includes('cloud') || forecast.includes('overcast')) return '☁️';
+  if (forecast.includes('wind')) return '💨';
+  if (forecast.includes('clear') || forecast.includes('sunny')) return isDaytime ? '☀️' : '🌙';
+
+  return isDaytime ? '🌤️' : '🌙';
+}
+
+/**
+ * Get temperature color class
+ * @param {number} temp - Temperature in Fahrenheit
+ * @returns {string} Tailwind CSS class
+ */
+function getTempColorClass(temp) {
+  if (temp >= 90) return 'text-red-600';
+  if (temp >= 80) return 'text-orange-500';
+  if (temp >= 70) return 'text-yellow-600';
+  if (temp >= 60) return 'text-green-600';
+  if (temp >= 50) return 'text-teal-600';
+  if (temp >= 40) return 'text-blue-500';
+  if (temp >= 32) return 'text-blue-600';
+  return 'text-blue-800';
+}
+
+/**
  * Get difficulty badge color
  */
 const getDifficultyColor = (difficulty) => {
@@ -43,27 +83,123 @@ const getDifficultyColor = (difficulty) => {
 };
 
 /**
- * Get the appropriate link for a park based on its source
+ * Get the link for a park - always links to our internal park detail page
  * @param {Object} stop - Trip stop with park data
- * @returns {Object} Link info with href and isExternal flag
+ * @returns {string|null} Internal link to park detail page
  */
 const getParkLink = (stop) => {
   if (!stop.parkCode) return null;
   
-  // Check if this is a Wikidata park (Q-code format)
-  const isWikidataPark = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
-  
-  if (isWikidataPark) {
-    // For Wikidata parks, use external URL if available
-    if (stop.park?.url) {
-      return { href: stop.park.url, isExternal: true };
-    }
-    return null; // No link available for Wikidata parks without URL
-  }
-  
-  // NPS parks link to internal park detail page
-  return { href: `/parks/${stop.parkCode}`, isExternal: false };
+  // Always link to our internal park detail page
+  // The /api/parks/[parkCode] endpoint supports both NPS and Wikidata parks
+  return `/parks/${stop.parkCode}`;
 };
+
+/**
+ * Weather section for a day card - fetches and displays weather for the park location
+ */
+function DayWeatherSection({ latitude, longitude, dayNumber, tripStartDate }) {
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchWeather = async () => {
+      if (!latitude || !longitude) {
+        setError('No coordinates');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/weather/${latitude}/${longitude}`);
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || 'Failed to fetch weather');
+        }
+        const data = await response.json();
+        setWeather(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchWeather();
+  }, [latitude, longitude]);
+
+  // Get the forecast for this specific day
+  const getDayForecast = () => {
+    if (!weather?.forecast?.length) return null;
+
+    // Group forecast periods by day (combine day/night)
+    const dailyForecasts = [];
+    for (let i = 0; i < weather.forecast.length; i += 2) {
+      const dayPeriod = weather.forecast[i];
+      const nightPeriod = weather.forecast[i + 1];
+      dailyForecasts.push({
+        day: dayPeriod,
+        night: nightPeriod,
+      });
+    }
+
+    // Return the forecast for this day (0-indexed, dayNumber is 1-indexed)
+    const dayIndex = dayNumber - 1;
+    return dailyForecasts[dayIndex] || dailyForecasts[0];
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 p-2 bg-sky-50 rounded-lg animate-pulse">
+        <div className="w-8 h-8 bg-sky-200 rounded" />
+        <div className="flex-1">
+          <div className="h-3 bg-sky-200 rounded w-20 mb-1" />
+          <div className="h-2 bg-sky-200 rounded w-16" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !weather) {
+    return null; // Silently fail - weather is optional
+  }
+
+  const forecast = getDayForecast();
+  if (!forecast) return null;
+
+  const { day, night } = forecast;
+
+  return (
+    <div className="flex items-center gap-3 p-2 bg-sky-50 rounded-lg">
+      <div className="text-2xl">
+        {getWeatherEmoji(day?.shortForecast, true)}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 text-sm">
+          {day && (
+            <span className={`font-semibold ${getTempColorClass(day.temperature)}`}>
+              {day.temperature}°F
+            </span>
+          )}
+          {night && (
+            <span className="text-gray-400">
+              / {night.temperature}°F
+            </span>
+          )}
+          {day?.windSpeed && (
+            <span className="text-gray-500 text-xs">
+              💨 {day.windSpeed}
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-gray-600 truncate">
+          {day?.shortForecast || 'N/A'}
+        </p>
+      </div>
+    </div>
+  );
+}
 
 /**
  * Day card component
@@ -202,25 +338,24 @@ function DayCard({ stop, tripStartDate }) {
               </div>
             )}
 
+            {/* Weather Forecast */}
+            {stop.park?.latitude && stop.park?.longitude && (
+              <DayWeatherSection
+                latitude={stop.park.latitude}
+                longitude={stop.park.longitude}
+                dayNumber={stop.dayNumber}
+                tripStartDate={tripStartDate}
+              />
+            )}
+
             {/* Park Link */}
             {parkLink && (
-              parkLink.isExternal ? (
-                <a
-                  href={parkLink.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
-                >
-                  Visit park website ↗
-                </a>
-              ) : (
-                <Link
-                  href={parkLink.href}
-                  className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
-                >
-                  View park details →
-                </Link>
-              )
+              <Link
+                href={parkLink}
+                className="inline-flex items-center gap-1 text-sm text-green-600 hover:text-green-700"
+              >
+                View park details →
+              </Link>
             )}
 
             {/* Nearby Places */}

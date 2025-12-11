@@ -190,7 +190,7 @@ describe('TripDetail Component', () => {
       expect(link.closest('a')).toHaveAttribute('href', '/parks/yose');
     });
 
-    it('should render external link for Wikidata parks', () => {
+    it('should render internal link for Wikidata parks (Q-codes)', () => {
       const tripWithWikidataPark = {
         ...mockTrip,
         stops: [
@@ -199,37 +199,31 @@ describe('TripDetail Component', () => {
             parkCode: 'Q5719910',
             park: {
               ...mockTrip.stops[0].park,
+              name: 'Some State Park',
               source: 'wikidata',
-              url: 'https://example.com/state-park',
             },
           },
         ],
       };
       render(<TripDetail trip={tripWithWikidataPark} />);
-      const link = screen.getByText('Visit park website ↗');
+      const link = screen.getByText('View park details →');
       expect(link).toBeInTheDocument();
-      expect(link.closest('a')).toHaveAttribute('href', 'https://example.com/state-park');
-      expect(link.closest('a')).toHaveAttribute('target', '_blank');
+      // All parks link to our internal park detail page
+      expect(link.closest('a')).toHaveAttribute('href', '/parks/Q5719910');
     });
 
-    it('should not render link for Wikidata parks without URL', () => {
-      const tripWithWikidataParkNoUrl = {
+    it('should not render link when parkCode is missing', () => {
+      const tripWithNoParkCode = {
         ...mockTrip,
         stops: [
           {
             ...mockTrip.stops[0],
-            parkCode: 'Q5719910',
-            park: {
-              ...mockTrip.stops[0].park,
-              source: 'wikidata',
-              url: null,
-            },
+            parkCode: null,
           },
         ],
       };
-      render(<TripDetail trip={tripWithWikidataParkNoUrl} />);
+      render(<TripDetail trip={tripWithNoParkCode} />);
       expect(screen.queryByText('View park details →')).not.toBeInTheDocument();
-      expect(screen.queryByText('Visit park website ↗')).not.toBeInTheDocument();
     });
   });
 

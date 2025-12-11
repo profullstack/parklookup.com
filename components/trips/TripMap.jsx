@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 
 // Dynamically import Leaflet components to avoid SSR issues
@@ -141,16 +141,16 @@ const calculateBounds = (stops, origin) => {
 };
 
 /**
- * Get route coordinates from stops
+ * Get waypoint coordinates from stops (for routing API)
  * @param {Array} stops - Trip stops
  * @param {Object} origin - Origin coordinates
- * @returns {Array} Array of [lat, lng] coordinates
+ * @returns {Array} Array of {lat, lng} coordinates
  */
-const getRouteCoordinates = (stops, origin) => {
-  const coords = [];
+const getWaypoints = (stops, origin) => {
+  const waypoints = [];
   
   if (origin?.lat && origin?.lng) {
-    coords.push([origin.lat, origin.lng]);
+    waypoints.push({ lat: origin.lat, lng: origin.lng });
   }
   
   // Sort stops by day number
@@ -158,11 +158,22 @@ const getRouteCoordinates = (stops, origin) => {
   
   sortedStops.forEach(stop => {
     if (stop.park?.latitude && stop.park?.longitude) {
-      coords.push([stop.park.latitude, stop.park.longitude]);
+      waypoints.push({ lat: stop.park.latitude, lng: stop.park.longitude });
     }
   });
   
-  return coords;
+  return waypoints;
+};
+
+/**
+ * Get straight-line route coordinates (fallback)
+ * @param {Array} stops - Trip stops
+ * @param {Object} origin - Origin coordinates
+ * @returns {Array} Array of [lat, lng] coordinates
+ */
+const getStraightLineCoordinates = (stops, origin) => {
+  const waypoints = getWaypoints(stops, origin);
+  return waypoints.map(wp => [wp.lat, wp.lng]);
 };
 
 /**
@@ -211,7 +222,52 @@ export default function TripMap({ stops = [], origin, originName, className = ''
   const [isClient, setIsClient] = useState(false);
   const [icons, setIcons] = useState({ origin: null, numbered: {} });
   const [mapKey, setMapKey] = useState(0);
+  const [routeCoordinates, setRouteCoordinates] = useState([]);
+  const [routeInfo, setRouteInfo] = useState(null);
+  const [routeLoading, setRouteLoading] = useState(false);
+  const [routeError, setRouteError] = useState(null);
   const mapRef = useRef(null);
+
+  // Fetch route from OSRM API
+  const fetchRoute = useCallback(async (waypoints) => {
+    if (waypoints.length < 2) {
+      setRouteCoordinates([]);
+      return;
+    }
+
+    setRouteLoading(true);
+    setRouteError(null);
+
+    try {
+      // Format waypoints for API: lng,lat;lng,lat;...
+      const waypointsStr = waypoints
+        .map(wp => `${wp.lng},${wp.lat}`)
+        .join(';');
+
+      const response = await fetch(`/api/route?waypoints=${waypointsStr}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch route');
+      }
+
+      const data = await response.json();
+      
+      if (data.success && data.route?.coordinates) {
+        setRouteCoordinates(data.route.coordinates);
+        setRouteInfo(data.route.summary);
+      } else {
+        // Fallback to straight lines
+        setRouteCoordinates(waypoints.map(wp => [wp.lat, wp.lng]));
+      }
+    } catch (error) {
+      console.warn('Route fetch failed, using straight lines:', error);
+      setRouteError(error.message);
+      // Fallback to straight lines
+      setRouteCoordinates(waypoints.map(wp => [wp.lat, wp.lng]));
+    } finally {
+      setRouteLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     setIsClient(true);
@@ -228,6 +284,18 @@ export default function TripMap({ stops = [], origin, originName, className = ''
       setIcons({ origin: originIcon, numbered: numberedIcons });
     }
   }, [stops]);
+
+  // Fetch route when stops or origin change
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const waypoints = getWaypoints(stops, origin);
+    if (waypoints.length >= 2) {
+      fetchRoute(waypoints);
+    } else {
+      setRouteCoordinates([]);
+    }
+  }, [stops, origin, isClient, fetchRoute]);
 
   // Force map re-render when stops change
   useEffect(() => {
@@ -264,8 +332,12 @@ export default function TripMap({ stops = [], origin, originName, className = ''
   }
 
   const bounds = calculateBounds(stops, origin);
-  const routeCoords = getRouteCoordinates(stops, origin);
   const sortedStops = [...stops].sort((a, b) => a.dayNumber - b.dayNumber);
+  
+  // Use fetched route or fallback to straight lines
+  const displayRoute = routeCoordinates.length > 0
+    ? routeCoordinates
+    : getStraightLineCoordinates(stops, origin);
 
   // Calculate center from bounds for initial view
   const center = bounds.length === 2
@@ -298,14 +370,14 @@ export default function TripMap({ stops = [], origin, originName, className = ''
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
 
-        {/* Route line */}
-        {routeCoords.length > 1 && (
+        {/* Route line - solid for actual route, dashed for straight line fallback */}
+        {displayRoute.length > 1 && (
           <Polyline
-            positions={routeCoords}
+            positions={displayRoute}
             color="#059669"
-            weight={3}
-            opacity={0.7}
-            dashArray="10, 10"
+            weight={4}
+            opacity={0.8}
+            dashArray={routeCoordinates.length > 0 ? undefined : "10, 10"}
           />
         )}
 
@@ -366,21 +438,54 @@ export default function TripMap({ stops = [], origin, originName, className = ''
         })}
       </MapContainer>
 
-      {/* Legend */}
+      {/* Legend and Route Info */}
       <div className="bg-white p-3 border-t">
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-blue-500" />
-            <span className="text-gray-600">Start</span>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4 text-sm">
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-blue-500" />
+              <span className="text-gray-600">Start</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-4 h-4 rounded-full bg-green-600" />
+              <span className="text-gray-600">Park stops</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-8 h-1 bg-green-600 rounded"
+                style={{
+                  borderStyle: routeCoordinates.length > 0 ? 'solid' : 'dashed',
+                  borderWidth: routeCoordinates.length > 0 ? 0 : '2px',
+                  borderColor: '#059669',
+                  height: routeCoordinates.length > 0 ? '4px' : '0',
+                }}
+              />
+              <span className="text-gray-600">
+                {routeCoordinates.length > 0 ? 'Driving route' : 'Route (approx)'}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-green-600" />
-            <span className="text-gray-600">Park stops</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-0.5 bg-green-600" style={{ borderStyle: 'dashed' }} />
-            <span className="text-gray-600">Route</span>
-          </div>
+          
+          {/* Route summary */}
+          {routeInfo && (
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <span className="flex items-center gap-1">
+                <span>🚗</span>
+                <span>{routeInfo.distanceMiles} mi</span>
+              </span>
+              <span className="flex items-center gap-1">
+                <span>⏱️</span>
+                <span>{routeInfo.durationHours} hrs</span>
+              </span>
+            </div>
+          )}
+          
+          {/* Loading indicator */}
+          {routeLoading && (
+            <span className="text-sm text-gray-500 animate-pulse">
+              Loading route...
+            </span>
+          )}
         </div>
       </div>
     </div>

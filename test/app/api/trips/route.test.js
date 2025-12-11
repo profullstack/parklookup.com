@@ -1084,45 +1084,38 @@ describe('Park Source Detection', () => {
   describe('Park Link Generation', () => {
     it('should generate internal link for NPS parks', () => {
       const stop = { parkCode: 'yose', park: { source: 'nps' } };
-      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
       
-      expect(isWikidata).toBe(false);
-      
+      // All parks link to internal park detail page
       const link = `/parks/${stop.parkCode}`;
       expect(link).toBe('/parks/yose');
     });
 
-    it('should generate external link for Wikidata parks with URL', () => {
+    it('should generate internal link for Wikidata parks (Q-codes)', () => {
       const stop = {
         parkCode: 'Q5719910',
         park: {
           source: 'wikidata',
-          url: 'https://example.com/park'
+          full_name: 'Some State Park'
         }
       };
-      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
       
-      expect(isWikidata).toBe(true);
-      expect(stop.park.url).toBe('https://example.com/park');
+      // All parks link to internal park detail page, including Wikidata parks
+      const link = `/parks/${stop.parkCode}`;
+      expect(link).toBe('/parks/Q5719910');
     });
 
-    it('should return null for Wikidata parks without URL', () => {
-      const stop = {
-        parkCode: 'Q5719910',
-        park: { source: 'wikidata' }
-      };
-      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
-      const hasUrl = !!stop.park?.url;
+    it('should return null when parkCode is missing', () => {
+      const stop = { parkCode: null, park: { full_name: 'Some Park' } };
       
-      expect(isWikidata).toBe(true);
-      expect(hasUrl).toBe(false);
+      const link = stop.parkCode ? `/parks/${stop.parkCode}` : null;
+      expect(link).toBeNull();
     });
 
-    it('should detect Wikidata by Q-code even without source field', () => {
-      const stop = { parkCode: 'Q5719910', park: { full_name: 'Some Park' } };
-      const isWikidata = stop.park?.source === 'wikidata' || /^Q\d+$/.test(stop.parkCode);
+    it('should handle empty parkCode', () => {
+      const stop = { parkCode: '', park: { full_name: 'Some Park' } };
       
-      expect(isWikidata).toBe(true);
+      const link = stop.parkCode ? `/parks/${stop.parkCode}` : null;
+      expect(link).toBeNull();
     });
   });
 
