@@ -289,14 +289,49 @@ function extractLocation(park) {
 }
 
 /**
+ * Check if a park already has places imported for given categories
+ */
+async function checkExistingPlaces(parkId, categories) {
+  const { data: existingLinks, error } = await supabase
+    .from('park_nearby_places')
+    .select('place_id, nearby_places(category)')
+    .eq('park_id', parkId);
+
+  if (error || !existingLinks) {
+    return { hasPlaces: false, categoriesWithPlaces: [] };
+  }
+
+  const categoriesWithPlaces = [...new Set(
+    existingLinks
+      .map(link => link.nearby_places?.category)
+      .filter(Boolean)
+  )];
+
+  return {
+    hasPlaces: existingLinks.length > 0,
+    categoriesWithPlaces,
+    totalPlaces: existingLinks.length,
+  };
+}
+
+/**
  * Batch insert places and link to park using upsert
  */
 async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
   if (dryRun || places.length === 0) {
-    return { success: places.length, failed: 0 };
+    return { success: places.length, failed: 0, updated: 0, inserted: 0 };
   }
 
-  const results = { success: 0, failed: 0 };
+  const results = { success: 0, failed: 0, updated: 0, inserted: 0 };
+
+  // First, check which places already exist
+  const dataCids = places.map(p => p.data_cid);
+  const { data: existingPlaces } = await supabase
+    .from('nearby_places')
+    .select('id, data_cid')
+    .in('data_cid', dataCids);
+
+  const existingCids = new Set(existingPlaces?.map(p => p.data_cid) || []);
 
   const { data: upsertedPlaces, error: upsertError } = await supabase
     .from('nearby_places')
@@ -304,7 +339,7 @@ async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
       onConflict: 'data_cid',
       ignoreDuplicates: false,
     })
-    .select('id, title, category');
+    .select('id, title, category, data_cid');
 
   if (upsertError) {
     console.error(`    Error upserting places:`, upsertError.message);
@@ -316,9 +351,16 @@ async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
 
   if (upsertedPlaces && upsertedPlaces.length > 0) {
     for (const place of upsertedPlaces) {
-      console.log(`    ✓ Inserted: ${place.title} (${place.category})`);
+      const wasExisting = existingCids.has(place.data_cid);
+      if (wasExisting) {
+        results.updated++;
+        console.log(`    ↻ Updated: ${place.title} (${place.category})`);
+      } else {
+        results.inserted++;
+        console.log(`    ✓ Inserted: ${place.title} (${place.category})`);
+      }
     }
-    console.log(`    Total inserted: ${upsertedPlaces.length} places`);
+    console.log(`    Total: ${results.inserted} inserted, ${results.updated} updated`);
   }
 
   // Batch link all places to park
@@ -345,7 +387,7 @@ async function batchInsertPlaces(places, parkId, searchLocation, dryRun) {
  * Import places for a single park using hybrid approach
  */
 async function importPlacesForPark(park, categories, options = {}) {
-  const { dryRun, skipPhotos, placesPerCategory } = options;
+  const { dryRun, skipPhotos, placesPerCategory, skipExisting } = options;
 
   const { location, searchLocation } = extractLocation(park);
 
@@ -353,7 +395,25 @@ async function importPlacesForPark(park, categories, options = {}) {
     success: 0,
     failed: 0,
     skipped: 0,
+    updated: 0,
+    inserted: 0,
   };
+
+  // Check if park already has places for these categories
+  if (skipExisting && !dryRun) {
+    const existing = await checkExistingPlaces(park.id, categories);
+    if (existing.hasPlaces) {
+      const missingCategories = categories.filter(c => !existing.categoriesWithPlaces.includes(c));
+      if (missingCategories.length === 0) {
+        console.log(`    ⏭️ Skipping - already has ${existing.totalPlaces} places for all categories`);
+        results.skipped = categories.length;
+        return results;
+      } else if (missingCategories.length < categories.length) {
+        console.log(`    ℹ️ Has ${existing.totalPlaces} places, importing missing: ${missingCategories.join(', ')}`);
+        categories = missingCategories;
+      }
+    }
+  }
 
   // Search all categories sequentially
   for (const category of categories) {
@@ -444,6 +504,8 @@ async function importPlacesForPark(park, categories, options = {}) {
         const batchResults = await batchInsertPlaces(placeData, park.id, searchLocation, dryRun);
         results.success += batchResults.success;
         results.failed += batchResults.failed;
+        results.updated += batchResults.updated || 0;
+        results.inserted += batchResults.inserted || 0;
       }
 
       // Delay between categories
@@ -461,24 +523,27 @@ async function importPlacesForPark(park, categories, options = {}) {
  * Process a single park and return results with park info for logging
  */
 async function processSinglePark(park, index, total, categories, options) {
-  const { dryRun, skipPhotos, placesPerCategory } = options;
+  const { dryRun, skipPhotos, placesPerCategory, skipExisting } = options;
 
   console.log(`\n[${index + 1}/${total}] ${park.full_name}`);
 
   try {
-    const results = await importPlacesForPark(park, categories, {
+    const results = await importPlacesForPark(park, [...categories], {
       dryRun,
       skipPhotos,
       placesPerCategory,
+      skipExisting,
     });
     return {
       success: results.success,
       failed: results.failed,
       skipped: results.skipped,
+      updated: results.updated || 0,
+      inserted: results.inserted || 0,
     };
   } catch (err) {
     console.error(`  Error processing ${park.full_name}:`, err.message);
-    return { success: 0, failed: 1, skipped: 0 };
+    return { success: 0, failed: 1, skipped: 0, updated: 0, inserted: 0 };
   }
 }
 
@@ -492,6 +557,8 @@ async function processParks(parks, categories, options) {
     success: 0,
     failed: 0,
     skipped: 0,
+    updated: 0,
+    inserted: 0,
   };
 
   // Process parks in batches of `concurrency`
@@ -510,6 +577,8 @@ async function processParks(parks, categories, options) {
       totals.success += result.success;
       totals.failed += result.failed;
       totals.skipped += result.skipped;
+      totals.updated += result.updated || 0;
+      totals.inserted += result.inserted || 0;
     }
 
     // Delay between batches (not between individual parks)
@@ -535,6 +604,7 @@ async function main() {
   let offset = 0;
   let dryRun = false;
   let skipPhotos = false;
+  let skipExisting = false;
   let placesPerCategory = 5;
   let concurrency = 3;
 
@@ -564,6 +634,8 @@ async function main() {
       dryRun = true;
     } else if (args[i] === '--skip-photos') {
       skipPhotos = true;
+    } else if (args[i] === '--skip-existing') {
+      skipExisting = true;
     } else if (args[i] === '--help' || args[i] === '-h') {
       console.log(`
 Hybrid Import Nearby Places Script (ValueSERP + ScaleSERP)
@@ -584,6 +656,7 @@ Options:
   --concurrency <n>    Number of parks to process in parallel (default: 3)
   --dry-run            Don't save to database, just show what would be done
   --skip-photos        Skip fetching photos (faster, less API calls)
+  --skip-existing      Skip parks that already have places for all categories
   --help, -h           Show this help message
 
 Examples:
@@ -631,6 +704,7 @@ Examples:
   console.log(`Concurrency: ${concurrency} parks in parallel`);
   console.log(`Dry run: ${dryRun}`);
   console.log(`Skip photos: ${skipPhotos}`);
+  console.log(`Skip existing: ${skipExisting}`);
   console.log('='.repeat(60));
 
   // Build query for parks
@@ -678,6 +752,7 @@ Examples:
   const totals = await processParks(parks, categories, {
     dryRun,
     skipPhotos,
+    skipExisting,
     placesPerCategory,
     concurrency,
   });
@@ -687,9 +762,11 @@ Examples:
   console.log('\n' + '='.repeat(60));
   console.log('Summary');
   console.log('='.repeat(60));
-  console.log(`Total places added: ${totals.success}`);
+  console.log(`Total places processed: ${totals.success}`);
+  console.log(`  - New places inserted: ${totals.inserted}`);
+  console.log(`  - Existing places updated: ${totals.updated}`);
   console.log(`Total failed: ${totals.failed}`);
-  console.log(`Total skipped: ${totals.skipped}`);
+  console.log(`Total parks skipped: ${totals.skipped}`);
   console.log(`Time elapsed: ${elapsed}s`);
   console.log(`Parks per second: ${(parks.length / (elapsed || 1)).toFixed(2)}`);
   console.log('');

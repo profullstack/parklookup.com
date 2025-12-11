@@ -103,8 +103,10 @@ const getAuthenticatedUser = async (request) => {
 
 /**
  * Check if user can create a trip (free tier enforcement)
+ * Free users can have 1 trip, which can be overwritten.
+ * Pro users can have unlimited trips.
  * @param {string} userId - User ID
- * @returns {Promise<Object>} Result with canCreate and reason
+ * @returns {Promise<Object>} Result with canCreate, isPro, and existingTripId
  */
 const checkTripLimit = async (userId) => {
   const supabase = createServerClient({ useServiceRole: true });
@@ -117,24 +119,21 @@ const checkTripLimit = async (userId) => {
     .single();
 
   if (profile?.is_pro) {
-    return { canCreate: true, isPro: true };
+    return { canCreate: true, isPro: true, existingTripId: null };
   }
 
-  // Count existing trips for free users
-  const { count } = await supabase
+  // For free users, check if they have an existing trip
+  // Free users can always create/overwrite their single trip
+  const { data: existingTrips } = await supabase
     .from('trips')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId);
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1);
 
-  if (count >= 1) {
-    return {
-      canCreate: false,
-      isPro: false,
-      reason: 'Free tier allows only 1 trip. Please upgrade to create more trips.',
-    };
-  }
+  const existingTripId = existingTrips?.[0]?.id || null;
 
-  return { canCreate: true, isPro: false };
+  // Free users can always create (will overwrite if exists)
+  return { canCreate: true, isPro: false, existingTripId };
 };
 
 /**
