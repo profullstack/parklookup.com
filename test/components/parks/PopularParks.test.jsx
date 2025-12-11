@@ -20,8 +20,8 @@ vi.mock('next/link', () => ({
 // Mock fetch
 global.fetch = vi.fn();
 
-// Sample park data for testing
-const mockParks = [
+// Sample park data for testing - parks with images
+const mockParksWithImages = [
   {
     id: 'park-1',
     park_code: 'yell',
@@ -56,6 +56,44 @@ const mockParks = [
   },
 ];
 
+// Parks without images (should be filtered out)
+const mockParksWithoutImages = [
+  {
+    id: 'park-5',
+    park_code: 'noimg1',
+    full_name: 'Park Without Image 1',
+    description: 'This park has no image.',
+    states: 'TX',
+    images: null,
+  },
+  {
+    id: 'park-6',
+    park_code: 'noimg2',
+    full_name: 'Park Without Image 2',
+    description: 'This park also has no image.',
+    states: 'FL',
+    images: [],
+  },
+];
+
+// Park with wikidata_image (should be included)
+const mockParkWithWikidataImage = {
+  id: 'park-7',
+  park_code: 'wiki1',
+  full_name: 'Park With Wikidata Image',
+  description: 'This park has a wikidata image.',
+  states: 'OR',
+  images: null,
+  wikidata_image: 'https://example.com/wikidata-image.jpg',
+};
+
+// Combined mock data for API response
+const mockAllParks = [
+  ...mockParksWithImages,
+  ...mockParksWithoutImages,
+  mockParkWithWikidataImage,
+];
+
 describe('PopularParks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -83,10 +121,10 @@ describe('PopularParks', () => {
 
   describe('Successful Data Fetch', () => {
     beforeEach(() => {
-      // Mock successful fetch from search API
+      // Mock successful fetch from search API with mixed parks (some with images, some without)
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockParks }),
+        json: () => Promise.resolve({ parks: mockAllParks }),
       });
     });
 
@@ -226,13 +264,27 @@ describe('PopularParks', () => {
         expect(section).toBeNull();
       });
     });
+
+    it('should not render section when no parks have images', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockParksWithoutImages }),
+      });
+
+      render(<PopularParks />);
+
+      await waitFor(() => {
+        const section = document.querySelector('section');
+        expect(section).toBeNull();
+      });
+    });
   });
 
   describe('Accessibility', () => {
     beforeEach(() => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockParks }),
+        json: () => Promise.resolve({ parks: mockAllParks }),
       });
     });
 
@@ -270,29 +322,91 @@ describe('PopularParks', () => {
   });
 
   describe('API Calls', () => {
-    it('should fetch data from search API with limit', async () => {
+    it('should fetch data from search API with limit of 30', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockParks }),
+        json: () => Promise.resolve({ parks: mockAllParks }),
       });
 
       render(<PopularParks />);
 
       await waitFor(() => {
-        expect(global.fetch).toHaveBeenCalledWith('/api/parks/search?limit=8');
+        expect(global.fetch).toHaveBeenCalledWith('/api/parks/search?limit=30');
       });
     });
 
     it('should only make one API call', async () => {
       global.fetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve({ parks: mockParks }),
+        json: () => Promise.resolve({ parks: mockAllParks }),
       });
 
       render(<PopularParks />);
 
       await waitFor(() => {
         expect(global.fetch).toHaveBeenCalledTimes(1);
+      });
+    });
+  });
+
+  describe('Image Filtering', () => {
+    it('should only display parks with images', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockAllParks }),
+      });
+
+      render(<PopularParks />);
+
+      await waitFor(() => {
+        // Parks with images should be displayed
+        expect(screen.getByText('Yellowstone National Park')).toBeInTheDocument();
+        expect(screen.getByText('Grand Canyon National Park')).toBeInTheDocument();
+      });
+
+      // Parks without images should NOT be displayed
+      expect(screen.queryByText('Park Without Image 1')).not.toBeInTheDocument();
+      expect(screen.queryByText('Park Without Image 2')).not.toBeInTheDocument();
+    });
+
+    it('should include parks with wikidata_image', async () => {
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: mockAllParks }),
+      });
+
+      render(<PopularParks />);
+
+      await waitFor(() => {
+        // Park with wikidata_image should be displayed
+        expect(screen.getByText('Park With Wikidata Image')).toBeInTheDocument();
+      });
+    });
+
+    it('should limit displayed parks to 8', async () => {
+      // Create more than 8 parks with images
+      const manyParksWithImages = Array.from({ length: 15 }, (_, i) => ({
+        id: `park-${i}`,
+        park_code: `park${i}`,
+        full_name: `Park Number ${i}`,
+        description: `Description for park ${i}`,
+        states: 'CA',
+        images: [{ url: `https://example.com/park${i}.jpg`, title: `Park ${i}` }],
+      }));
+
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ parks: manyParksWithImages }),
+      });
+
+      render(<PopularParks />);
+
+      await waitFor(() => {
+        // Should only show 8 parks
+        const parkLinks = document.querySelectorAll('a[href^="/parks/"]');
+        // Each park card has multiple links, so we check for park names instead
+        const parkNames = screen.getAllByText(/Park Number \d/);
+        expect(parkNames.length).toBeLessThanOrEqual(8);
       });
     });
   });

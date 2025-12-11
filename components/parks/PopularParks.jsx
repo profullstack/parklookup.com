@@ -18,16 +18,22 @@ export default function PopularParks() {
   useEffect(() => {
     const fetchPopularParks = async () => {
       try {
-        // Fetch parks from the search API - get first 8 parks sorted by name
-        // This uses the public all_parks view which includes both NPS and state parks
-        const response = await fetch('/api/parks/search?limit=8');
+        // Fetch more parks than needed so we can filter for those with images
+        // We fetch 30 to ensure we get at least 8 with images after filtering
+        const response = await fetch('/api/parks/search?limit=30');
         
         if (!response.ok) {
           throw new Error('Failed to fetch parks');
         }
         
         const data = await response.json();
-        setParks(data.parks || []);
+        
+        // Filter to only parks that have images, then take first 8
+        const parksWithImages = (data.parks || [])
+          .filter((park) => park.images?.[0]?.url || park.wikidata_image)
+          .slice(0, 8);
+        
+        setParks(parksWithImages);
       } catch (err) {
         console.error('Error fetching popular parks:', err);
         setError(err.message);
@@ -89,31 +95,13 @@ export default function PopularParks() {
               className="group block bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="relative h-48 overflow-hidden">
-                {park.images?.[0]?.url ? (
-                  <Image
-                    src={park.images[0].url}
-                    alt={park.full_name}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
-                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                    <svg
-                      className="w-16 h-16 text-white/50"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
-                      />
-                    </svg>
-                  </div>
-                )}
+                <Image
+                  src={park.images?.[0]?.url || park.wikidata_image}
+                  alt={park.full_name}
+                  fill
+                  className="object-cover group-hover:scale-105 transition-transform duration-300"
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-4">
                   <h3 className="text-white font-bold text-lg leading-tight">
