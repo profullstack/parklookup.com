@@ -53,12 +53,21 @@ export default function Header() {
               States
             </Link>
             {user && (
-              <Link
-                href="/favorites"
-                className="text-gray-600 hover:text-green-600 font-medium transition-colors"
-              >
-                My Favorites
-              </Link>
+              <>
+                <Link
+                  href="/trips"
+                  className="text-gray-600 hover:text-green-600 font-medium transition-colors flex items-center gap-1"
+                >
+                  <span>🧭</span>
+                  My Trips
+                </Link>
+                <Link
+                  href="/favorites"
+                  className="text-gray-600 hover:text-green-600 font-medium transition-colors"
+                >
+                  My Favorites
+                </Link>
+              </>
             )}
           </div>
 
@@ -135,13 +144,23 @@ export default function Header() {
                 States
               </Link>
               {user && (
-                <Link
-                  href="/favorites"
-                  className="text-gray-600 hover:text-green-600 font-medium"
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  My Favorites
-                </Link>
+                <>
+                  <Link
+                    href="/trips"
+                    className="text-gray-600 hover:text-green-600 font-medium flex items-center gap-1"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span>🧭</span>
+                    My Trips
+                  </Link>
+                  <Link
+                    href="/favorites"
+                    className="text-gray-600 hover:text-green-600 font-medium"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    My Favorites
+                  </Link>
+                </>
               )}
               <hr className="border-gray-100" />
               {user ? (
