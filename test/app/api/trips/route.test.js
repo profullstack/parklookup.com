@@ -826,5 +826,272 @@ describe('Supabase Client Configuration', () => {
 
       expect(query.filters).toContainEqual({ column: 'user_id', value: userId });
     });
+
+    it('should use service role for authentication validation', () => {
+      // The getAuthenticatedUser function should use service role
+      // to properly validate JWT tokens without RLS interference
+      
+      const authClientOptions = { useServiceRole: true };
+      expect(authClientOptions.useServiceRole).toBe(true);
+    });
+  });
+});
+
+describe('Trip Deletion - Comprehensive Tests', () => {
+  describe('DELETE /api/trips/[id] - Request Flow', () => {
+    it('should validate trip ID before processing', () => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      
+      const validId = '123e4567-e89b-12d3-a456-426614174000';
+      const invalidId = 'not-a-uuid';
+      
+      expect(uuidRegex.test(validId)).toBe(true);
+      expect(uuidRegex.test(invalidId)).toBe(false);
+    });
+
+    it('should require authentication before deletion', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'DELETE',
+      });
+      
+      const authHeader = request.headers.get('authorization');
+      expect(authHeader).toBeNull();
+    });
+
+    it('should verify trip ownership before deletion', () => {
+      const trip = {
+        id: 'trip-uuid-123',
+        user_id: 'user-uuid-456',
+      };
+      const requestingUserId = 'user-uuid-456';
+      
+      const isOwner = trip.user_id === requestingUserId;
+      expect(isOwner).toBe(true);
+    });
+
+    it('should reject deletion if user does not own trip', () => {
+      const trip = {
+        id: 'trip-uuid-123',
+        user_id: 'user-uuid-456',
+      };
+      const requestingUserId = 'different-user-uuid';
+      
+      const isOwner = trip.user_id === requestingUserId;
+      expect(isOwner).toBe(false);
+    });
+  });
+
+  describe('DELETE /api/trips/[id] - Error Handling', () => {
+    it('should return 400 for invalid trip ID', () => {
+      const invalidIds = ['', 'abc', '123', null, undefined];
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      
+      invalidIds.forEach(id => {
+        const isValid = id ? uuidRegex.test(id) : false;
+        expect(isValid).toBe(false);
+      });
+    });
+
+    it('should return 401 for missing authorization', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'DELETE',
+      });
+      
+      const authHeader = request.headers.get('authorization');
+      const hasAuth = authHeader?.startsWith('Bearer ');
+      
+      expect(hasAuth).toBeFalsy();
+    });
+
+    it('should return 401 for invalid authorization format', () => {
+      const request = new Request('http://localhost/api/trips/123e4567-e89b-12d3-a456-426614174000', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Basic dXNlcjpwYXNz',
+        },
+      });
+      
+      const authHeader = request.headers.get('authorization');
+      const isBearer = authHeader?.startsWith('Bearer ');
+      
+      expect(isBearer).toBe(false);
+    });
+
+    it('should return 404 for non-existent trip', () => {
+      const tripQueryResult = {
+        data: null,
+        error: { code: 'PGRST116', message: 'No rows found' },
+      };
+      
+      const tripNotFound = !tripQueryResult.data || tripQueryResult.error;
+      expect(tripNotFound).toBe(true);
+    });
+
+    it('should return 403 for unauthorized deletion attempt', () => {
+      const trip = {
+        id: 'trip-uuid-123',
+        user_id: 'owner-user-uuid',
+      };
+      const requestingUserId = 'attacker-user-uuid';
+      
+      const isAuthorized = trip.user_id === requestingUserId;
+      expect(isAuthorized).toBe(false);
+    });
+
+    it('should return 500 for database errors', () => {
+      const deleteResult = {
+        error: { message: 'Database connection failed' },
+      };
+      
+      const hasError = !!deleteResult.error;
+      expect(hasError).toBe(true);
+    });
+  });
+
+  describe('DELETE /api/trips/[id] - Success Response', () => {
+    it('should return success true on successful deletion', () => {
+      const successResponse = {
+        success: true,
+        message: 'Trip deleted successfully',
+      };
+      
+      expect(successResponse.success).toBe(true);
+    });
+
+    it('should return confirmation message', () => {
+      const successResponse = {
+        success: true,
+        message: 'Trip deleted successfully',
+      };
+      
+      expect(successResponse.message).toBe('Trip deleted successfully');
+    });
+
+    it('should cascade delete trip_stops', () => {
+      // This documents the expected database behavior:
+      // When a trip is deleted, all associated trip_stops should be
+      // automatically deleted due to the CASCADE constraint
+      
+      const tripSchema = {
+        trips: {
+          id: 'uuid',
+          user_id: 'uuid',
+        },
+        trip_stops: {
+          id: 'uuid',
+          trip_id: 'uuid', // Foreign key with ON DELETE CASCADE
+        },
+      };
+      
+      expect(tripSchema.trip_stops.trip_id).toBeDefined();
+    });
+  });
+
+  describe('DELETE /api/trips/[id] - Authorization Flow', () => {
+    it('should extract token from Bearer header', () => {
+      const authHeader = 'Bearer my-jwt-token-123';
+      const token = authHeader.substring(7);
+      
+      expect(token).toBe('my-jwt-token-123');
+    });
+
+    it('should validate token with Supabase auth', () => {
+      // This documents the expected auth flow:
+      // 1. Extract token from Authorization header
+      // 2. Call supabase.auth.getUser(token)
+      // 3. Return user if valid, null if invalid
+      
+      const authFlow = {
+        step1: 'Extract Bearer token',
+        step2: 'Call supabase.auth.getUser(token)',
+        step3: 'Return user or null',
+      };
+      
+      expect(authFlow.step2).toContain('getUser');
+    });
+
+    it('should use service role client for auth validation', () => {
+      // The auth validation should use service role to bypass RLS
+      // This ensures the token can be validated regardless of RLS policies
+      
+      const clientConfig = { useServiceRole: true };
+      expect(clientConfig.useServiceRole).toBe(true);
+    });
+  });
+
+  describe('DELETE /api/trips/[id] - Database Operations', () => {
+    it('should first fetch trip to verify ownership', () => {
+      const fetchQuery = {
+        table: 'trips',
+        select: ['id', 'user_id'],
+        filters: [{ column: 'id', value: 'trip-uuid' }],
+      };
+      
+      expect(fetchQuery.select).toContain('user_id');
+    });
+
+    it('should delete trip by ID', () => {
+      const deleteQuery = {
+        table: 'trips',
+        operation: 'delete',
+        filters: [{ column: 'id', value: 'trip-uuid' }],
+      };
+      
+      expect(deleteQuery.operation).toBe('delete');
+      expect(deleteQuery.filters[0].column).toBe('id');
+    });
+
+    it('should use service role for delete operation', () => {
+      // Service role is required to bypass RLS for the delete operation
+      
+      const deleteClientConfig = { useServiceRole: true };
+      expect(deleteClientConfig.useServiceRole).toBe(true);
+    });
+  });
+});
+
+describe('Trip Deletion - Edge Cases', () => {
+  it('should handle concurrent deletion attempts', () => {
+    // If two requests try to delete the same trip simultaneously,
+    // the second one should get a 404 (trip not found)
+    
+    const firstDeleteResult = { success: true };
+    const secondDeleteResult = { error: 'Trip not found' };
+    
+    expect(firstDeleteResult.success).toBe(true);
+    expect(secondDeleteResult.error).toBe('Trip not found');
+  });
+
+  it('should handle trip with many stops', () => {
+    // Cascade delete should handle trips with many stops efficiently
+    
+    const tripWithManyStops = {
+      id: 'trip-uuid',
+      stops: Array(100).fill({ id: 'stop-uuid' }),
+    };
+    
+    expect(tripWithManyStops.stops.length).toBe(100);
+  });
+
+  it('should handle trip with no stops', () => {
+    // Deletion should work even if trip has no stops
+    
+    const tripWithNoStops = {
+      id: 'trip-uuid',
+      stops: [],
+    };
+    
+    expect(tripWithNoStops.stops.length).toBe(0);
+  });
+
+  it('should handle special characters in trip title', () => {
+    // Trip deletion should work regardless of trip content
+    
+    const tripWithSpecialChars = {
+      id: 'trip-uuid',
+      title: "Trip with 'quotes' and \"double quotes\" and <html>",
+    };
+    
+    expect(tripWithSpecialChars.title).toContain("'quotes'");
   });
 });

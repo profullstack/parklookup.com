@@ -21,10 +21,12 @@ const getAuthenticatedUser = async (request) => {
   }
 
   const token = authHeader.substring(7);
-  const supabase = createServerClient();
+  // Use service role to validate the token - this bypasses RLS for auth operations
+  const supabase = createServerClient({ useServiceRole: true });
 
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) {
+    console.error('Auth error:', error?.message);
     return null;
   }
 

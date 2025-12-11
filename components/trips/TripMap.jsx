@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import dynamic from 'next/dynamic';
 
 // Dynamically import Leaflet components to avoid SSR issues
@@ -27,6 +27,10 @@ const Popup = dynamic(
 );
 const Polyline = dynamic(
   () => import('react-leaflet').then(mod => mod.Polyline),
+  { ssr: false }
+);
+const useMap = dynamic(
+  () => import('react-leaflet').then(mod => mod.useMap),
   { ssr: false }
 );
 
@@ -162,6 +166,40 @@ const getRouteCoordinates = (stops, origin) => {
 };
 
 /**
+ * Map bounds fitter component
+ * Fits the map to the given bounds after mount
+ */
+function MapBoundsFitter({ bounds }) {
+  const [mapReady, setMapReady] = useState(false);
+  
+  useEffect(() => {
+    // Delay to ensure map is fully rendered
+    const timer = setTimeout(() => setMapReady(true), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (!mapReady || typeof window === 'undefined') return;
+    
+    // Get the map instance from the parent context
+    const mapContainer = document.querySelector('.leaflet-container');
+    if (mapContainer && mapContainer._leaflet_map) {
+      const map = mapContainer._leaflet_map;
+      if (bounds && bounds.length === 2) {
+        try {
+          map.fitBounds(bounds, { padding: [50, 50] });
+          map.invalidateSize();
+        } catch (e) {
+          console.warn('Failed to fit bounds:', e);
+        }
+      }
+    }
+  }, [bounds, mapReady]);
+
+  return null;
+}
+
+/**
  * TripMap component
  * @param {Object} props - Component props
  * @param {Array} props.stops - Trip stops with park data
@@ -172,6 +210,8 @@ const getRouteCoordinates = (stops, origin) => {
 export default function TripMap({ stops = [], origin, originName, className = '' }) {
   const [isClient, setIsClient] = useState(false);
   const [icons, setIcons] = useState({ origin: null, numbered: {} });
+  const [mapKey, setMapKey] = useState(0);
+  const mapRef = useRef(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -189,6 +229,31 @@ export default function TripMap({ stops = [], origin, originName, className = ''
     }
   }, [stops]);
 
+  // Force map re-render when stops change
+  useEffect(() => {
+    if (isClient) {
+      setMapKey(prev => prev + 1);
+    }
+  }, [stops, origin, isClient]);
+
+  // Invalidate map size after render
+  useEffect(() => {
+    if (!isClient) return;
+    
+    const timer = setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize();
+      }
+      // Also try to find the map via DOM
+      const mapContainer = document.querySelector('.leaflet-container');
+      if (mapContainer?._leaflet_map) {
+        mapContainer._leaflet_map.invalidateSize();
+      }
+    }, 200);
+    
+    return () => clearTimeout(timer);
+  }, [isClient, mapKey]);
+
   // Don't render on server
   if (!isClient) {
     return (
@@ -202,13 +267,31 @@ export default function TripMap({ stops = [], origin, originName, className = ''
   const routeCoords = getRouteCoordinates(stops, origin);
   const sortedStops = [...stops].sort((a, b) => a.dayNumber - b.dayNumber);
 
+  // Calculate center from bounds for initial view
+  const center = bounds.length === 2
+    ? [(bounds[0][0] + bounds[1][0]) / 2, (bounds[0][1] + bounds[1][1]) / 2]
+    : [39.8283, -98.5795]; // US center
+
   return (
     <div className={`rounded-lg overflow-hidden shadow-md ${className}`}>
       <MapContainer
+        key={mapKey}
+        center={center}
+        zoom={6}
         bounds={bounds}
         scrollWheelZoom={true}
         style={{ height: '400px', width: '100%' }}
         className="z-0"
+        whenReady={(map) => {
+          mapRef.current = map.target;
+          // Fit bounds after map is ready
+          setTimeout(() => {
+            if (bounds && bounds.length === 2) {
+              map.target.fitBounds(bounds, { padding: [50, 50] });
+            }
+            map.target.invalidateSize();
+          }, 100);
+        }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
