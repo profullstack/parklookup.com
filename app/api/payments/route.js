@@ -94,7 +94,7 @@ export async function GET(request) {
     if (profile.stripe_subscription_id) {
       try {
         const stripeSubscription = await stripe.subscriptions.retrieve(profile.stripe_subscription_id, {
-          expand: ['latest_invoice', 'discount'],
+          expand: ['latest_invoice', 'discount', 'discount.coupon'],
         });
         
         // Safely convert timestamps - they must be valid positive numbers
@@ -108,9 +108,7 @@ export async function GET(request) {
           ? new Date(stripeSubscription.canceled_at * 1000).toISOString()
           : null;
         
-        // Get the actual amount paid from the latest invoice (includes discounts)
-        const latestInvoice = stripeSubscription.latest_invoice;
-        const actualAmountPaid = latestInvoice?.amount_paid ?? stripeSubscription.items.data[0]?.price?.unit_amount ?? 0;
+        // Get base price from the subscription item
         const baseAmount = stripeSubscription.items.data[0]?.price?.unit_amount || 0;
         
         // Check if there's an active discount/coupon
@@ -119,12 +117,35 @@ export async function GET(request) {
         const discountPercent = discount?.coupon?.percent_off || null;
         const discountAmount = discount?.coupon?.amount_off || null;
         
+        // Calculate the actual amount after discount
+        let actualAmountPaid = baseAmount;
+        if (hasDiscount) {
+          if (discountPercent) {
+            actualAmountPaid = Math.round(baseAmount * (1 - discountPercent / 100));
+          } else if (discountAmount) {
+            actualAmountPaid = Math.max(0, baseAmount - discountAmount);
+          }
+        }
+        
+        // If we have a latest invoice with amount_paid, use that as it's the most accurate
+        const latestInvoice = stripeSubscription.latest_invoice;
+        if (latestInvoice && typeof latestInvoice === 'object' && latestInvoice.amount_paid > 0) {
+          actualAmountPaid = latestInvoice.amount_paid;
+        }
+        
         console.log('Stripe subscription data:', {
           id: stripeSubscription.id,
           status: stripeSubscription.status,
           cancel_at_period_end: stripeSubscription.cancel_at_period_end,
           canceled_at: stripeSubscription.canceled_at,
           current_period_end: stripeSubscription.current_period_end,
+          baseAmount,
+          actualAmountPaid,
+          hasDiscount,
+          discountPercent,
+          discountAmount,
+          couponName: discount?.coupon?.name || discount?.coupon?.id,
+          latestInvoiceAmountPaid: latestInvoice?.amount_paid,
         });
 
         subscription = {
@@ -144,6 +165,8 @@ export async function GET(request) {
             percentOff: discountPercent,
             amountOff: discountAmount,
             couponName: discount?.coupon?.name || discount?.coupon?.id,
+            duration: discount?.coupon?.duration, // 'forever', 'once', 'repeating'
+            durationInMonths: discount?.coupon?.duration_in_months,
           } : null,
         };
       } catch (subError) {

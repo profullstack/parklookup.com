@@ -232,28 +232,47 @@ export default function PaymentsPage() {
                     <StatusBadge status={paymentData.subscription.status} />
                   </div>
                   <div className="text-right">
-                    <p className="text-sm text-gray-500">Plan</p>
-                    <p className="text-lg font-semibold text-gray-900">
-                      {formatCurrency(paymentData.subscription.plan.amount, paymentData.subscription.plan.currency)}
-                      <span className="text-sm font-normal text-gray-500">
-                        /{paymentData.subscription.plan.interval}
-                      </span>
-                    </p>
-                    {paymentData.subscription.discount && (
-                      <p className="text-xs text-green-600">
-                        {paymentData.subscription.discount.percentOff
-                          ? `${paymentData.subscription.discount.percentOff}% off`
-                          : paymentData.subscription.discount.amountOff
-                            ? `${formatCurrency(paymentData.subscription.discount.amountOff, paymentData.subscription.plan.currency)} off`
-                            : 'Discount applied'}
-                        {paymentData.subscription.plan.baseAmount && paymentData.subscription.plan.baseAmount !== paymentData.subscription.plan.amount && (
-                          <span className="ml-1 line-through text-gray-400">
-                            {formatCurrency(paymentData.subscription.plan.baseAmount, paymentData.subscription.plan.currency)}
-                          </span>
-                        )}
+                      <p className="text-sm text-gray-500">Plan</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        {formatCurrency(paymentData.subscription.plan.amount, paymentData.subscription.plan.currency)}
+                        <span className="text-sm font-normal text-gray-500">
+                          /{paymentData.subscription.plan.interval}
+                        </span>
                       </p>
-                    )}
-                  </div>
+                      {paymentData.subscription.discount && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                            {paymentData.subscription.discount.couponName && (
+                              <span className="mr-1">🎟️ {paymentData.subscription.discount.couponName}:</span>
+                            )}
+                            {paymentData.subscription.discount.percentOff
+                              ? `${paymentData.subscription.discount.percentOff}% off`
+                              : paymentData.subscription.discount.amountOff
+                                ? `${formatCurrency(paymentData.subscription.discount.amountOff, paymentData.subscription.plan.currency)} off`
+                                : 'Discount applied'}
+                          </span>
+                          {paymentData.subscription.plan.baseAmount && paymentData.subscription.plan.baseAmount !== paymentData.subscription.plan.amount && (
+                            <p className="text-xs text-gray-400 mt-0.5">
+                              <span className="line-through">
+                                {formatCurrency(paymentData.subscription.plan.baseAmount, paymentData.subscription.plan.currency)}
+                              </span>
+                              <span className="ml-1 text-green-600">
+                                You save {formatCurrency(paymentData.subscription.plan.baseAmount - paymentData.subscription.plan.amount, paymentData.subscription.plan.currency)}/{paymentData.subscription.plan.interval}
+                              </span>
+                            </p>
+                          )}
+                          {paymentData.subscription.discount.duration && paymentData.subscription.discount.duration !== 'forever' && (
+                            <p className="text-xs text-gray-500 mt-0.5">
+                              {paymentData.subscription.discount.duration === 'once'
+                                ? 'Applied to first payment only'
+                                : paymentData.subscription.discount.durationInMonths
+                                  ? `Valid for ${paymentData.subscription.discount.durationInMonths} months`
+                                  : 'Limited time discount'}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
                 </div>
 
                 {(paymentData.subscription.currentPeriodStart || paymentData.subscription.currentPeriodEnd) && (

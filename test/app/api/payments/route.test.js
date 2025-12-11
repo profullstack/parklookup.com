@@ -293,6 +293,146 @@ describe('Payments API Route', () => {
         expect(data.subscription.cancelAtPeriodEnd).toBe(false);
         expect(data.subscription.canceledAt).toBeNull();
       });
+
+      it('should return discount information when coupon is applied (percent off)', async () => {
+        vi.resetModules();
+        
+        // Mock a subscription with a percent-off discount
+        const discountedSubscription = {
+          ...mockSubscription,
+          discount: {
+            coupon: {
+              id: '50OFF',
+              name: '50% Off',
+              percent_off: 50,
+              amount_off: null,
+              duration: 'forever',
+              duration_in_months: null,
+            },
+          },
+        };
+        mockStripeSubscriptionsRetrieve.mockResolvedValue(discountedSubscription);
+
+        const { GET } = await import('@/app/api/payments/route.js');
+
+        const request = new Request('http://localhost:3000/api/payments', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.subscription.discount).toBeDefined();
+        expect(data.subscription.discount.percentOff).toBe(50);
+        expect(data.subscription.discount.couponName).toBe('50% Off');
+        expect(data.subscription.discount.duration).toBe('forever');
+        expect(data.subscription.plan.amount).toBe(500); // 999 * 0.5 rounded
+        expect(data.subscription.plan.baseAmount).toBe(999);
+      });
+
+      it('should return discount information when coupon is applied (amount off)', async () => {
+        vi.resetModules();
+        
+        // Mock a subscription with an amount-off discount
+        const discountedSubscription = {
+          ...mockSubscription,
+          discount: {
+            coupon: {
+              id: 'SAVE200',
+              name: 'Save $2',
+              percent_off: null,
+              amount_off: 200, // $2.00 off in cents
+              duration: 'repeating',
+              duration_in_months: 3,
+            },
+          },
+        };
+        mockStripeSubscriptionsRetrieve.mockResolvedValue(discountedSubscription);
+
+        const { GET } = await import('@/app/api/payments/route.js');
+
+        const request = new Request('http://localhost:3000/api/payments', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.subscription.discount).toBeDefined();
+        expect(data.subscription.discount.amountOff).toBe(200);
+        expect(data.subscription.discount.couponName).toBe('Save $2');
+        expect(data.subscription.discount.duration).toBe('repeating');
+        expect(data.subscription.discount.durationInMonths).toBe(3);
+        expect(data.subscription.plan.amount).toBe(799); // 999 - 200
+        expect(data.subscription.plan.baseAmount).toBe(999);
+      });
+
+      it('should use latest invoice amount_paid when available', async () => {
+        vi.resetModules();
+        
+        // Mock a subscription with latest invoice showing actual amount paid
+        const subscriptionWithInvoice = {
+          ...mockSubscription,
+          latest_invoice: {
+            amount_paid: 499, // Actual amount paid after discount
+          },
+          discount: {
+            coupon: {
+              id: '50OFF',
+              name: '50% Off',
+              percent_off: 50,
+              amount_off: null,
+              duration: 'forever',
+              duration_in_months: null,
+            },
+          },
+        };
+        mockStripeSubscriptionsRetrieve.mockResolvedValue(subscriptionWithInvoice);
+
+        const { GET } = await import('@/app/api/payments/route.js');
+
+        const request = new Request('http://localhost:3000/api/payments', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.subscription.plan.amount).toBe(499); // Uses invoice amount_paid
+        expect(data.subscription.plan.baseAmount).toBe(999);
+      });
+
+      it('should return null discount when no coupon is applied', async () => {
+        vi.resetModules();
+        const { GET } = await import('@/app/api/payments/route.js');
+
+        const request = new Request('http://localhost:3000/api/payments', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.subscription.discount).toBeNull();
+        expect(data.subscription.plan.amount).toBe(999);
+        expect(data.subscription.plan.baseAmount).toBe(999);
+      });
     });
 
     describe('Error Handling', () => {
