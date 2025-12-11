@@ -86,14 +86,25 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Failed to confirm subscription cancellation' }, { status: 500 });
     }
 
+    // Safely convert period end timestamp
+    let periodEndIso = null;
+    if (subscription.current_period_end && subscription.current_period_end > 0) {
+      try {
+        const periodEndDate = new Date(subscription.current_period_end * 1000);
+        if (!isNaN(periodEndDate.getTime())) {
+          periodEndIso = periodEndDate.toISOString();
+        }
+      } catch (dateError) {
+        console.error('Error converting period end date:', dateError);
+      }
+    }
+
     // Update profile with cancellation status only after Stripe confirms
     const { error: updateError } = await supabase
       .from('profiles')
       .update({
         subscription_status: 'canceling',
-        subscription_period_end: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
-          : null,
+        subscription_period_end: periodEndIso,
       })
       .eq('id', user.id);
 
@@ -107,9 +118,7 @@ export async function POST(request) {
     return NextResponse.json({
       success: true,
       message: 'Subscription will be canceled at the end of the billing period',
-      cancelAt: subscription.current_period_end
-        ? new Date(subscription.current_period_end * 1000).toISOString()
-        : null,
+      cancelAt: periodEndIso,
     });
   } catch (error) {
     console.error('Error canceling subscription:', error);

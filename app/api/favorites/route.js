@@ -134,6 +134,14 @@ export async function POST(request) {
       if (error.code === '23505') {
         return NextResponse.json({ error: 'Park already in favorites' }, { status: 409 });
       }
+      if (error.code === '23503') {
+        // Foreign key constraint violation - park ID not found in nps_parks table
+        // This happens when trying to favorite a state park (from wikidata_parks)
+        console.error('Database error:', error);
+        return NextResponse.json({
+          error: 'This park type cannot be favorited yet. Only National Parks are currently supported.'
+        }, { status: 400 });
+      }
       console.error('Database error:', error);
       return NextResponse.json({ error: 'Failed to add favorite' }, { status: 500 });
     }
