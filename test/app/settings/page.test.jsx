@@ -32,9 +32,21 @@ import { useAuth } from '@/hooks/useAuth';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+// Mock localStorage
+const mockLocalStorage = {
+  getItem: vi.fn(),
+  setItem: vi.fn(),
+  removeItem: vi.fn(),
+};
+Object.defineProperty(window, 'localStorage', {
+  value: mockLocalStorage,
+  writable: true,
+});
+
 describe('Settings Page', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLocalStorage.getItem.mockReturnValue('test-auth-token');
   });
 
   afterEach(() => {
@@ -122,11 +134,13 @@ describe('Settings Page', () => {
       });
     });
 
-    it('should fetch and display profile data', async () => {
+    it('should fetch and display profile data with auth header', async () => {
       render(<SettingsPage />);
 
       await waitFor(() => {
-        expect(mockFetch).toHaveBeenCalledWith('/api/profile');
+        expect(mockFetch).toHaveBeenCalledWith('/api/profile', {
+          headers: { Authorization: 'Bearer test-auth-token' },
+        });
       });
     });
 
@@ -257,6 +271,7 @@ describe('Settings Page', () => {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
+            Authorization: 'Bearer test-auth-token',
           },
           body: expect.stringContaining('newname'),
         });

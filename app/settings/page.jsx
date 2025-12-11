@@ -46,7 +46,11 @@ export default function SettingsPage() {
       if (!user) {return;}
 
       try {
-        const response = await fetch('/api/profile');
+        // Get token from localStorage
+        const token = localStorage.getItem('parklookup_auth_token');
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        
+        const response = await fetch('/api/profile', { headers });
         if (!response.ok) {
           throw new Error('Failed to fetch profile');
         }
@@ -78,10 +82,14 @@ export default function SettingsPage() {
     setSuccess(null);
 
     try {
+      // Get token from localStorage
+      const token = localStorage.getItem('parklookup_auth_token');
+      
       const response = await fetch('/api/profile', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify({
           display_name: displayName,
