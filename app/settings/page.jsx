@@ -5,7 +5,7 @@
 
 'use client';
 
-import { Suspense, useState, useEffect } from 'react';
+import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import Card, { CardContent } from '@/components/ui/Card';
@@ -42,6 +42,9 @@ function SettingsContent() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  
+  // Track if we've already processed the checkout status to prevent double-processing
+  const checkoutProcessedRef = useRef(false);
 
   // Form state
   const [displayName, setDisplayName] = useState('');
@@ -60,21 +63,35 @@ function SettingsContent() {
 
   // Check for checkout cancellation and show discount modal
   useEffect(() => {
+    // Only process once to prevent issues with re-renders
+    if (checkoutProcessedRef.current) {
+      return;
+    }
+    
     const checkoutStatus = searchParams.get('checkout');
+    
     if (checkoutStatus === 'cancelled') {
+      checkoutProcessedRef.current = true;
+      
+      // Clean up the URL first
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/settings');
+      }
+      
       // Show discount modal after a short delay for better UX
       const timer = setTimeout(() => {
         setShowDiscountModal(true);
       }, 500);
       
-      // Clean up the URL without triggering a navigation
-      window.history.replaceState({}, '', '/settings');
-      
       return () => clearTimeout(timer);
     } else if (checkoutStatus === 'success') {
+      checkoutProcessedRef.current = true;
       setSuccess('🎉 Welcome to Pro! Your subscription is now active.');
+      
       // Clean up the URL
-      window.history.replaceState({}, '', '/settings');
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({}, '', '/settings');
+      }
     }
   }, [searchParams]);
 
