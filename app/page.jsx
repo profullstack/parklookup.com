@@ -7,6 +7,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import SearchBar from '@/components/parks/SearchBar';
 import { StatesList, StatesGrid } from '@/components/states/StatesList';
+import PopularParks from '@/components/parks/PopularParks';
+import TripPlannerPromo from '@/components/trips/TripPlannerPromo';
 
 export default function HomePage() {
   return (
@@ -146,6 +148,12 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Trip Planner Promo Section */}
+      <TripPlannerPromo />
+
+      {/* Popular Parks Section */}
+      <PopularParks />
 
       {/* States Section */}
       <section className="py-16 bg-gray-50">
