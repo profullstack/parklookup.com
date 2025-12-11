@@ -643,10 +643,25 @@ Examples:
   }
 
   // Apply offset and limit
-  if (offset > 0) {
-    query = query.range(offset, offset + (limit || 1000) - 1);
+  // Note: Supabase has a default limit of 1000 rows, so we need to handle pagination
+  // or explicitly set a higher limit when fetching all parks
+  if (parkId || parkCode) {
+    // Single park query, no pagination needed
   } else if (limit) {
-    query = query.limit(limit);
+    if (offset > 0) {
+      query = query.range(offset, offset + limit - 1);
+    } else {
+      query = query.limit(limit);
+    }
+  } else {
+    // No limit specified - fetch all parks
+    // Supabase default limit is 1000, so we need to set a higher limit
+    // or use pagination. Setting a high limit to get all parks.
+    if (offset > 0) {
+      query = query.range(offset, offset + 10000 - 1);
+    } else {
+      query = query.limit(10000); // High enough to get all 7k+ parks
+    }
   }
 
   const { data: parks, error } = await query;
