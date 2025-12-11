@@ -527,6 +527,87 @@ describe('Parks API Route', () => {
           expect(response.status).toBe(200);
           expect(data.park.images[0].altText).toBe('Alt Text');
         });
+
+        it('should convert http:// URLs to https://', async () => {
+          vi.resetModules();
+          const parkWithHttpUrl = {
+            data: {
+              id: '9',
+              park_code: 'Q123',
+              full_name: 'State Park With HTTP URL',
+              images: [{ url: 'http://commons.wikimedia.org/wiki/Special:FilePath/Image.jpg', title: 'State Park' }],
+              wikidata_image: 'http://commons.wikimedia.org/wiki/Special:FilePath/Image.jpg',
+              source: 'wikidata',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithHttpUrl)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/Q123');
+          const response = await GET(request, { params: { parkCode: 'Q123' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images[0].url).toBe('https://commons.wikimedia.org/wiki/Special:FilePath/Image.jpg');
+        });
+
+        it('should convert http:// to https:// for wikidata_image fallback', async () => {
+          vi.resetModules();
+          const parkWithHttpWikidataImage = {
+            data: {
+              id: '10',
+              park_code: 'Q456',
+              full_name: 'Another State Park',
+              images: null,
+              wikidata_image: 'http://commons.wikimedia.org/wiki/Special:FilePath/Another.jpg',
+              source: 'wikidata',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithHttpWikidataImage)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/Q456');
+          const response = await GET(request, { params: { parkCode: 'Q456' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images[0].url).toBe('https://commons.wikimedia.org/wiki/Special:FilePath/Another.jpg');
+        });
+
+        it('should not modify already https:// URLs', async () => {
+          vi.resetModules();
+          const parkWithHttpsUrl = {
+            data: {
+              id: '11',
+              park_code: 'yell',
+              full_name: 'Yellowstone',
+              images: [{ url: 'https://www.nps.gov/image.jpg', altText: 'Yellowstone' }],
+              wikidata_image: null,
+              source: 'nps',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithHttpsUrl)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/yell');
+          const response = await GET(request, { params: { parkCode: 'yell' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images[0].url).toBe('https://www.nps.gov/image.jpg');
+        });
       });
     });
 });

@@ -11,6 +11,16 @@ const VALID_TABS = ['overview', 'map', 'weather', 'activities', 'reviews', 'info
 const DEFAULT_TAB = 'overview';
 
 /**
+ * Converts Wikimedia Commons URLs to use HTTPS
+ * @param {string} url - Image URL
+ * @returns {string} Normalized URL with HTTPS
+ */
+const normalizeImageUrl = (url) => {
+  if (!url) return url;
+  return url.replace(/^http:\/\//i, 'https://');
+};
+
+/**
  * Normalizes image data to ensure consistent structure across NPS and Wikidata parks
  * @param {Object} park - Park data from database
  * @returns {Array} Normalized images array with {url, altText} objects
@@ -22,7 +32,7 @@ const normalizeImages = (park) => {
     for (const img of park.images) {
       if (img && img.url) {
         images.push({
-          url: img.url,
+          url: normalizeImageUrl(img.url),
           altText: img.altText || img.title || park.full_name,
         });
       }
@@ -31,7 +41,7 @@ const normalizeImages = (park) => {
 
   if (images.length === 0 && park.wikidata_image) {
     images.push({
-      url: park.wikidata_image,
+      url: normalizeImageUrl(park.wikidata_image),
       altText: park.full_name,
     });
   }
