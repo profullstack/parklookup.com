@@ -232,51 +232,303 @@ describe('Parks API Route', () => {
   });
 
   describe('GET /api/parks/[parkCode]', () => {
-    it('should return a single park by park code', async () => {
-      vi.resetModules();
-      mockSupabaseClient = {
-        from: vi.fn(() => createChainableMock(mockSingleParkData)),
-      };
-
-      const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
-
-      const request = new Request('http://localhost:8080/api/parks/yell');
-      const response = await GET(request, { params: { parkCode: 'yell' } });
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data).toHaveProperty('park');
+      it('should return a single park by park code', async () => {
+        vi.resetModules();
+        mockSupabaseClient = {
+          from: vi.fn(() => createChainableMock(mockSingleParkData)),
+        };
+  
+        const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+        const request = new Request('http://localhost:8080/api/parks/yell');
+        const response = await GET(request, { params: { parkCode: 'yell' } });
+        const data = await response.json();
+  
+        expect(response.status).toBe(200);
+        expect(data).toHaveProperty('park');
+      });
+  
+      it('should return 404 for non-existent park', async () => {
+        vi.resetModules();
+        mockSupabaseClient = {
+          from: vi.fn(() =>
+            createChainableMock({
+              data: null,
+              error: { code: 'PGRST116' },
+            })
+          ),
+        };
+  
+        const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+        const request = new Request('http://localhost:8080/api/parks/nonexistent');
+        const response = await GET(request, { params: { parkCode: 'nonexistent' } });
+  
+        expect(response.status).toBe(404);
+      });
+  
+      it('should return 400 if park code is missing', async () => {
+        vi.resetModules();
+        const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+        const request = new Request('http://localhost:8080/api/parks/');
+        const response = await GET(request, { params: { parkCode: '' } });
+  
+        expect(response.status).toBe(400);
+      });
+  
+      describe('Image normalization', () => {
+        it('should normalize NPS park images with altText', async () => {
+          vi.resetModules();
+          const npsParkWithImages = {
+            data: {
+              id: '1',
+              park_code: 'yell',
+              full_name: 'Yellowstone National Park',
+              images: [
+                { url: 'https://example.com/image1.jpg', altText: 'Old Faithful' },
+                { url: 'https://example.com/image2.jpg', altText: 'Grand Prismatic' },
+              ],
+              wikidata_image: null,
+              source: 'nps',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(npsParkWithImages)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/yell');
+          const response = await GET(request, { params: { parkCode: 'yell' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images).toHaveLength(2);
+          expect(data.park.images[0]).toEqual({
+            url: 'https://example.com/image1.jpg',
+            altText: 'Old Faithful',
+          });
+          expect(data.park.images[1]).toEqual({
+            url: 'https://example.com/image2.jpg',
+            altText: 'Grand Prismatic',
+          });
+        });
+  
+        it('should normalize Wikidata park images with title to altText', async () => {
+          vi.resetModules();
+          const wikidataParkWithImages = {
+            data: {
+              id: '2',
+              park_code: 'Q4648515',
+              full_name: 'Big Basin Redwoods State Park',
+              images: [{ url: 'https://commons.wikimedia.org/image.jpg', title: 'Big Basin Redwoods State Park' }],
+              wikidata_image: 'https://commons.wikimedia.org/image.jpg',
+              source: 'wikidata',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(wikidataParkWithImages)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/Q4648515');
+          const response = await GET(request, { params: { parkCode: 'Q4648515' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images).toHaveLength(1);
+          expect(data.park.images[0]).toEqual({
+            url: 'https://commons.wikimedia.org/image.jpg',
+            altText: 'Big Basin Redwoods State Park',
+          });
+        });
+  
+        it('should use wikidata_image when images array is empty', async () => {
+          vi.resetModules();
+          const parkWithOnlyWikidataImage = {
+            data: {
+              id: '3',
+              park_code: 'Q123456',
+              full_name: 'Some State Park',
+              images: [],
+              wikidata_image: 'https://commons.wikimedia.org/fallback.jpg',
+              source: 'wikidata',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithOnlyWikidataImage)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/Q123456');
+          const response = await GET(request, { params: { parkCode: 'Q123456' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images).toHaveLength(1);
+          expect(data.park.images[0]).toEqual({
+            url: 'https://commons.wikimedia.org/fallback.jpg',
+            altText: 'Some State Park',
+          });
+        });
+  
+        it('should use wikidata_image when images is null', async () => {
+          vi.resetModules();
+          const parkWithNullImages = {
+            data: {
+              id: '4',
+              park_code: 'Q789012',
+              full_name: 'Another State Park',
+              images: null,
+              wikidata_image: 'https://commons.wikimedia.org/another.jpg',
+              source: 'wikidata',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithNullImages)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/Q789012');
+          const response = await GET(request, { params: { parkCode: 'Q789012' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images).toHaveLength(1);
+          expect(data.park.images[0]).toEqual({
+            url: 'https://commons.wikimedia.org/another.jpg',
+            altText: 'Another State Park',
+          });
+        });
+  
+        it('should return empty array when no images and no wikidata_image', async () => {
+          vi.resetModules();
+          const parkWithNoImages = {
+            data: {
+              id: '5',
+              park_code: 'noimg',
+              full_name: 'Park Without Images',
+              images: null,
+              wikidata_image: null,
+              source: 'nps',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithNoImages)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/noimg');
+          const response = await GET(request, { params: { parkCode: 'noimg' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images).toHaveLength(0);
+        });
+  
+        it('should fallback to park name when image has no altText or title', async () => {
+          vi.resetModules();
+          const parkWithImageNoAlt = {
+            data: {
+              id: '6',
+              park_code: 'test',
+              full_name: 'Test National Park',
+              images: [{ url: 'https://example.com/image.jpg' }],
+              wikidata_image: null,
+              source: 'nps',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithImageNoAlt)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/test');
+          const response = await GET(request, { params: { parkCode: 'test' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images).toHaveLength(1);
+          expect(data.park.images[0]).toEqual({
+            url: 'https://example.com/image.jpg',
+            altText: 'Test National Park',
+          });
+        });
+  
+        it('should skip images without url', async () => {
+          vi.resetModules();
+          const parkWithInvalidImages = {
+            data: {
+              id: '7',
+              park_code: 'invalid',
+              full_name: 'Park With Invalid Images',
+              images: [
+                { url: 'https://example.com/valid.jpg', altText: 'Valid' },
+                { altText: 'No URL' },
+                null,
+                { url: '', altText: 'Empty URL' },
+              ],
+              wikidata_image: null,
+              source: 'nps',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithInvalidImages)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/invalid');
+          const response = await GET(request, { params: { parkCode: 'invalid' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          // Should only include the valid image
+          expect(data.park.images).toHaveLength(1);
+          expect(data.park.images[0].url).toBe('https://example.com/valid.jpg');
+        });
+  
+        it('should prefer altText over title when both exist', async () => {
+          vi.resetModules();
+          const parkWithBothAltAndTitle = {
+            data: {
+              id: '8',
+              park_code: 'both',
+              full_name: 'Park With Both',
+              images: [{ url: 'https://example.com/image.jpg', altText: 'Alt Text', title: 'Title Text' }],
+              wikidata_image: null,
+              source: 'nps',
+            },
+            error: null,
+          };
+          mockSupabaseClient = {
+            from: vi.fn(() => createChainableMock(parkWithBothAltAndTitle)),
+          };
+  
+          const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
+  
+          const request = new Request('http://localhost:8080/api/parks/both');
+          const response = await GET(request, { params: { parkCode: 'both' } });
+          const data = await response.json();
+  
+          expect(response.status).toBe(200);
+          expect(data.park.images[0].altText).toBe('Alt Text');
+        });
+      });
     });
-
-    it('should return 404 for non-existent park', async () => {
-      vi.resetModules();
-      mockSupabaseClient = {
-        from: vi.fn(() =>
-          createChainableMock({
-            data: null,
-            error: { code: 'PGRST116' },
-          })
-        ),
-      };
-
-      const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
-
-      const request = new Request('http://localhost:8080/api/parks/nonexistent');
-      const response = await GET(request, { params: { parkCode: 'nonexistent' } });
-
-      expect(response.status).toBe(404);
-    });
-
-    it('should return 400 if park code is missing', async () => {
-      vi.resetModules();
-      const { GET } = await import('@/app/api/parks/[parkCode]/route.js');
-
-      const request = new Request('http://localhost:8080/api/parks/');
-      const response = await GET(request, { params: { parkCode: '' } });
-
-      expect(response.status).toBe(400);
-    });
-  });
 });
 
 describe('Parks Search API', () => {

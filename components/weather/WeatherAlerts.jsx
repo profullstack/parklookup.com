@@ -205,12 +205,12 @@ export default function WeatherAlerts({ latitude, longitude, parkName }) {
           {alerts.length} active alert{alerts.length !== 1 ? 's' : ''} for this area
         </p>
         <a
-          href={`https://www.weather.gov/alerts?lat=${latitude}&lon=${longitude}`}
+          href="https://www.weather.gov/alerts"
           target="_blank"
           rel="noopener noreferrer"
           className="text-sm text-blue-600 hover:underline"
         >
-          View on weather.gov →
+          View all alerts on weather.gov →
         </a>
       </div>
 

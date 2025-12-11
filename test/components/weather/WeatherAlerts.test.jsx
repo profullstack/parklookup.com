@@ -363,11 +363,8 @@ describe('WeatherAlerts Component', () => {
       render(<WeatherAlerts latitude={38.9807} longitude={-76.9373} />);
 
       await waitFor(() => {
-        const link = screen.getByText('View on weather.gov →');
-        expect(link).toHaveAttribute(
-          'href',
-          'https://www.weather.gov/alerts?lat=38.9807&lon=-76.9373'
-        );
+        const link = screen.getByText('View all alerts on weather.gov →');
+        expect(link).toHaveAttribute('href', 'https://www.weather.gov/alerts');
       });
     });
   });

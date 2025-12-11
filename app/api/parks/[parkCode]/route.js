@@ -8,6 +8,41 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/client';
 
 /**
+ * Normalizes image data to ensure consistent structure across NPS and Wikidata parks
+ * NPS parks have: [{url, altText}]
+ * Wikidata parks have: [{url, title}] or just wikidata_image URL
+ *
+ * @param {Object} park - Park data from database
+ * @returns {Array} Normalized images array with {url, altText} objects
+ */
+const normalizeImages = (park) => {
+  const images = [];
+
+  // Process existing images array
+  if (park.images && Array.isArray(park.images)) {
+    for (const img of park.images) {
+      if (img && img.url) {
+        images.push({
+          url: img.url,
+          // Use altText if available (NPS), otherwise use title (Wikidata), fallback to park name
+          altText: img.altText || img.title || park.full_name,
+        });
+      }
+    }
+  }
+
+  // If no images from array but wikidata_image exists, use it
+  if (images.length === 0 && park.wikidata_image) {
+    images.push({
+      url: park.wikidata_image,
+      altText: park.full_name,
+    });
+  }
+
+  return images;
+};
+
+/**
  * GET handler for fetching a single park
  */
 export async function GET(request, { params }) {
@@ -63,7 +98,13 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Failed to fetch park' }, { status: 500 });
     }
 
-    return NextResponse.json({ park });
+    // Normalize images to ensure consistent structure
+    const normalizedPark = {
+      ...park,
+      images: normalizeImages(park),
+    };
+
+    return NextResponse.json({ park: normalizedPark });
   } catch (error) {
     console.error('API error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
