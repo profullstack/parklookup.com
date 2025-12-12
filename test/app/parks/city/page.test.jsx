@@ -143,12 +143,12 @@ describe('City Parks Index Page', () => {
       expect(screen.getByText('About City Parks')).toBeInTheDocument();
     });
 
-    it('should have purple gradient hero (different from county)', async () => {
+    it('should have green gradient hero (consistent with other local parks pages)', async () => {
       const CityParksPage = (await import('@/app/parks/city/page.jsx')).default;
       const { container } = render(await CityParksPage());
 
-      // Check for purple gradient class
-      const heroSection = container.querySelector('.bg-gradient-to-br.from-purple-600');
+      // Check for green gradient class
+      const heroSection = container.querySelector('.bg-gradient-to-br.from-green-600');
       expect(heroSection).toBeInTheDocument();
     });
   });
