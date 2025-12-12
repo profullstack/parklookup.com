@@ -115,9 +115,10 @@ function FeedItem({ item, onLikeToggle, currentUserId }) {
       {/* Media */}
       <Link href={`/media/${mediaId}`} className="block">
         <div className="relative aspect-square bg-gray-100 dark:bg-gray-700">
-          {item.url || item.thumbnail_url ? (
+          {/* For videos, use thumbnail_url; for photos, use url */}
+          {(isVideo ? item.thumbnail_url : item.url) ? (
             <Image
-              src={item.url || item.thumbnail_url}
+              src={isVideo ? item.thumbnail_url : item.url}
               alt={item.title || 'User photo'}
               fill
               className="object-cover"

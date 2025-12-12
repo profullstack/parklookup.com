@@ -65,8 +65,9 @@ function MediaCard({ media, onLikeToggle, currentUserId }) {
   };
 
   const mediaId = media.id || media.media_id;
-  const imageUrl = media.url || media.thumbnail_url;
   const isVideo = media.media_type === 'video';
+  // For videos, use thumbnail_url; for photos, use url
+  const imageUrl = isVideo ? media.thumbnail_url : media.url;
 
   return (
     <div className="group relative bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow">
