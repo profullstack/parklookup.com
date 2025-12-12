@@ -50,28 +50,12 @@ async function getUserFromRequest(request) {
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const parkId = searchParams.get('parkId');
     const parkCode = searchParams.get('parkCode');
     const userId = searchParams.get('userId');
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     const supabase = createServiceClient();
-
-    // If parkCode is provided, get park ID first
-    let resolvedParkId = parkId;
-    if (parkCode && !parkId) {
-      const { data: park, error: parkError } = await supabase
-        .from('all_parks')
-        .select('id')
-        .eq('park_code', parkCode)
-        .single();
-
-      if (parkError || !park) {
-        return NextResponse.json({ error: 'Park not found' }, { status: 404 });
-      }
-      resolvedParkId = park.id;
-    }
 
     // Build query - fetch media without relationship joins
     let query = supabase
@@ -81,8 +65,8 @@ export async function GET(request) {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    if (resolvedParkId) {
-      query = query.eq('park_id', resolvedParkId);
+    if (parkCode) {
+      query = query.eq('park_code', parkCode);
     }
 
     if (userId) {
@@ -100,9 +84,9 @@ export async function GET(request) {
       return NextResponse.json({ media: [] });
     }
 
-    // Get unique user IDs and park IDs
+    // Get unique user IDs and park codes
     const userIds = [...new Set(media.map((m) => m.user_id))];
-    const parkIds = [...new Set(media.map((m) => m.park_id).filter(Boolean))];
+    const parkCodes = [...new Set(media.map((m) => m.park_code).filter(Boolean))];
     const mediaIds = media.map((m) => m.id);
 
     // Fetch profiles separately
@@ -111,11 +95,11 @@ export async function GET(request) {
       .select('id, display_name, avatar_url')
       .in('id', userIds);
 
-    // Fetch parks separately
+    // Fetch parks separately (from all_parks view to support all park types)
     const { data: parks } = await supabase
       .from('all_parks')
       .select('id, park_code, full_name')
-      .in('id', parkIds);
+      .in('park_code', parkCodes);
 
     // Fetch likes and comments counts
     const { data: likeCounts } = await supabase
@@ -136,7 +120,7 @@ export async function GET(request) {
 
     const parkMap = {};
     parks?.forEach((p) => {
-      parkMap[p.id] = p;
+      parkMap[p.park_code] = p;
     });
 
     const likeCountMap = {};
@@ -149,14 +133,24 @@ export async function GET(request) {
       commentCountMap[comment.media_id] = (commentCountMap[comment.media_id] || 0) + 1;
     });
 
-    // Combine data
-    const mediaWithDetails = media.map((m) => ({
-      ...m,
-      profiles: profileMap[m.user_id] || null,
-      park: parkMap[m.park_id] || null,
-      likes_count: likeCountMap[m.id] || 0,
-      comments_count: commentCountMap[m.id] || 0,
-    }));
+    // Get public URLs for media
+    const mediaWithDetails = media.map((m) => {
+      const { data: mediaUrl } = supabase.storage.from('user-media').getPublicUrl(m.storage_path);
+
+      const { data: thumbnailUrl } = m.thumbnail_path
+        ? supabase.storage.from('media-thumbnails').getPublicUrl(m.thumbnail_path)
+        : { data: null };
+
+      return {
+        ...m,
+        profiles: profileMap[m.user_id] || null,
+        park: parkMap[m.park_code] || null,
+        likes_count: likeCountMap[m.id] || 0,
+        comments_count: commentCountMap[m.id] || 0,
+        url: mediaUrl?.publicUrl,
+        thumbnail_url: thumbnailUrl?.publicUrl,
+      };
+    });
 
     return NextResponse.json({ media: mediaWithDetails });
   } catch (error) {
@@ -192,10 +186,10 @@ export async function POST(request) {
 
     const supabase = createServiceClient();
 
-    // Get park ID from park code
+    // Verify park exists in all_parks view (supports NPS, state parks, etc.)
     const { data: park, error: parkError } = await supabase
       .from('all_parks')
-      .select('id')
+      .select('id, park_code, full_name')
       .eq('park_code', parkCode)
       .single();
 
@@ -217,11 +211,12 @@ export async function POST(request) {
     const mediaType = getMediaType(mimeType);
 
     // Create initial media record with processing status
+    // Using park_code instead of park_id for flexibility across park types
     const mediaId = randomUUID();
     const { error: insertError } = await supabase.from('user_media').insert({
       id: mediaId,
       user_id: user.id,
-      park_id: park.id,
+      park_code: parkCode,
       media_type: mediaType,
       storage_path: '', // Will be updated after upload
       original_filename: originalFilename,
@@ -306,6 +301,7 @@ export async function POST(request) {
             ...updatedMedia,
             url: mediaUrl.publicUrl,
             thumbnail_url: thumbnailUrl?.publicUrl,
+            park: park,
           },
         },
         { status: 201 }

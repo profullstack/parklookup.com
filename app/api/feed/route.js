@@ -122,9 +122,9 @@ export async function GET(request) {
       });
     }
 
-    // Get unique user IDs and park IDs
+    // Get unique user IDs and park codes
     const userIds = [...new Set(media.map((m) => m.user_id))];
-    const parkIds = [...new Set(media.map((m) => m.park_id).filter(Boolean))];
+    const parkCodes = [...new Set(media.map((m) => m.park_code).filter(Boolean))];
     const mediaIds = media.map((m) => m.id);
 
     // Fetch profiles separately
@@ -133,11 +133,11 @@ export async function GET(request) {
       .select('id, display_name, avatar_url')
       .in('id', userIds);
 
-    // Fetch parks separately
+    // Fetch parks separately (from all_parks view to support all park types)
     const { data: parks } = await supabase
       .from('all_parks')
       .select('id, park_code, full_name')
-      .in('id', parkIds);
+      .in('park_code', parkCodes);
 
     // Fetch likes and comments counts
     const { data: likeCounts } = await supabase
@@ -158,7 +158,7 @@ export async function GET(request) {
 
     const parkMap = {};
     parks?.forEach((p) => {
-      parkMap[p.id] = p;
+      parkMap[p.park_code] = p;
     });
 
     const likeCountMap = {};
@@ -182,12 +182,12 @@ export async function GET(request) {
         : { data: null };
 
       const profile = profileMap[item.user_id];
-      const park = parkMap[item.park_id];
+      const park = parkMap[item.park_code];
 
       return {
         media_id: item.id,
         user_id: item.user_id,
-        park_id: item.park_id,
+        park_code: item.park_code,
         media_type: item.media_type,
         storage_path: item.storage_path,
         thumbnail_path: item.thumbnail_path,
@@ -202,7 +202,6 @@ export async function GET(request) {
         user_display_name: profile?.display_name,
         user_avatar_url: profile?.avatar_url,
         park_name: park?.full_name,
-        park_code: park?.park_code,
         url: mediaUrl?.publicUrl,
         thumbnail_url: thumbnailUrl?.publicUrl,
       };
