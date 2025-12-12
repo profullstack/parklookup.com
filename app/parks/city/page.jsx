@@ -83,7 +83,7 @@ export default async function CityParksIndexPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-600 to-purple-800 text-white py-16">
+      <section className="bg-gradient-to-br from-green-600 to-green-800 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <div className="flex items-center justify-center gap-3 mb-4">
@@ -104,7 +104,7 @@ export default async function CityParksIndexPage() {
               </div>
             </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">City Parks</h1>
-            <p className="text-xl text-purple-100 max-w-2xl mx-auto mb-6">
+            <p className="text-xl text-green-100 max-w-2xl mx-auto mb-6">
               Explore {totalCount.toLocaleString()} city parks across {states.length} states.
               Municipal parks, urban green spaces, and neighborhood recreation areas.
             </p>
@@ -132,7 +132,7 @@ export default async function CityParksIndexPage() {
                 >
                   <span className="text-lg font-semibold text-gray-900">{state.code}</span>
                   <span className="text-sm text-gray-600">{state.name}</span>
-                  <span className="text-xs text-purple-600 mt-1">
+                  <span className="text-xs text-green-600 mt-1">
                     {state.count.toLocaleString()} parks
                   </span>
                 </Link>
@@ -176,7 +176,7 @@ export default async function CityParksIndexPage() {
             <div className="flex flex-wrap justify-center gap-4">
               <Link
                 href="/parks/county"
-                className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                className="inline-flex items-center px-6 py-3 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-colors"
               >
                 Browse County Parks
               </Link>
