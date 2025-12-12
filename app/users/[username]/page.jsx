@@ -125,7 +125,7 @@ export default async function UserProfilePage({ params }) {
     });
   }
 
-  // Get public URLs for media
+  // Get public URLs for media and attach profile data
   const mediaWithUrls = recentMedia?.map((item) => {
     const { data: mediaUrl } = supabase.storage
       .from('user-media')
@@ -140,6 +140,13 @@ export default async function UserProfilePage({ params }) {
       url: mediaUrl?.publicUrl,
       thumbnail_url: thumbnailUrl?.publicUrl,
       park: parkMap[item.park_code] || null,
+      // Attach profile data so MediaCard can display username and display_name
+      profiles: {
+        id: profile.id,
+        username: profile.username,
+        display_name: profile.display_name,
+        avatar_url: profile.avatar_url,
+      },
     };
   }) || [];
 
