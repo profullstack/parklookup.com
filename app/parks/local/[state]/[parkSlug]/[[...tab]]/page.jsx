@@ -1,3 +1,14 @@
+/**
+ * Local Park Detail Page
+ *
+ * URL: /parks/local/{state}/{parkSlug}
+ *
+ * Server-rendered page for individual local park details with SEO optimization.
+ */
+
+// Force dynamic rendering to prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createAnonClient } from '@/lib/supabase/server';
@@ -81,7 +92,12 @@ export async function generateMetadata({ params }) {
  * Local park detail page
  */
 export default async function LocalParkPage({ params }) {
-  const { state, parkSlug } = await params;
+  const { state, parkSlug, tab: tabSegment } = await params;
+  
+  // Determine active tab from URL path segment
+  // [[...tab]] is an optional catch-all, so tabSegment is an array or undefined
+  const activeTab = tabSegment?.[0] || 'overview';
+  
   const park = await getLocalPark(state, parkSlug);
 
   if (!park) {
@@ -139,11 +155,12 @@ export default async function LocalParkPage({ params }) {
         </div>
 
         {/* Park Detail */}
-        <LocalParkDetailClient 
-          park={park} 
+        <LocalParkDetailClient
+          park={park}
           parkType={parkType}
           stateCode={park.state_code}
           stateName={park.state_name}
+          activeTab={activeTab}
         />
       </div>
     </>

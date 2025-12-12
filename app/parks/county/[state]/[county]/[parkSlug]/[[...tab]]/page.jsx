@@ -142,12 +142,12 @@ async function getParkData(state, county, parkSlug) {
 /**
  * County Park Detail Page Component
  */
-export default async function CountyParkPage({ params, searchParams }) {
-  const { state, county, parkSlug } = await params;
-  const resolvedSearchParams = await searchParams;
+export default async function CountyParkPage({ params }) {
+  const { state, county, parkSlug, tab: tabSegment } = await params;
 
-  // Determine active tab from URL
-  const tab = resolvedSearchParams?.tab || 'overview';
+  // Determine active tab from URL path segment
+  // [[...tab]] is an optional catch-all, so tabSegment is an array or undefined
+  const tab = tabSegment?.[0] || 'overview';
 
   // Fetch park data
   const park = await getParkData(state, county, parkSlug);

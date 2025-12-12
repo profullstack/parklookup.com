@@ -141,12 +141,12 @@ async function getParkData(state, city, parkSlug) {
 /**
  * City Park Detail Page Component
  */
-export default async function CityParkPage({ params, searchParams }) {
-  const { state, city, parkSlug } = await params;
-  const resolvedSearchParams = await searchParams;
+export default async function CityParkPage({ params }) {
+  const { state, city, parkSlug, tab: tabSegment } = await params;
 
-  // Determine active tab from URL
-  const tab = resolvedSearchParams?.tab || 'overview';
+  // Determine active tab from URL path segment
+  // [[...tab]] is an optional catch-all, so tabSegment is an array or undefined
+  const tab = tabSegment?.[0] || 'overview';
 
   // Fetch park data
   const park = await getParkData(state, city, parkSlug);
