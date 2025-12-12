@@ -27,35 +27,39 @@ export const metadata = {
 async function getStatesWithLocalParks() {
   const supabase = createServiceClient();
 
-  const { data, error } = await supabase
-    .from('local_parks')
-    .select('state_id, states!inner(id, code, name, slug)')
-    .not('state_id', 'is', null);
+  // First, get all states
+  const { data: states, error: statesError } = await supabase
+    .from('states')
+    .select('id, code, name, slug')
+    .order('name');
 
-  if (error) {
-    console.error('Error fetching states with local parks:', error);
+  if (statesError) {
+    console.error('Error fetching states:', statesError);
     return [];
   }
 
-  // Get unique states with park counts
-  const stateMap = new Map();
-  data?.forEach((park) => {
-    const state = park.states;
-    if (state && !stateMap.has(state.id)) {
-      stateMap.set(state.id, {
+  // Then get park counts for each state using a more efficient approach
+  // Use RPC or aggregate query if available, otherwise count per state
+  const statesWithParks = [];
+
+  for (const state of states || []) {
+    const { count, error } = await supabase
+      .from('local_parks')
+      .select('id', { count: 'exact', head: true })
+      .eq('state_id', state.id);
+
+    if (!error && count > 0) {
+      statesWithParks.push({
         id: state.id,
         code: state.code,
         name: state.name,
         slug: state.slug,
-        count: 0,
+        count,
       });
     }
-    if (state) {
-      stateMap.get(state.id).count++;
-    }
-  });
+  }
 
-  return Array.from(stateMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  return statesWithParks.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 /**
