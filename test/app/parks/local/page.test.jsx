@@ -25,20 +25,16 @@ const createChainableMock = (finalResult) => {
 // Mock data
 const mockStatesData = {
   data: [
-    {
-      state_id: '1',
-      states: { id: '1', code: 'CA', name: 'California', slug: 'california' },
-    },
-    {
-      state_id: '1',
-      states: { id: '1', code: 'CA', name: 'California', slug: 'california' },
-    },
-    {
-      state_id: '2',
-      states: { id: '2', code: 'NY', name: 'New York', slug: 'new-york' },
-    },
+    { id: '1', code: 'CA', name: 'California', slug: 'california' },
+    { id: '2', code: 'NY', name: 'New York', slug: 'new-york' },
   ],
   error: null,
+};
+
+// Mock park counts per state
+const mockStateParkCounts = {
+  1: 100, // California
+  2: 50, // New York
 };
 
 const mockFeaturedParksData = {
@@ -114,17 +110,28 @@ describe('Local Parks Index Page', () => {
 
     // Create a mock that handles different queries
     const fromMock = vi.fn((tableName) => {
+      if (tableName === 'states') {
+        return {
+          select: vi.fn(() => ({
+            order: vi.fn(() => Promise.resolve(mockStatesData)),
+          })),
+        };
+      }
       if (tableName === 'local_parks') {
         return {
           select: vi.fn((fields, options) => {
-            // Count query
+            // Count query for total parks
             if (options?.count === 'exact' && options?.head === true) {
-              return Promise.resolve(mockCountData);
-            }
-            // States query (has states!inner)
-            if (fields.includes('state_id')) {
               return {
-                not: vi.fn(() => Promise.resolve(mockStatesData)),
+                eq: vi.fn((field, value) => {
+                  // Per-state count query
+                  if (field === 'state_id') {
+                    const count = mockStateParkCounts[value] || 0;
+                    return Promise.resolve({ count, error: null });
+                  }
+                  return Promise.resolve(mockCountData);
+                }),
+                then: vi.fn((resolve) => resolve(mockCountData)),
               };
             }
             // Featured parks query
@@ -236,15 +243,20 @@ describe('Local Parks Index Page', () => {
       vi.resetModules();
       mockSupabaseClient = {
         from: vi.fn((tableName) => {
+          if (tableName === 'states') {
+            return {
+              select: vi.fn(() => ({
+                order: vi.fn(() => Promise.resolve({ data: [], error: null })),
+              })),
+            };
+          }
           if (tableName === 'local_parks') {
             return {
               select: vi.fn((fields, options) => {
-                if (options?.count === 'exact') {
-                  return Promise.resolve({ count: 0, error: null });
-                }
-                if (fields.includes('state_id')) {
+                if (options?.count === 'exact' && options?.head === true) {
                   return {
-                    not: vi.fn(() => Promise.resolve({ data: [], error: null })),
+                    eq: vi.fn(() => Promise.resolve({ count: 0, error: null })),
+                    then: vi.fn((resolve) => resolve({ count: 0, error: null })),
                   };
                 }
                 return {
