@@ -38,21 +38,10 @@ const formatParkType = (type) => {
 
 /**
  * Builds the URL for a local park detail page
+ * All parks now use the same simple URL structure: /park/[id]
  */
 const buildParkUrl = (park) => {
-  const stateSlug = park.state?.slug || park.state?.code?.toLowerCase();
-  const parkType = park.park_type;
-
-  if (parkType === 'county' && park.county?.slug) {
-    return `/parks/county/${stateSlug}/${park.county.slug}/${park.slug}`;
-  } else if (parkType === 'city' && park.city?.slug) {
-    return `/parks/city/${stateSlug}/${park.city.slug}/${park.slug}`;
-  } else if (park.county?.slug) {
-    return `/parks/county/${stateSlug}/${park.county.slug}/${park.slug}`;
-  } else {
-    // Fallback to state-level URL
-    return `/parks/local/${stateSlug}/${park.slug}`;
-  }
+  return `/park/${park.id}`;
 };
 
 /**

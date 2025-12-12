@@ -134,28 +134,22 @@ describe('LocalParkCard Component', () => {
   });
 
   describe('Links', () => {
-    it('should link to county park detail page', async () => {
+    it('should link to park detail page using numeric ID', async () => {
       const LocalParkCard = (await import('@/components/parks/LocalParkCard')).default;
       
       render(<LocalParkCard park={mockCountyPark} />);
 
       const link = screen.getByRole('link');
-      expect(link).toHaveAttribute(
-        'href',
-        '/parks/county/ca/los-angeles/griffith-park'
-      );
+      expect(link).toHaveAttribute('href', '/park/1');
     });
 
-    it('should link to city park detail page', async () => {
+    it('should link to city park detail page using numeric ID', async () => {
       const LocalParkCard = (await import('@/components/parks/LocalParkCard')).default;
       
       render(<LocalParkCard park={mockCityPark} />);
 
       const link = screen.getByRole('link');
-      expect(link).toHaveAttribute(
-        'href',
-        '/parks/city/ny/new-york/central-park'
-      );
+      expect(link).toHaveAttribute('href', '/park/2');
     });
   });
 

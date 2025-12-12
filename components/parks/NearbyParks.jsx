@@ -104,7 +104,7 @@ function NearbyParkCard({ park }) {
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow">
-      <Link href={`/parks/${park.park_code}`}>
+      <Link href={`/park/${park.id}`}>
         {/* Thumbnail */}
         <div className="relative h-32 bg-gray-200 dark:bg-gray-700">
           {imageUrl ? (
@@ -332,7 +332,7 @@ export function NearbyParksCompact({
         return (
           <Link
             key={park.id || park.park_code}
-            href={`/parks/${park.park_code}`}
+            href={`/park/${park.id}`}
             className="flex items-center gap-3 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
           >
             <span className="text-lg">{config.icon}</span>

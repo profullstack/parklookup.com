@@ -189,7 +189,7 @@ describe('NearbyParks', () => {
       expect(screen.getByText(/🗿 National Monument/)).toBeInTheDocument();
     });
 
-    it('should link to park detail pages', async () => {
+    it('should link to park detail pages using numeric ID', async () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ parks: [mockParks[0]] }),
@@ -208,7 +208,7 @@ describe('NearbyParks', () => {
       });
 
       const link = screen.getByRole('link');
-      expect(link).toHaveAttribute('href', '/parks/yose');
+      expect(link).toHaveAttribute('href', '/park/1');
     });
   });
 
@@ -385,7 +385,7 @@ describe('NearbyParksCompact', () => {
       });
     });
 
-    it('should link to park detail pages', async () => {
+    it('should link to park detail pages using numeric ID', async () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ parks: [mockParks[0]] }),
@@ -400,8 +400,9 @@ describe('NearbyParksCompact', () => {
       );
 
       await waitFor(() => {
-        const links = document.querySelectorAll('a[href*="/parks/"]');
+        const links = document.querySelectorAll('a[href*="/park/"]');
         expect(links.length).toBeGreaterThan(0);
+        expect(links[0]).toHaveAttribute('href', '/park/1');
       });
     });
   });
