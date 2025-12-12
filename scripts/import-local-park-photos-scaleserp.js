@@ -439,12 +439,39 @@ const processPark = async (supabase, park, options) => {
       
       console.log(`   📷 Google Images returned ${imageResults.length} results`);
       
+      // Log first result structure for debugging
+      if (imageResults.length > 0) {
+        console.log(`   📋 Image result fields: ${Object.keys(imageResults[0]).join(', ')}`);
+        console.log(`   📋 First image URL: ${imageResults[0].image || imageResults[0].original || 'none'}`);
+      }
+      
       // Convert image results to photo format
-      photos = imageResults.map(img => ({
-        image: img.original || img.link,
-        thumbnail: img.thumbnail,
-        title: img.title,
-      }));
+      // Note: 'link' is the source page URL, NOT the image URL
+      // Use 'image' or 'original' for the actual image file URL
+      photos = imageResults
+        .filter(img => {
+          // Only include results that have an actual image URL (not just a page link)
+          const imageUrl = img.image || img.original;
+          if (!imageUrl) {
+            console.log(`   ⚠️  Skipping result with no image URL: ${img.title?.substring(0, 50)}`);
+            return false;
+          }
+          // Verify it looks like an image URL
+          const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(imageUrl) ||
+                            imageUrl.includes('googleusercontent.com') ||
+                            imageUrl.includes('gstatic.com');
+          if (!isImageUrl) {
+            console.log(`   ⚠️  URL doesn't look like an image: ${imageUrl.substring(0, 80)}`);
+          }
+          return isImageUrl;
+        })
+        .map(img => ({
+          image: img.image || img.original,
+          thumbnail: img.thumbnail,
+          title: img.title,
+        }));
+      
+      console.log(`   📷 ${photos.length} valid image URLs after filtering`);
     } else {
       photos = fullSizePhotos;
     }
