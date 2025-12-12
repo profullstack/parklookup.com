@@ -167,11 +167,11 @@ export default async function StateLocalParksPage({ params }) {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-12">
+      <section className="bg-gradient-to-br from-green-600 to-green-800 text-white py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Breadcrumb */}
           <nav className="mb-4">
-            <ol className="flex items-center space-x-2 text-sm text-blue-100">
+            <ol className="flex items-center space-x-2 text-sm text-green-100">
               <li>
                 <Link href="/" className="hover:text-white">
                   Home
@@ -194,7 +194,7 @@ export default async function StateLocalParksPage({ params }) {
               {state.code}
             </span>
           </div>
-          <p className="text-xl text-blue-100">
+          <p className="text-xl text-green-100">
             {total.toLocaleString()} county and city parks across {counties.length} counties
           </p>
         </div>
@@ -210,12 +210,12 @@ export default async function StateLocalParksPage({ params }) {
                 <Link
                   key={county.id}
                   href={`/parks/county/${stateSlug}/${county.slug}`}
-                  className="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors border border-gray-200"
+                  className="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-green-50 hover:border-green-200 transition-colors border border-gray-200"
                 >
                   <span className="font-medium text-gray-900 text-sm text-center line-clamp-1">
                     {county.name}
                   </span>
-                  <span className="text-xs text-blue-600 mt-1">
+                  <span className="text-xs text-green-600 mt-1">
                     {county.park_count} park{county.park_count !== 1 ? 's' : ''}
                   </span>
                 </Link>
@@ -280,7 +280,7 @@ export default async function StateLocalParksPage({ params }) {
       {/* Back Link */}
       <section className="py-8 bg-white border-t">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <Link href="/parks/local" className="text-blue-600 hover:text-blue-700 font-medium">
+          <Link href="/parks/local" className="text-green-600 hover:text-green-700 font-medium">
             ← Back to All Local Parks
           </Link>
           <span className="mx-4 text-gray-300">|</span>

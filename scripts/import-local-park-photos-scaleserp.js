@@ -488,10 +488,36 @@ const processPark = async (supabase, park, options) => {
     console.log(`   📷 Found ${photos.length} place photos`);
 
     // Check if we have full-size images (not just thumbnails)
-    const fullSizePhotos = photos.filter(p => p.image || p.original || p.link || p.url);
+    let fullSizePhotos = photos.filter(p => p.image || p.original || p.link || p.url);
     console.log(`   📷 ${fullSizePhotos.length} have full-size images`);
 
-    // If no full-size images from place_photos, try Google Images search
+    // Validate place_photos URLs to ensure they're actual images (not PDFs, etc.)
+    if (fullSizePhotos.length > 0) {
+      console.log(`   🔍 Validating place_photos URLs via HEAD requests...`);
+      const validatedPlacePhotos = await validateImageUrls(fullSizePhotos);
+      
+      let validCount = 0;
+      let invalidCount = 0;
+      
+      fullSizePhotos = validatedPlacePhotos
+        .filter(img => {
+          if (img.isValid) {
+            validCount++;
+            return true;
+          } else {
+            invalidCount++;
+            const imageUrl = img.image || img.original || img.link || img.url;
+            if (invalidCount <= 3) {
+              console.log(`   ⚠️  Invalid place_photo (${img.contentType || 'no response'}): ${imageUrl?.substring(0, 60)}...`);
+            }
+            return false;
+          }
+        });
+      
+      console.log(`   📷 ${validCount} valid place_photos, ${invalidCount} invalid after HEAD validation`);
+    }
+
+    // If no valid full-size images from place_photos, try Google Images search
     if (fullSizePhotos.length === 0) {
       console.log(`   🔄 No full-size images from place_photos, trying Google Images search...`);
       await sleep(REQUEST_DELAY);
