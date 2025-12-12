@@ -13,6 +13,7 @@ const variants = {
   outline: 'border-2 border-green-600 text-green-600 hover:bg-green-50',
   ghost: 'text-gray-600 hover:bg-gray-100',
   danger: 'bg-red-600 hover:bg-red-700 text-white',
+  white: 'bg-white hover:bg-green-50 text-green-700 border border-green-200',
 };
 
 const sizes = {

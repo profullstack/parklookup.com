@@ -187,7 +187,7 @@ export default function TripsPage() {
               </p>
             </div>
             <Link href="/trip/new">
-              <Button className="bg-white text-green-700 hover:bg-green-50">
+              <Button variant="white">
                 + Create New Trip
               </Button>
             </Link>
