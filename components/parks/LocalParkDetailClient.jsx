@@ -8,6 +8,8 @@ import { useAnalytics } from '@/hooks/useAnalytics';
 import WeatherForecast from '@/components/weather/WeatherForecast';
 import WeatherAlerts from '@/components/weather/WeatherAlerts';
 import { ParkPlaceholder } from '@/components/ui/ParkPlaceholder';
+import LocalParkUserPhotos from '@/components/parks/LocalParkUserPhotos';
+import NearbyParks from '@/components/parks/NearbyParks';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -317,57 +319,34 @@ export default function LocalParkDetailClient({ park, activeTab = 'overview' }) 
               </a>
             )}
           </div>
+
+          {/* Nearby Parks */}
+          {hasCoordinates && (
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+                Nearby Parks
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                Other parks in the area
+              </p>
+              <NearbyParks
+                latitude={parseFloat(park.latitude)}
+                longitude={parseFloat(park.longitude)}
+                currentParkCode={null}
+                radius={50}
+                limit={6}
+              />
+            </div>
+          )}
         </div>
       )}
 
       {/* Photos Tab */}
       {activeTab === 'photos' && (
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
-            Photos
-          </h2>
-          {park.photos && park.photos.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {park.photos.map((photo, index) => (
-                <div
-                  key={photo.id || index}
-                  className="relative aspect-square rounded-lg overflow-hidden group"
-                >
-                  <Image
-                    src={photo.image_url}
-                    alt={photo.title || `${park.name} photo ${index + 1}`}
-                    fill
-                    className="object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {photo.attribution && (
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {photo.attribution}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-lg">
-              <svg
-                className="w-12 h-12 mx-auto text-gray-400 mb-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                />
-              </svg>
-              <p className="text-gray-600 dark:text-gray-400">
-                No photos available for this park yet
-              </p>
-            </div>
-          )}
-        </div>
+        <LocalParkUserPhotos
+          localParkId={park.id}
+          existingPhotos={park.photos || []}
+        />
       )}
 
       {/* Map Tab */}

@@ -45,12 +45,13 @@ async function getUserFromRequest(request) {
 
 /**
  * GET /api/media
- * Get user's media or media for a specific park
+ * Get user's media or media for a specific park (national or local)
  */
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const parkCode = searchParams.get('parkCode');
+    const localParkId = searchParams.get('localParkId');
     const userId = searchParams.get('userId');
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
@@ -69,6 +70,10 @@ export async function GET(request) {
       query = query.eq('park_code', parkCode);
     }
 
+    if (localParkId) {
+      query = query.eq('local_park_id', localParkId);
+    }
+
     if (userId) {
       query = query.eq('user_id', userId);
     }
@@ -84,9 +89,10 @@ export async function GET(request) {
       return NextResponse.json({ media: [] });
     }
 
-    // Get unique user IDs and park codes
+    // Get unique user IDs, park codes, and local park IDs
     const userIds = [...new Set(media.map((m) => m.user_id))];
     const parkCodes = [...new Set(media.map((m) => m.park_code).filter(Boolean))];
+    const localParkIds = [...new Set(media.map((m) => m.local_park_id).filter(Boolean))];
     const mediaIds = media.map((m) => m.id);
 
     // Fetch profiles separately (include username for profile links)
@@ -100,6 +106,16 @@ export async function GET(request) {
       .from('all_parks')
       .select('id, park_code, full_name')
       .in('park_code', parkCodes);
+
+    // Fetch local parks separately
+    let localParks = [];
+    if (localParkIds.length > 0) {
+      const { data } = await supabase
+        .from('local_parks')
+        .select('id, name, slug')
+        .in('id', localParkIds);
+      localParks = data || [];
+    }
 
     // Fetch likes and comments counts
     const { data: likeCounts } = await supabase
@@ -121,6 +137,11 @@ export async function GET(request) {
     const parkMap = {};
     parks?.forEach((p) => {
       parkMap[p.park_code] = p;
+    });
+
+    const localParkMap = {};
+    localParks?.forEach((p) => {
+      localParkMap[p.id] = p;
     });
 
     const likeCountMap = {};
@@ -145,6 +166,7 @@ export async function GET(request) {
         ...m,
         profiles: profileMap[m.user_id] || null,
         park: parkMap[m.park_code] || null,
+        local_park: localParkMap[m.local_park_id] || null,
         likes_count: likeCountMap[m.id] || 0,
         comments_count: commentCountMap[m.id] || 0,
         url: mediaUrl?.publicUrl,
@@ -161,7 +183,7 @@ export async function GET(request) {
 
 /**
  * POST /api/media
- * Upload new media (photo or video)
+ * Upload new media (photo or video) for national parks (parkCode) or local parks (localParkId)
  */
 export async function POST(request) {
   try {
@@ -173,6 +195,7 @@ export async function POST(request) {
     const formData = await request.formData();
     const file = formData.get('file');
     const parkCode = formData.get('parkCode');
+    const localParkId = formData.get('localParkId');
     const title = formData.get('title') || '';
     const description = formData.get('description') || '';
 
@@ -180,21 +203,40 @@ export async function POST(request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    if (!parkCode) {
-      return NextResponse.json({ error: 'Park code is required' }, { status: 400 });
+    if (!parkCode && !localParkId) {
+      return NextResponse.json({ error: 'Park code or local park ID is required' }, { status: 400 });
     }
 
     const supabase = createServiceClient();
 
-    // Verify park exists in all_parks view (supports NPS, state parks, etc.)
-    const { data: park, error: parkError } = await supabase
-      .from('all_parks')
-      .select('id, park_code, full_name')
-      .eq('park_code', parkCode)
-      .single();
+    let park = null;
+    let localPark = null;
 
-    if (parkError || !park) {
-      return NextResponse.json({ error: 'Park not found' }, { status: 404 });
+    // Verify park exists based on which identifier was provided
+    if (parkCode) {
+      // Verify park exists in all_parks view (supports NPS, state parks, etc.)
+      const { data, error: parkError } = await supabase
+        .from('all_parks')
+        .select('id, park_code, full_name')
+        .eq('park_code', parkCode)
+        .single();
+
+      if (parkError || !data) {
+        return NextResponse.json({ error: 'Park not found' }, { status: 404 });
+      }
+      park = data;
+    } else if (localParkId) {
+      // Verify local park exists
+      const { data, error: localParkError } = await supabase
+        .from('local_parks')
+        .select('id, name, slug')
+        .eq('id', localParkId)
+        .single();
+
+      if (localParkError || !data) {
+        return NextResponse.json({ error: 'Local park not found' }, { status: 404 });
+      }
+      localPark = data;
     }
 
     // Get file buffer and validate
@@ -211,12 +253,13 @@ export async function POST(request) {
     const mediaType = getMediaType(mimeType);
 
     // Create initial media record with processing status
-    // Using park_code instead of park_id for flexibility across park types
+    // Using park_code for national parks or local_park_id for local parks
     const mediaId = randomUUID();
     const { error: insertError } = await supabase.from('user_media').insert({
       id: mediaId,
       user_id: user.id,
-      park_code: parkCode,
+      park_code: parkCode || null,
+      local_park_id: localParkId || null,
       media_type: mediaType,
       storage_path: '', // Will be updated after upload
       original_filename: originalFilename,
@@ -310,6 +353,7 @@ export async function POST(request) {
             url: mediaUrl.publicUrl,
             thumbnail_url: thumbnailUrl?.publicUrl,
             park: park,
+            local_park: localPark,
           },
         },
         { status: 201 }
