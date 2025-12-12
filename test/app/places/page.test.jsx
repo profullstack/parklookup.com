@@ -319,7 +319,7 @@ describe('PlaceDetailPage', () => {
       render(<PlaceDetailPage />);
 
       await waitFor(() => {
-        const parkLink = document.querySelector('a[href="/parks/indu"]');
+        const parkLink = document.querySelector('a[href="/park/park-uuid-1"]');
         expect(parkLink).toBeInTheDocument();
       });
     });

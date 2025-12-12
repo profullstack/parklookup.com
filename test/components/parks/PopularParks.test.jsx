@@ -208,7 +208,7 @@ describe('PopularParks', () => {
       render(<PopularParks />);
 
       await waitFor(() => {
-        const parkLinks = document.querySelectorAll('a[href^="/parks/"]');
+        const parkLinks = document.querySelectorAll('a[href^="/park/"]');
         expect(parkLinks.length).toBeGreaterThan(0);
       });
     });

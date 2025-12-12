@@ -262,7 +262,7 @@ describe('InteractiveParksMap Component', () => {
       render(<InteractiveParksMap parks={mockNationalParks} />);
 
       const link = screen.getAllByText('View Details →')[0];
-      expect(link).toHaveAttribute('href', '/parks/yose');
+      expect(link).toHaveAttribute('href', '/park/1');
     });
 
     it('should link to county park detail page', async () => {

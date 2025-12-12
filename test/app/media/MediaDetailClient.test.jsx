@@ -189,10 +189,10 @@ describe('MediaDetailClient', () => {
       expect(userLink).toBeTruthy();
     });
 
-    it('should link to park page using park_code', () => {
+    it('should link to park page using park id', () => {
       render(<MediaDetailClient media={mockMedia} />);
       const parkLink = screen.getByRole('link', { name: /Yosemite National Park/i });
-      expect(parkLink).toHaveAttribute('href', '/parks/yose');
+      expect(parkLink).toHaveAttribute('href', '/park/park-1');
     });
   });
 
@@ -289,7 +289,7 @@ describe('MediaDetailClient', () => {
       });
 
       await waitFor(() => {
-        expect(mockPush).toHaveBeenCalledWith('/parks/yose/photos');
+        expect(mockPush).toHaveBeenCalledWith('/park/park-1/photos');
       });
     });
 

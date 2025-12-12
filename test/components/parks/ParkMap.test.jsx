@@ -331,7 +331,7 @@ describe('ParkMap Component', () => {
       render(<ParksMap parks={parks} />);
 
       const viewDetailsLink = screen.getByText('View Details');
-      expect(viewDetailsLink).toHaveAttribute('href', '/parks/yose');
+      expect(viewDetailsLink).toHaveAttribute('href', '/park/1');
     });
 
     it('should display state information in popup', async () => {

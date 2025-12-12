@@ -251,12 +251,12 @@ describe('ParkDetailClient', () => {
         />
       );
 
-      expect(screen.getByText('Overview').closest('a')).toHaveAttribute('href', '/parks/yell');
-      expect(screen.getByText('Map').closest('a')).toHaveAttribute('href', '/parks/yell/map');
-      expect(screen.getByText('Weather Events').closest('a')).toHaveAttribute('href', '/parks/yell/weather');
-      expect(screen.getByText('Activities').closest('a')).toHaveAttribute('href', '/parks/yell/activities');
-      expect(screen.getByText('Reviews').closest('a')).toHaveAttribute('href', '/parks/yell/reviews');
-      expect(screen.getByText('Info').closest('a')).toHaveAttribute('href', '/parks/yell/info');
+      expect(screen.getByText('Overview').closest('a')).toHaveAttribute('href', '/park/park-uuid-1');
+      expect(screen.getByText('Map').closest('a')).toHaveAttribute('href', '/park/park-uuid-1/map');
+      expect(screen.getByText('Weather Events').closest('a')).toHaveAttribute('href', '/park/park-uuid-1/weather');
+      expect(screen.getByText('Activities').closest('a')).toHaveAttribute('href', '/park/park-uuid-1/activities');
+      expect(screen.getByText('Reviews').closest('a')).toHaveAttribute('href', '/park/park-uuid-1/reviews');
+      expect(screen.getByText('Info').closest('a')).toHaveAttribute('href', '/park/park-uuid-1/info');
     });
   });
 
@@ -668,7 +668,7 @@ describe('ParkDetailClient', () => {
       );
 
       const photosTab = screen.getByRole('link', { name: 'Photos' });
-      expect(photosTab).toHaveAttribute('href', '/parks/yell/photos');
+      expect(photosTab).toHaveAttribute('href', '/park/park-uuid-1/photos');
     });
   });
 
@@ -705,7 +705,7 @@ describe('ParkDetailClient', () => {
         />
       );
 
-      expect(screen.getByText('Map').closest('a')).toHaveAttribute('href', '/parks/Q4648515/map');
+      expect(screen.getByText('Map').closest('a')).toHaveAttribute('href', '/park/park-uuid-2/map');
     });
   });
 
