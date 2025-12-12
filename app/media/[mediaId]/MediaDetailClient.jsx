@@ -228,7 +228,7 @@ export default function MediaDetailClient({ media }) {
             <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm sticky top-6">
               {/* User info */}
               <div className="flex items-center gap-3 mb-4">
-                <Link href={`/users/${media.user_id}`}>
+                <Link href={`/users/${media.profiles?.username || media.user_id}`}>
                   {media.profiles?.avatar_url ? (
                     <Image
                       src={media.profiles.avatar_url}
@@ -247,7 +247,7 @@ export default function MediaDetailClient({ media }) {
                 </Link>
                 <div>
                   <Link
-                    href={`/users/${media.user_id}`}
+                    href={`/users/${media.profiles?.username || media.user_id}`}
                     className="font-medium text-gray-900 dark:text-white hover:underline"
                   >
                     {media.profiles?.display_name || 'Anonymous'}

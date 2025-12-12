@@ -36,8 +36,29 @@ async function getUserFromRequest(request) {
 }
 
 /**
+ * Resolve userId to profile id (supports UUID or username)
+ */
+async function resolveUserId(supabase, userId) {
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+  
+  if (isUUID) {
+    return userId;
+  }
+  
+  // Lookup by username
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('username', userId)
+    .single();
+  
+  return profile?.id || null;
+}
+
+/**
  * GET /api/users/[userId]/follow
  * Check if current user is following the target user
+ * Supports lookup by userId (UUID) or username
  */
 export async function GET(request, { params }) {
   try {
@@ -50,12 +71,18 @@ export async function GET(request, { params }) {
 
     const supabase = createServiceClient();
 
+    // Resolve userId (could be UUID or username)
+    const targetId = await resolveUserId(supabase, userId);
+    if (!targetId) {
+      return NextResponse.json({ is_following: false });
+    }
+
     // Check if following
     const { data: follow } = await supabase
       .from('user_follows')
       .select('id')
       .eq('follower_id', user.id)
-      .eq('following_id', userId)
+      .eq('following_id', targetId)
       .single();
 
     return NextResponse.json({ is_following: !!follow });
@@ -68,6 +95,7 @@ export async function GET(request, { params }) {
 /**
  * POST /api/users/[userId]/follow
  * Follow a user
+ * Supports lookup by userId (UUID) or username
  */
 export async function POST(request, { params }) {
   try {
@@ -77,23 +105,17 @@ export async function POST(request, { params }) {
     }
 
     const { userId } = await params;
-
-    // Can't follow yourself
-    if (user.id === userId) {
-      return NextResponse.json({ error: 'Cannot follow yourself' }, { status: 400 });
-    }
-
     const supabase = createServiceClient();
 
-    // Verify target user exists
-    const { data: targetUser, error: userError } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('id', userId)
-      .single();
-
-    if (userError || !targetUser) {
+    // Resolve userId (could be UUID or username)
+    const targetId = await resolveUserId(supabase, userId);
+    if (!targetId) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    // Can't follow yourself
+    if (user.id === targetId) {
+      return NextResponse.json({ error: 'Cannot follow yourself' }, { status: 400 });
     }
 
     // Check if already following
@@ -101,7 +123,7 @@ export async function POST(request, { params }) {
       .from('user_follows')
       .select('id')
       .eq('follower_id', user.id)
-      .eq('following_id', userId)
+      .eq('following_id', targetId)
       .single();
 
     if (existingFollow) {
@@ -111,7 +133,7 @@ export async function POST(request, { params }) {
     // Create follow
     const { error } = await supabase.from('user_follows').insert({
       follower_id: user.id,
-      following_id: userId,
+      following_id: targetId,
     });
 
     if (error) {
@@ -123,7 +145,7 @@ export async function POST(request, { params }) {
     const { count } = await supabase
       .from('user_follows')
       .select('*', { count: 'exact', head: true })
-      .eq('following_id', userId);
+      .eq('following_id', targetId);
 
     return NextResponse.json(
       {
@@ -142,6 +164,7 @@ export async function POST(request, { params }) {
 /**
  * DELETE /api/users/[userId]/follow
  * Unfollow a user
+ * Supports lookup by userId (UUID) or username
  */
 export async function DELETE(request, { params }) {
   try {
@@ -151,15 +174,20 @@ export async function DELETE(request, { params }) {
     }
 
     const { userId } = await params;
-
     const supabase = createServiceClient();
+
+    // Resolve userId (could be UUID or username)
+    const targetId = await resolveUserId(supabase, userId);
+    if (!targetId) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
     // Delete follow
     const { error } = await supabase
       .from('user_follows')
       .delete()
       .eq('follower_id', user.id)
-      .eq('following_id', userId);
+      .eq('following_id', targetId);
 
     if (error) {
       console.error('Error deleting follow:', error);
@@ -170,7 +198,7 @@ export async function DELETE(request, { params }) {
     const { count } = await supabase
       .from('user_follows')
       .select('*', { count: 'exact', head: true })
-      .eq('following_id', userId);
+      .eq('following_id', targetId);
 
     return NextResponse.json({
       success: true,

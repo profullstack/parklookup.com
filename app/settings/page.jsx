@@ -7,6 +7,7 @@
 
 import { Suspense, useState, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -42,12 +43,16 @@ function SettingsContent() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef(null);
   
   // Track if we've already processed the checkout status to prevent double-processing
   const checkoutProcessedRef = useRef(false);
 
   // Form state
   const [displayName, setDisplayName] = useState('');
+  const [username, setUsername] = useState('');
   const [preferences, setPreferences] = useState({
     emailNotifications: true,
     darkMode: false,
@@ -176,6 +181,8 @@ function SettingsContent() {
         const data = await response.json();
         setProfile(data.profile);
         setDisplayName(data.profile?.display_name || user.email?.split('@')[0] || '');
+        setUsername(data.profile?.username || '');
+        setAvatarUrl(data.profile?.avatar_url || null);
         if (data.profile?.preferences) {
           setPreferences((prev) => ({
             ...prev,
@@ -193,6 +200,98 @@ function SettingsContent() {
       fetchProfile();
     }
   }, [user]);
+
+  /**
+   * Handle avatar file selection
+   */
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      setError('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setError('File too large. Maximum size is 5MB.');
+      return;
+    }
+
+    setAvatarUploading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('parklookup_auth_token');
+      const formData = new FormData();
+      formData.append('avatar', file);
+
+      const response = await fetch('/api/profile/avatar', {
+        method: 'POST',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to upload avatar');
+      }
+
+      const data = await response.json();
+      setAvatarUrl(data.avatar_url);
+      setSuccess('Avatar updated successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAvatarUploading(false);
+      // Reset the input
+      if (avatarInputRef.current) {
+        avatarInputRef.current.value = '';
+      }
+    }
+  };
+
+  /**
+   * Handle avatar removal
+   */
+  const handleRemoveAvatar = async () => {
+    if (!avatarUrl) return;
+    if (!showConfirm('Are you sure you want to remove your avatar?')) return;
+
+    setAvatarUploading(true);
+    setError(null);
+
+    try {
+      const token = localStorage.getItem('parklookup_auth_token');
+
+      const response = await fetch('/api/profile/avatar', {
+        method: 'DELETE',
+        headers: {
+          ...(token && { Authorization: `Bearer ${token}` }),
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to remove avatar');
+      }
+
+      setAvatarUrl(null);
+      setSuccess('Avatar removed successfully!');
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -212,6 +311,7 @@ function SettingsContent() {
         },
         body: JSON.stringify({
           display_name: displayName,
+          username,
           preferences,
         }),
       });
@@ -261,6 +361,76 @@ function SettingsContent() {
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Profile</h2>
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Avatar */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Profile Photo
+                </label>
+                <div className="flex items-center gap-4">
+                  {/* Avatar Preview */}
+                  <div className="relative">
+                    {avatarUrl ? (
+                      <Image
+                        src={avatarUrl}
+                        alt="Your avatar"
+                        width={80}
+                        height={80}
+                        className="rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
+                        <svg className="w-10 h-10 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                        </svg>
+                      </div>
+                    )}
+                    {avatarUploading && (
+                      <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload/Remove Buttons */}
+                  <div className="flex flex-col gap-2">
+                    <input
+                      ref={avatarInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                      id="avatar-upload"
+                    />
+                    <label
+                      htmlFor="avatar-upload"
+                      className={`px-4 py-2 text-sm font-medium rounded-lg cursor-pointer transition-colors ${
+                        avatarUploading
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                      }`}
+                    >
+                      {avatarUploading ? 'Uploading...' : 'Upload Photo'}
+                    </label>
+                    {avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveAvatar}
+                        disabled={avatarUploading}
+                        className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">
+                  JPEG, PNG, GIF, or WebP. Max 5MB.
+                </p>
+              </div>
+
               {/* Email (read-only) */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -274,6 +444,32 @@ function SettingsContent() {
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   Email cannot be changed
+                </p>
+              </div>
+
+              {/* Username */}
+              <div>
+                <label
+                  htmlFor="username"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Username
+                </label>
+                <div className="flex items-center">
+                  <span className="text-gray-500 mr-1">@</span>
+                  <input
+                    type="text"
+                    id="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
+                    placeholder="username"
+                    pattern="[a-z0-9_]{3,50}"
+                    title="3-50 characters, lowercase letters, numbers, and underscores only"
+                  />
+                </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  Your unique username for your profile URL
                 </p>
               </div>
 

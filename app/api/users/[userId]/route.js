@@ -38,6 +38,7 @@ async function getUserFromRequest(request) {
 /**
  * GET /api/users/[userId]
  * Get user profile with stats
+ * Supports lookup by userId (UUID) or username
  */
 export async function GET(request, { params }) {
   try {
@@ -46,44 +47,54 @@ export async function GET(request, { params }) {
 
     const supabase = createServiceClient();
 
-    // Get user profile
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+    // Determine if userId is a UUID or username
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId);
+
+    // Get user profile - lookup by id or username
+    let query = supabase.from('profiles').select('*');
+    
+    if (isUUID) {
+      query = query.eq('id', userId);
+    } else {
+      query = query.ilike('username', userId);
+    }
+
+    const { data: profile, error: profileError } = await query.single();
 
     if (profileError || !profile) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Use the profile.id for all subsequent queries
+    const profileId = profile.id;
+
     // Get follower count
     const { count: followersCount } = await supabase
       .from('user_follows')
       .select('*', { count: 'exact', head: true })
-      .eq('following_id', userId);
+      .eq('following_id', profileId);
 
     // Get following count
     const { count: followingCount } = await supabase
       .from('user_follows')
       .select('*', { count: 'exact', head: true })
-      .eq('follower_id', userId);
+      .eq('follower_id', profileId);
 
     // Get media count
     const { count: mediaCount } = await supabase
       .from('user_media')
       .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
+      .eq('user_id', profileId)
       .eq('status', 'ready');
 
     // Check if current user is following
     let isFollowing = false;
-    if (currentUser && currentUser.id !== userId) {
+    if (currentUser && currentUser.id !== profileId) {
       const { data: follow } = await supabase
         .from('user_follows')
         .select('id')
         .eq('follower_id', currentUser.id)
-        .eq('following_id', userId)
+        .eq('following_id', profileId)
         .single();
 
       isFollowing = !!follow;
@@ -92,6 +103,7 @@ export async function GET(request, { params }) {
     return NextResponse.json({
       profile: {
         id: profile.id,
+        username: profile.username,
         display_name: profile.display_name,
         avatar_url: profile.avatar_url,
         bio: profile.bio,
@@ -105,7 +117,7 @@ export async function GET(request, { params }) {
         media_count: mediaCount || 0,
       },
       is_following: isFollowing,
-      is_own_profile: currentUser?.id === userId,
+      is_own_profile: currentUser?.id === profileId,
     });
   } catch (error) {
     console.error('Error in GET /api/users/[userId]:', error);

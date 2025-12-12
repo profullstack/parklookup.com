@@ -129,8 +129,8 @@ function MediaCard({ media, onLikeToggle, currentUserId }) {
               </svg>
             </div>
           )}
-          <Link 
-            href={`/users/${media.user_id}`}
+          <Link
+            href={`/users/${media.profiles?.username || media.user_username || media.user_id}`}
             className="text-sm font-medium text-gray-900 dark:text-white hover:underline truncate"
           >
             {media.profiles?.display_name || media.user_display_name || 'Anonymous'}

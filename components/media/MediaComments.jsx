@@ -98,11 +98,14 @@ function Comment({ comment, mediaId, currentUserId, accessToken, onDelete, onUpd
     setIsSubmitting(false);
   };
 
+  // Get the profile link - prefer username, fallback to user_id
+  const profileLink = `/users/${comment.profiles?.username || comment.user_id}`;
+
   return (
     <div className={`${depth > 0 ? 'ml-8 border-l-2 border-gray-200 dark:border-gray-700 pl-4' : ''}`}>
       <div className="flex gap-3">
         {/* Avatar */}
-        <Link href={`/users/${comment.user_id}`} className="flex-shrink-0">
+        <Link href={profileLink} className="flex-shrink-0">
           {comment.profiles?.avatar_url ? (
             <Image
               src={comment.profiles.avatar_url}
@@ -124,7 +127,7 @@ function Comment({ comment, mediaId, currentUserId, accessToken, onDelete, onUpd
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <Link
-              href={`/users/${comment.user_id}`}
+              href={profileLink}
               className="text-sm font-medium text-gray-900 dark:text-white hover:underline"
             >
               {comment.profiles?.display_name || 'Anonymous'}

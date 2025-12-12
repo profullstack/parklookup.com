@@ -67,6 +67,7 @@ export async function GET(request, { params }) {
         `
         *,
         profiles:user_id (
+          username,
           display_name,
           avatar_url
         )
@@ -90,6 +91,7 @@ export async function GET(request, { params }) {
         `
         *,
         profiles:user_id (
+          username,
           display_name,
           avatar_url
         )
@@ -179,6 +181,7 @@ export async function POST(request, { params }) {
         `
         *,
         profiles:user_id (
+          username,
           display_name,
           avatar_url
         )

@@ -116,12 +116,39 @@ export async function PUT(request) {
 
     // Parse request body
     const body = await request.json();
-    const { display_name, avatar_url, preferences } = body;
+    const { display_name, username, avatar_url, preferences } = body;
 
     // Build update object
     const updates = {};
     if (display_name !== undefined) {
       updates.display_name = display_name;
+    }
+    if (username !== undefined) {
+      // Validate username format
+      const usernameRegex = /^[a-z0-9_]{3,50}$/;
+      if (!usernameRegex.test(username)) {
+        return NextResponse.json(
+          { error: 'Username must be 3-50 characters, lowercase letters, numbers, and underscores only' },
+          { status: 400 }
+        );
+      }
+      
+      // Check if username is already taken
+      const { data: existingUser } = await supabase
+        .from('profiles')
+        .select('id')
+        .ilike('username', username)
+        .neq('id', user.id)
+        .single();
+      
+      if (existingUser) {
+        return NextResponse.json(
+          { error: 'Username is already taken' },
+          { status: 409 }
+        );
+      }
+      
+      updates.username = username;
     }
     if (avatar_url !== undefined) {
       updates.avatar_url = avatar_url;

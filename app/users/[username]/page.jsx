@@ -6,13 +6,13 @@ import UserProfileClient from './UserProfileClient';
  * Generate metadata for the user profile page
  */
 export async function generateMetadata({ params }) {
-  const { userId } = await params;
+  const { username } = await params;
   const supabase = createServiceClient();
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('display_name')
-    .eq('id', userId)
+    .select('display_name, username')
+    .ilike('username', username)
     .single();
 
   if (!profile) {
@@ -22,8 +22,8 @@ export async function generateMetadata({ params }) {
   }
 
   return {
-    title: `${profile.display_name || 'User'} | ParkLookup`,
-    description: `View photos and videos shared by ${profile.display_name || 'this user'}`,
+    title: `${profile.display_name || profile.username} | ParkLookup`,
+    description: `View photos and videos shared by ${profile.display_name || profile.username}`,
   };
 }
 
@@ -32,19 +32,21 @@ export async function generateMetadata({ params }) {
  * Shows user profile with their photos and follow functionality
  */
 export default async function UserProfilePage({ params }) {
-  const { userId } = await params;
+  const { username } = await params;
   const supabase = createServiceClient();
 
-  // Fetch user profile
+  // Fetch user profile by username (case-insensitive)
   const { data: profile, error } = await supabase
     .from('profiles')
     .select('*')
-    .eq('id', userId)
+    .ilike('username', username)
     .single();
 
   if (error || !profile) {
     notFound();
   }
+
+  const userId = profile.id;
 
   // Get follower count
   const { count: followersCount } = await supabase
@@ -65,20 +67,29 @@ export default async function UserProfilePage({ params }) {
     .eq('user_id', userId)
     .eq('status', 'ready');
 
-  // Get recent media
+  // Get recent media (without the broken join)
   const { data: recentMedia } = await supabase
     .from('user_media')
-    .select(`
-      *,
-      nps_parks:park_id (
-        park_code,
-        full_name
-      )
-    `)
+    .select('*')
     .eq('user_id', userId)
     .eq('status', 'ready')
     .order('created_at', { ascending: false })
     .limit(12);
+
+  // Get park info separately if needed
+  const parkCodes = [...new Set(recentMedia?.map((m) => m.park_code).filter(Boolean) || [])];
+  let parkMap = {};
+  
+  if (parkCodes.length > 0) {
+    const { data: parks } = await supabase
+      .from('all_parks')
+      .select('park_code, full_name')
+      .in('park_code', parkCodes);
+    
+    parks?.forEach((p) => {
+      parkMap[p.park_code] = p;
+    });
+  }
 
   // Get public URLs for media
   const mediaWithUrls = recentMedia?.map((item) => {
@@ -94,6 +105,7 @@ export default async function UserProfilePage({ params }) {
       ...item,
       url: mediaUrl?.publicUrl,
       thumbnail_url: thumbnailUrl?.publicUrl,
+      park: parkMap[item.park_code] || null,
     };
   }) || [];
 

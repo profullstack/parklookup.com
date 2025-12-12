@@ -117,9 +117,12 @@ export default function UserProfileClient({ profile, initialMedia = [] }) {
             {/* Info */}
             <div className="flex-1 text-center sm:text-left">
               <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {profile.display_name || 'Anonymous User'}
-                </h1>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {profile.display_name || profile.username}
+                  </h1>
+                  <p className="text-gray-500 dark:text-gray-400">@{profile.username}</p>
+                </div>
                 {!isOwnProfile && user && (
                   <button
                     onClick={handleFollowToggle}

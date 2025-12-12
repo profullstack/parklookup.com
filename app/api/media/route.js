@@ -89,10 +89,10 @@ export async function GET(request) {
     const parkCodes = [...new Set(media.map((m) => m.park_code).filter(Boolean))];
     const mediaIds = media.map((m) => m.id);
 
-    // Fetch profiles separately
+    // Fetch profiles separately (include username for profile links)
     const { data: profiles } = await supabase
       .from('profiles')
-      .select('id, display_name, avatar_url')
+      .select('id, display_name, avatar_url, username')
       .in('id', userIds);
 
     // Fetch parks separately (from all_parks view to support all park types)

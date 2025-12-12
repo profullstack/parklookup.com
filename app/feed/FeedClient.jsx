@@ -71,7 +71,7 @@ function FeedItem({ item, onLikeToggle, currentUserId }) {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-center gap-3 p-4">
-        <Link href={`/users/${item.user_id}`}>
+        <Link href={`/users/${item.user_username || item.user_id}`}>
           {item.user_avatar_url ? (
             <Image
               src={item.user_avatar_url}
@@ -90,7 +90,7 @@ function FeedItem({ item, onLikeToggle, currentUserId }) {
         </Link>
         <div className="flex-1 min-w-0">
           <Link
-            href={`/users/${item.user_id}`}
+            href={`/users/${item.user_username || item.user_id}`}
             className="font-medium text-gray-900 dark:text-white hover:underline"
           >
             {item.user_display_name || 'Anonymous'}
