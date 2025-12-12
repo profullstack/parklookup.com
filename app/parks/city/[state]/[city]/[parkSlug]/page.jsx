@@ -6,6 +6,9 @@
  * Server-rendered page for individual city park details with SEO optimization.
  */
 
+// Force dynamic rendering to prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import LocalParkDetailClient from '@/components/parks/LocalParkDetailClient';

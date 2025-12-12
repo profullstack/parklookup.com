@@ -6,6 +6,9 @@
  * Lists all parks in a specific county with filtering and pagination.
  */
 
+// Force dynamic rendering to prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';

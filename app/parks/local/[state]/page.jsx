@@ -3,6 +3,9 @@
  * Lists all local parks in a specific state with county breakdown
  */
 
+// Force dynamic rendering to prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createServiceClient } from '@/lib/supabase/server';
