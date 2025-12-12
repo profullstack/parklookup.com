@@ -27,6 +27,8 @@ export default function StatePage() {
   const [state, setState] = useState(null);
   const [parks, setParks] = useState([]);
   const [stateParks, setStateParks] = useState([]);
+  const [counties, setCounties] = useState([]);
+  const [localParksCount, setLocalParksCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
@@ -50,6 +52,8 @@ export default function StatePage() {
         setState(data.state);
         setParks(data.parks);
         setStateParks(data.stateParks || []);
+        setCounties(data.counties || []);
+        setLocalParksCount(data.localParksCount || 0);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -280,7 +284,7 @@ export default function StatePage() {
         {stateParks.length > 0 && (
           <>
             <h2 className="text-xl font-semibold text-gray-900 mb-6">State Parks ({stateParks.length})</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
               {stateParks.map((park) => (
                 <div
                   key={park.id}
@@ -304,6 +308,44 @@ export default function StatePage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </>
+        )}
+
+        {/* Counties with Local Parks */}
+        {counties.length > 0 && (
+          <>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-semibold text-gray-900">
+                County & City Parks ({localParksCount.toLocaleString()})
+              </h2>
+              <Link
+                href={`/parks/local/${slug}`}
+                className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+              >
+                View All →
+              </Link>
+            </div>
+            <div className="bg-white rounded-lg shadow-sm p-6 mb-12">
+              <p className="text-gray-600 mb-4">
+                Browse local parks by county. Click on a county to see all parks in that area.
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                {counties.map((county) => (
+                  <Link
+                    key={county.id}
+                    href={`/parks/county/${slug}/${county.slug}`}
+                    className="flex flex-col items-center p-3 bg-gray-50 rounded-lg hover:bg-blue-50 hover:border-blue-200 transition-colors border border-gray-200"
+                  >
+                    <span className="font-medium text-gray-900 text-sm text-center line-clamp-1">
+                      {county.name}
+                    </span>
+                    <span className="text-xs text-blue-600 mt-1">
+                      {county.park_count} park{county.park_count !== 1 ? 's' : ''}
+                    </span>
+                  </Link>
+                ))}
+              </div>
             </div>
           </>
         )}

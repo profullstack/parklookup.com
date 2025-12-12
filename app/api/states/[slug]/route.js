@@ -149,11 +149,44 @@ export async function GET(request, { params }) {
       .eq('state_id', state.id)
       .order('name');
 
+    // Get counties with local parks in this state
+    const { data: countiesWithParks } = await supabase
+      .from('local_parks')
+      .select('county_id, counties!inner(id, name, slug)')
+      .eq('state_id', state.id)
+      .not('county_id', 'is', null);
+
+    // Aggregate counties with park counts
+    const countyMap = new Map();
+    (countiesWithParks ?? []).forEach((park) => {
+      const county = park.counties;
+      if (county && !countyMap.has(county.id)) {
+        countyMap.set(county.id, {
+          id: county.id,
+          name: county.name,
+          slug: county.slug,
+          park_count: 0,
+        });
+      }
+      if (county) {
+        countyMap.get(county.id).park_count++;
+      }
+    });
+    const counties = Array.from(countyMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    // Get local parks count for this state
+    const { count: localParksCount } = await supabase
+      .from('local_parks')
+      .select('id', { count: 'exact', head: true })
+      .eq('state_id', state.id);
+
     return NextResponse.json({
       state,
       parks: parks ?? [],
       stateParks: stateParks ?? [],
-      totalParks: (parks?.length ?? 0) + (stateParks?.length ?? 0),
+      counties: counties ?? [],
+      localParksCount: localParksCount ?? 0,
+      totalParks: (parks?.length ?? 0) + (stateParks?.length ?? 0) + (localParksCount ?? 0),
     });
   } catch (error) {
     console.error('API error:', error);

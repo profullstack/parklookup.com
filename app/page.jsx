@@ -26,12 +26,12 @@ export default function HomePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
           <div className="text-center">
             <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Discover National
+              Discover National, State
               <br />
-              and State Parks
+              & Local Parks
             </h1>
             <p className="text-xl md:text-2xl text-green-100 mb-8 max-w-2xl mx-auto">
-              Explore over 7,000 national and state parks, monuments, and historic sites. Plan your
+              Explore thousands of national, state, county, and city parks across America. Plan your
               next adventure today.
             </p>
 
@@ -45,6 +45,12 @@ export default function HomePage() {
                 className="inline-flex items-center justify-center px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
               >
                 Explore All Parks
+              </Link>
+              <Link
+                href="/parks/local"
+                className="inline-flex items-center justify-center px-6 py-3 border-2 border-white text-white font-semibold rounded-lg hover:bg-white/10 transition-colors"
+              >
+                Local Parks
               </Link>
               <Link
                 href="/map"
@@ -181,7 +187,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8">
+          <div className="grid md:grid-cols-5 gap-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
                 <Image
@@ -205,6 +211,11 @@ export default function HomePage() {
                 <li>
                   <Link href="/parks" className="hover:text-white transition-colors">
                     All Parks
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/parks/local" className="hover:text-white transition-colors">
+                    County & City Parks
                   </Link>
                 </li>
                 <li>
@@ -242,6 +253,27 @@ export default function HomePage() {
             </div>
 
             <div>
+              <h4 className="text-white font-semibold mb-4">Park Types</h4>
+              <ul className="space-y-2 text-sm">
+                <li>
+                  <Link href="/parks/county" className="hover:text-white transition-colors">
+                    County Parks
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/parks/city" className="hover:text-white transition-colors">
+                    City Parks
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/map" className="hover:text-white transition-colors">
+                    Park Map
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
               <h4 className="text-white font-semibold mb-4">Data Sources</h4>
               <ul className="space-y-2 text-sm">
                 <li>
@@ -262,6 +294,16 @@ export default function HomePage() {
                     className="hover:text-white transition-colors"
                   >
                     Wikidata
+                  </a>
+                </li>
+                <li>
+                  <a
+                    href="https://www.openstreetmap.org"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-white transition-colors"
+                  >
+                    OpenStreetMap
                   </a>
                 </li>
               </ul>
