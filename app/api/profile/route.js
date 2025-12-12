@@ -8,30 +8,44 @@ import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/client';
 
 /**
+ * Helper to get user from authorization header
+ */
+async function getUserFromToken(request) {
+  const authHeader = request.headers.get('authorization');
+
+  if (!authHeader?.startsWith('Bearer ')) {
+    return { user: null, error: 'No authorization token provided' };
+  }
+
+  const token = authHeader.substring(7);
+  const supabase = createServerClient();
+
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    return { user: null, error: 'Invalid or expired token' };
+  }
+
+  return { user, error: null };
+}
+
+/**
  * GET /api/profile
  * Get the current user's profile
  */
 export async function GET(request) {
   try {
-    // Get auth token from request headers
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const supabase = createServerClient({ useServiceRole: true });
-
-    // Get authenticated user using the token
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
+    const { user, error: authError } = await getUserFromToken(request);
 
     if (authError || !user) {
-      console.error('Auth error:', authError?.message);
+      console.error('Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = createServerClient({ useServiceRole: true });
 
     // Get profile
     const { data: profile, error: profileError } = await supabase
@@ -91,25 +105,14 @@ export async function GET(request) {
  */
 export async function PUT(request) {
   try {
-    // Get auth token from request headers
-    const authHeader = request.headers.get('authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const supabase = createServerClient({ useServiceRole: true });
-
-    // Get authenticated user using the token
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
+    const { user, error: authError } = await getUserFromToken(request);
 
     if (authError || !user) {
-      console.error('Auth error:', authError?.message);
+      console.error('Auth error:', authError);
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+
+    const supabase = createServerClient({ useServiceRole: true });
 
     // Parse request body
     const body = await request.json();

@@ -1,510 +1,587 @@
 /**
- * Profile API Tests
- * Tests for the user profile API endpoint
- *
- * @vitest-environment node
+ * Tests for Profile API endpoints
+ * Using Vitest for testing (following project conventions)
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { GET, PUT } from '@/app/api/profile/route';
 
-// Mock Supabase
-const mockSupabase = {
+// Mock Supabase client
+const mockSupabaseClient = {
   auth: {
     getUser: vi.fn(),
   },
   from: vi.fn(),
+  select: vi.fn(),
+  eq: vi.fn(),
+  insert: vi.fn(),
+  update: vi.fn(),
+  single: vi.fn(),
 };
 
 vi.mock('@/lib/supabase/client', () => ({
-  createServerClient: vi.fn(() => mockSupabase),
+  createServerClient: vi.fn(() => mockSupabaseClient),
+  default: vi.fn(() => mockSupabaseClient),
 }));
 
-// Helper to create request with auth header
-const createAuthRequest = (url, options = {}) => {
-  const headers = new Headers(options.headers || {});
-  headers.set('Authorization', 'Bearer test-token');
-  return new Request(url, { ...options, headers });
-};
+describe('Profile API Routes', () => {
+  const mockUser = {
+    id: 'user-uuid-123',
+    email: 'test@example.com',
+  };
 
-describe('Profile API', () => {
+  const mockProfile = {
+    id: 'user-uuid-123',
+    email: 'test@example.com',
+    display_name: 'test',
+    avatar_url: null,
+    preferences: null,
+    created_at: '2024-01-01T00:00:00Z',
+    updated_at: '2024-01-01T00:00:00Z',
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', 'https://test.supabase.co');
+    vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-key');
+    vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'test-anon-key');
+
+    // Setup mock chain for queries
+    mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
+    mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
+    mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
+    mockSupabaseClient.insert.mockReturnValue(mockSupabaseClient);
+    mockSupabaseClient.update.mockReturnValue(mockSupabaseClient);
+    mockSupabaseClient.single.mockResolvedValue({ data: mockProfile, error: null });
+
+    mockSupabaseClient.auth.getUser.mockResolvedValue({
+      data: { user: mockUser },
+      error: null,
+    });
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
   });
 
   describe('GET /api/profile', () => {
-    it('should return 401 if no authorization header', async () => {
-      const request = new Request('http://localhost/api/profile');
-      const response = await GET(request);
-      const data = await response.json();
+    describe('Authentication', () => {
+      it('should return 401 when authorization header is missing', async () => {
+        vi.resetModules();
+        const { GET } = await import('@/app/api/profile/route.js');
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Unauthorized');
-    });
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+        });
 
-    it('should return 401 if user is not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: null },
-        error: { message: 'Not authenticated' },
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(401);
+        expect(data.error).toBe('Unauthorized');
       });
 
-      const request = createAuthRequest('http://localhost/api/profile');
-      const response = await GET(request);
-      const data = await response.json();
+      it('should return 401 when authorization header does not start with Bearer', async () => {
+        vi.resetModules();
+        const { GET } = await import('@/app/api/profile/route.js');
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Unauthorized');
-    });
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Basic some_token',
+          },
+        });
 
-    it('should return existing profile for authenticated user', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      const mockProfile = {
-        id: 'user-123',
-        email: 'test@example.com',
-        display_name: 'testuser',
-        avatar_url: null,
-        preferences: { darkMode: false },
-        is_pro: false,
-        created_at: '2024-01-01T00:00:00Z',
-      };
+        const response = await GET(request);
+        const data = await response.json();
 
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
+        expect(response.status).toBe(401);
+        expect(data.error).toBe('Unauthorized');
       });
 
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
+      it('should return 401 when token is invalid', async () => {
+        vi.resetModules();
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: { message: 'Invalid token' },
+        });
+
+        const { GET } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer invalid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(401);
+        expect(data.error).toBe('Unauthorized');
+      });
+
+      it('should return 401 when token is expired', async () => {
+        vi.resetModules();
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: { message: 'Token expired' },
+        });
+
+        const { GET } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer expired_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(401);
+        expect(data.error).toBe('Unauthorized');
+      });
+    });
+
+    describe('Fetching Profile', () => {
+      it('should return user profile successfully', async () => {
+        vi.resetModules();
+
+        mockSupabaseClient.single.mockResolvedValue({
           data: mockProfile,
           error: null,
-        }),
+        });
+
+        const { GET } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.profile).toBeDefined();
+        expect(data.profile.id).toBe(mockUser.id);
+        expect(data.profile.email).toBe(mockUser.email);
+        expect(data.user).toBeDefined();
+        expect(data.user.id).toBe(mockUser.id);
+        expect(data.user.email).toBe(mockUser.email);
       });
 
-      const request = createAuthRequest('http://localhost/api/profile');
-      const response = await GET(request);
-      const data = await response.json();
+      it('should create profile if it does not exist', async () => {
+        vi.resetModules();
 
-      expect(response.status).toBe(200);
-      expect(data.profile).toEqual(mockProfile);
-      expect(data.user.id).toBe('user-123');
-      expect(data.user.email).toBe('test@example.com');
+        const newProfile = {
+          ...mockProfile,
+          display_name: 'test',
+        };
+
+        // First call: profile not found (PGRST116)
+        // Second call: insert returns new profile
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: 'PGRST116', message: 'No rows returned' },
+          })
+          .mockResolvedValueOnce({
+            data: newProfile,
+            error: null,
+          });
+
+        const { GET } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.profile).toBeDefined();
+        expect(data.profile.display_name).toBe('test');
+      });
     });
 
-    it('should create profile if it does not exist', async () => {
-      const mockUser = { id: 'user-456', email: 'new@example.com' };
-      const mockNewProfile = {
-        id: 'user-456',
-        email: 'new@example.com',
-        display_name: 'new',
-        avatar_url: null,
-        preferences: {},
-        is_pro: false,
-      };
+    describe('Error Handling', () => {
+      it('should return 500 when database query fails', async () => {
+        vi.resetModules();
 
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      // First call - profile doesn't exist
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
+        mockSupabaseClient.single.mockResolvedValue({
           data: null,
-          error: { code: 'PGRST116' }, // No rows returned
-        }),
+          error: { code: 'OTHER', message: 'Database error' },
+        });
+
+        const { GET } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.error).toBe('Failed to fetch profile');
       });
 
-      // Second call - create profile
-      mockSupabase.from.mockReturnValueOnce({
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: mockNewProfile,
-          error: null,
-        }),
+      it('should return 500 when profile creation fails', async () => {
+        vi.resetModules();
+
+        // First call: profile not found
+        // Second call: insert fails
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: 'PGRST116', message: 'No rows returned' },
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: { message: 'Insert failed' },
+          });
+
+        const { GET } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'GET',
+          headers: {
+            Authorization: 'Bearer valid_token',
+          },
+        });
+
+        const response = await GET(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.error).toBe('Failed to create profile');
       });
-
-      const request = createAuthRequest('http://localhost/api/profile');
-      const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.profile).toEqual(mockNewProfile);
-    });
-
-    it('should return 500 if database error occurs', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: { code: 'SOME_ERROR', message: 'Database error' },
-        }),
-      });
-
-      const request = createAuthRequest('http://localhost/api/profile');
-      const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to fetch profile');
-    });
-
-    it('should return 500 if profile creation fails', async () => {
-      const mockUser = { id: 'user-456', email: 'new@example.com' };
-
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      // Profile doesn't exist
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: { code: 'PGRST116' },
-        }),
-      });
-
-      // Creation fails
-      mockSupabase.from.mockReturnValueOnce({
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: { message: 'Insert failed' },
-        }),
-      });
-
-      const request = createAuthRequest('http://localhost/api/profile');
-      const response = await GET(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to create profile');
     });
   });
 
   describe('PUT /api/profile', () => {
-    it('should return 401 if no authorization header', async () => {
-      const request = new Request('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ display_name: 'newname' }),
+    describe('Authentication', () => {
+      it('should return 401 when authorization header is missing', async () => {
+        vi.resetModules();
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ display_name: 'New Name' }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(401);
+        expect(data.error).toBe('Unauthorized');
       });
 
-      const response = await PUT(request);
-      const data = await response.json();
+      it('should return 401 when token is invalid', async () => {
+        vi.resetModules();
+        mockSupabaseClient.auth.getUser.mockResolvedValue({
+          data: { user: null },
+          error: { message: 'Invalid token' },
+        });
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Unauthorized');
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer invalid_token',
+          },
+          body: JSON.stringify({ display_name: 'New Name' }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(401);
+        expect(data.error).toBe('Unauthorized');
+      });
     });
 
-    it('should return 401 if user is not authenticated', async () => {
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: null },
-        error: { message: 'Not authenticated' },
+    describe('Updating Profile', () => {
+      it('should update display_name successfully', async () => {
+        vi.resetModules();
+
+        const updatedProfile = {
+          ...mockProfile,
+          display_name: 'New Name',
+        };
+
+        // First call: check if profile exists
+        // Second call: update profile
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: mockUser.id },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: updatedProfile,
+            error: null,
+          });
+
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ display_name: 'New Name' }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.profile).toBeDefined();
+        expect(data.profile.display_name).toBe('New Name');
       });
 
-      const request = createAuthRequest('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ display_name: 'newname' }),
+      it('should update avatar_url successfully', async () => {
+        vi.resetModules();
+
+        const updatedProfile = {
+          ...mockProfile,
+          avatar_url: 'https://example.com/avatar.png',
+        };
+
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: mockUser.id },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: updatedProfile,
+            error: null,
+          });
+
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ avatar_url: 'https://example.com/avatar.png' }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.profile.avatar_url).toBe('https://example.com/avatar.png');
       });
 
-      const response = await PUT(request);
-      const data = await response.json();
+      it('should update preferences successfully', async () => {
+        vi.resetModules();
 
-      expect(response.status).toBe(401);
-      expect(data.error).toBe('Unauthorized');
+        const preferences = { theme: 'dark', notifications: true };
+        const updatedProfile = {
+          ...mockProfile,
+          preferences,
+        };
+
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: mockUser.id },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: updatedProfile,
+            error: null,
+          });
+
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ preferences }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.profile.preferences).toEqual(preferences);
+      });
+
+      it('should update multiple fields at once', async () => {
+        vi.resetModules();
+
+        const updatedProfile = {
+          ...mockProfile,
+          display_name: 'New Name',
+          avatar_url: 'https://example.com/avatar.png',
+          preferences: { theme: 'dark' },
+        };
+
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: mockUser.id },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: updatedProfile,
+            error: null,
+          });
+
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({
+            display_name: 'New Name',
+            avatar_url: 'https://example.com/avatar.png',
+            preferences: { theme: 'dark' },
+          }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.profile.display_name).toBe('New Name');
+        expect(data.profile.avatar_url).toBe('https://example.com/avatar.png');
+        expect(data.profile.preferences).toEqual({ theme: 'dark' });
+      });
+
+      it('should create profile if it does not exist during update', async () => {
+        vi.resetModules();
+
+        const newProfile = {
+          ...mockProfile,
+          display_name: 'New Name',
+        };
+
+        // First call: profile not found
+        // Second call: insert new profile
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: 'PGRST116', message: 'No rows returned' },
+          })
+          .mockResolvedValueOnce({
+            data: newProfile,
+            error: null,
+          });
+
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ display_name: 'New Name' }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(200);
+        expect(data.profile).toBeDefined();
+        expect(data.profile.display_name).toBe('New Name');
+      });
     });
 
-    it('should update existing profile', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      const mockUpdatedProfile = {
-        id: 'user-123',
-        email: 'test@example.com',
-        display_name: 'newname',
-        avatar_url: null,
-        preferences: { darkMode: true },
-        is_pro: false,
-      };
+    describe('Error Handling', () => {
+      it('should return 500 when profile update fails', async () => {
+        vi.resetModules();
 
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
+        // First call: profile exists
+        // Second call: update fails
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: { id: mockUser.id },
+            error: null,
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: { message: 'Update failed' },
+          });
+
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ display_name: 'New Name' }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.error).toBe('Failed to update profile');
       });
 
-      // Check if profile exists
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: { id: 'user-123' },
-          error: null,
-        }),
+      it('should return 500 when profile creation during update fails', async () => {
+        vi.resetModules();
+
+        // First call: profile not found
+        // Second call: insert fails
+        mockSupabaseClient.single
+          .mockResolvedValueOnce({
+            data: null,
+            error: { code: 'PGRST116', message: 'No rows returned' },
+          })
+          .mockResolvedValueOnce({
+            data: null,
+            error: { message: 'Insert failed' },
+          });
+
+        const { PUT } = await import('@/app/api/profile/route.js');
+
+        const request = new Request('http://localhost:3000/api/profile', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer valid_token',
+          },
+          body: JSON.stringify({ display_name: 'New Name' }),
+        });
+
+        const response = await PUT(request);
+        const data = await response.json();
+
+        expect(response.status).toBe(500);
+        expect(data.error).toBe('Failed to create profile');
       });
-
-      // Update profile
-      mockSupabase.from.mockReturnValueOnce({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: mockUpdatedProfile,
-          error: null,
-        }),
-      });
-
-      const request = createAuthRequest('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({
-          display_name: 'newname',
-          preferences: { darkMode: true },
-        }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.profile.display_name).toBe('newname');
-      expect(data.profile.preferences.darkMode).toBe(true);
-    });
-
-    it('should create profile if it does not exist during update', async () => {
-      const mockUser = { id: 'user-789', email: 'new@example.com' };
-      const mockNewProfile = {
-        id: 'user-789',
-        email: 'new@example.com',
-        display_name: 'newuser',
-        avatar_url: null,
-        preferences: {},
-        is_pro: false,
-      };
-
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      // Profile doesn't exist
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: null,
-        }),
-      });
-
-      // Create profile
-      mockSupabase.from.mockReturnValueOnce({
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: mockNewProfile,
-          error: null,
-        }),
-      });
-
-      const request = createAuthRequest('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ display_name: 'newuser' }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.profile).toEqual(mockNewProfile);
-    });
-
-    it('should update avatar_url', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      const mockUpdatedProfile = {
-        id: 'user-123',
-        email: 'test@example.com',
-        display_name: 'testuser',
-        avatar_url: 'https://example.com/avatar.jpg',
-        preferences: {},
-        is_pro: false,
-      };
-
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: { id: 'user-123' },
-          error: null,
-        }),
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: mockUpdatedProfile,
-          error: null,
-        }),
-      });
-
-      const request = createAuthRequest('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ avatar_url: 'https://example.com/avatar.jpg' }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.profile.avatar_url).toBe('https://example.com/avatar.jpg');
-    });
-
-    it('should return 500 if update fails', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: { id: 'user-123' },
-          error: null,
-        }),
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: { message: 'Update failed' },
-        }),
-      });
-
-      const request = createAuthRequest('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ display_name: 'newname' }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to update profile');
-    });
-
-    it('should return 500 if profile creation during update fails', async () => {
-      const mockUser = { id: 'user-789', email: 'new@example.com' };
-
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: null,
-        }),
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: null,
-          error: { message: 'Insert failed' },
-        }),
-      });
-
-      const request = createAuthRequest('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ display_name: 'newuser' }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(500);
-      expect(data.error).toBe('Failed to create profile');
-    });
-
-    it('should handle partial updates', async () => {
-      const mockUser = { id: 'user-123', email: 'test@example.com' };
-      const mockUpdatedProfile = {
-        id: 'user-123',
-        email: 'test@example.com',
-        display_name: 'testuser',
-        avatar_url: null,
-        preferences: { units: 'metric' },
-        is_pro: false,
-      };
-
-      mockSupabase.auth.getUser.mockResolvedValueOnce({
-        data: { user: mockUser },
-        error: null,
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: { id: 'user-123' },
-          error: null,
-        }),
-      });
-
-      mockSupabase.from.mockReturnValueOnce({
-        update: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValueOnce({
-          data: mockUpdatedProfile,
-          error: null,
-        }),
-      });
-
-      // Only update preferences
-      const request = createAuthRequest('http://localhost/api/profile', {
-        method: 'PUT',
-        body: JSON.stringify({ preferences: { units: 'metric' } }),
-      });
-
-      const response = await PUT(request);
-      const data = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(data.profile.preferences.units).toBe('metric');
     });
   });
 });
