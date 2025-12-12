@@ -31,7 +31,7 @@ export default function HomePage() {
               and State Parks
             </h1>
             <p className="text-xl md:text-2xl text-green-100 mb-8 max-w-2xl mx-auto">
-              Explore over 400 national and state parks, monuments, and historic sites. Plan your
+              Explore over 7,000 national and state parks, monuments, and historic sites. Plan your
               next adventure today.
             </p>
 
