@@ -12,12 +12,12 @@ import FavoriteButton from './FavoriteButton';
 
 /**
  * Get the appropriate URL for a park based on its source
- * All parks now use the same URL structure: /parks/[park_code]
+ * All parks now use the same URL structure: /park/[id]
  * @param {Object} park - Park data
  * @returns {string} URL path for the park
  */
 function getParkUrl(park) {
-  return `/parks/${park.park_code}`;
+  return `/park/${park.id}`;
 }
 
 /**

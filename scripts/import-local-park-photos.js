@@ -206,6 +206,7 @@ const processPark = async (supabase, park, options) => {
     matched: false,
     photosAdded: 0,
     error: null,
+    photoSources: [],
   };
 
   try {
@@ -217,13 +218,14 @@ const processPark = async (supabase, park, options) => {
     });
 
     if (!match) {
+      console.log(`\n   ⚪ "${park.name}" - No Wikidata match found`);
       return result;
     }
 
     result.matched = true;
 
     if (options.dryRun) {
-      console.log(`   [DRY RUN] Would match "${park.name}" with ${match.wikidata_id} (${match.label})`);
+      console.log(`\n   [DRY RUN] Would match "${park.name}" with ${match.wikidata_id} (${match.label})`);
       return result;
     }
 
@@ -236,7 +238,13 @@ const processPark = async (supabase, park, options) => {
       if (primaryImage) {
         const added = await insertParkPhotos(supabase, park.id, [primaryImage], true);
         result.photosAdded += added;
+        result.photoSources.push('wikidata_p18');
+        console.log(`\n   ✅ "${park.name}" - Found primary image from Wikidata P18`);
+      } else {
+        console.log(`\n   ⚠️  "${park.name}" - Wikidata P18 image URL exists but fetch failed`);
       }
+    } else {
+      console.log(`\n   ℹ️  "${park.name}" - No primary image (P18) in Wikidata`);
     }
 
     // Fetch additional images from Commons category
@@ -248,10 +256,24 @@ const processPark = async (supabase, park, options) => {
       if (commonsImages.length > 0) {
         const added = await insertParkPhotos(supabase, park.id, commonsImages, !match.image_url);
         result.photosAdded += added;
+        result.photoSources.push(`commons_category(${commonsImages.length})`);
+        console.log(`   ✅ "${park.name}" - Found ${commonsImages.length} images from Commons category "${match.commons_category}"`);
+      } else {
+        console.log(`   ⚠️  "${park.name}" - Commons category "${match.commons_category}" has no images`);
       }
+    } else {
+      console.log(`   ℹ️  "${park.name}" - No Commons category linked in Wikidata`);
+    }
+
+    // Summary for this park
+    if (result.photosAdded === 0) {
+      console.log(`   🔴 "${park.name}" - Matched to Wikidata (${match.wikidata_id}) but NO PHOTOS FOUND`);
+    } else {
+      console.log(`   🟢 "${park.name}" - Total photos added: ${result.photosAdded} from [${result.photoSources.join(', ')}]`);
     }
   } catch (error) {
     result.error = error.message;
+    console.log(`\n   ❌ "${park.name}" - Error: ${error.message}`);
   }
 
   return result;
