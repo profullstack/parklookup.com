@@ -19,7 +19,7 @@ export default function TripDetailPage() {
   const params = useParams();
   const { id } = params;
   const { session, loading: authLoading, isAuthenticated } = useAuth();
-  const { isPro } = useProfile();
+  const { isPro, loading: profileLoading } = useProfile();
   
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -120,8 +120,8 @@ export default function TripDetailPage() {
     }
   }, [session, id, router]);
 
-  // Show loading while checking auth
-  if (authLoading || (isAuthenticated && loading)) {
+  // Show loading while checking auth or loading profile
+  if (authLoading || profileLoading || (isAuthenticated && loading)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">

@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/client';
 import { generateTripPdf } from '@/lib/pdf/trip-pdf-generator.js';
+import { isUserProFromDb } from '@/lib/subscription/pro-status';
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
@@ -47,25 +48,6 @@ const getAuthenticatedUser = async (request) => {
   return user;
 };
 
-/**
- * Check if user has pro subscription
- * @param {Object} supabase - Supabase client
- * @param {string} userId - User ID
- * @returns {Promise<boolean>} True if user is pro
- */
-const isUserPro = async (supabase, userId) => {
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('is_pro')
-    .eq('id', userId)
-    .single();
-
-  if (error || !profile) {
-    return false;
-  }
-
-  return profile.is_pro === true;
-};
 
 /**
  * Transform database trip to API format
@@ -133,7 +115,7 @@ export async function GET(request, { params }) {
     const supabase = createServerClient({ useServiceRole: true });
 
     // Check if user is pro
-    const isPro = await isUserPro(supabase, user.id);
+    const isPro = await isUserProFromDb(supabase, user.id);
     if (!isPro) {
       return NextResponse.json(
         { error: 'PDF export is a Pro feature' },

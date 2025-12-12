@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
+import { isProUser } from '@/lib/subscription/pro-status';
 
 /**
  * Hook to fetch and manage user profile
@@ -68,8 +69,9 @@ export function useProfile() {
 
   /**
    * Check if user is a pro subscriber
+   * Uses centralized pro status utility
    */
-  const isPro = profile?.is_pro === true;
+  const isPro = isProUser(profile);
 
   /**
    * Refresh profile data
