@@ -43,6 +43,39 @@ vi.mock('leaflet', () => ({
 // Mock leaflet CSS
 vi.mock('leaflet/dist/leaflet.css', () => ({}));
 
+// Mock LocalParkUserPhotos component
+vi.mock('@/components/parks/LocalParkUserPhotos', () => ({
+  default: ({ localParkId, existingPhotos }) => (
+    <div data-testid="local-park-user-photos">
+      <h2>Photos & Videos</h2>
+      {existingPhotos?.length > 0 ? (
+        existingPhotos.map((photo, index) => (
+          <img key={photo.id || index} src={photo.image_url} alt={`Photo ${index + 1}`} />
+        ))
+      ) : (
+        <p>No photos available for this park yet</p>
+      )}
+    </div>
+  ),
+}));
+
+// Mock NearbyParks component
+vi.mock('@/components/parks/NearbyParks', () => ({
+  default: ({ latitude, longitude, currentParkCode, radius, limit }) => (
+    <div data-testid="nearby-parks" data-lat={latitude} data-lng={longitude}>
+      Nearby Parks
+    </div>
+  ),
+}));
+
+// Mock useAuth hook
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({
+    user: null,
+    accessToken: null,
+  }),
+}));
+
 describe('LocalParkDetailClient Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
