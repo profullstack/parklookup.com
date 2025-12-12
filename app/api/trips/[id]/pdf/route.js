@@ -52,15 +52,18 @@ const getAuthenticatedUser = async (request) => {
 /**
  * Transform database trip to API format
  * @param {Object} trip - Database trip object
+ * @param {Array} routeCoordinates - Optional route coordinates
  * @returns {Object} Transformed trip
  */
-const transformTrip = (trip) => {
+const transformTrip = (trip, routeCoordinates = []) => {
   return {
     id: trip.id,
     title: trip.title,
     origin: trip.origin,
-    originLat: trip.origin_lat,
-    originLng: trip.origin_lng,
+    originCoords:
+      trip.origin_lat && trip.origin_lng
+        ? { lat: trip.origin_lat, lng: trip.origin_lng }
+        : null,
     startDate: trip.start_date,
     endDate: trip.end_date,
     interests: trip.interests,
@@ -71,6 +74,7 @@ const transformTrip = (trip) => {
     safetyNotes: trip.ai_summary?.safety_notes || [],
     bestPhotoSpots: trip.ai_summary?.best_photo_spots || [],
     estimatedBudget: trip.ai_summary?.estimated_budget || null,
+    routeCoordinates,
     stops: (trip.trip_stops || [])
       .sort((a, b) => {
         if (a.day_number !== b.day_number) {
@@ -92,6 +96,62 @@ const transformTrip = (trip) => {
         notes: stop.notes,
       })),
   };
+};
+
+/**
+ * Fetch route coordinates from OSRM API
+ * @param {Object} origin - Origin coordinates {lat, lng}
+ * @param {Array} stops - Trip stops with park coordinates
+ * @returns {Promise<Array>} Route coordinates as [lat, lng] pairs
+ */
+const fetchRouteCoordinates = async (origin, stops) => {
+  try {
+    // Build waypoints array
+    const waypoints = [];
+
+    if (origin?.lat && origin?.lng) {
+      waypoints.push({ lat: origin.lat, lng: origin.lng });
+    }
+
+    // Sort stops by day number and add their coordinates
+    const sortedStops = [...stops].sort((a, b) => a.day_number - b.day_number);
+    for (const stop of sortedStops) {
+      if (stop.park?.latitude && stop.park?.longitude) {
+        waypoints.push({ lat: stop.park.latitude, lng: stop.park.longitude });
+      }
+    }
+
+    if (waypoints.length < 2) {
+      return [];
+    }
+
+    // Format waypoints for API: lng,lat;lng,lat;...
+    const waypointsStr = waypoints.map((wp) => `${wp.lng},${wp.lat}`).join(';');
+
+    // Use internal API route
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/route?waypoints=${waypointsStr}`, {
+      headers: {
+        'User-Agent': 'ParkLookup-PDF/1.0',
+      },
+    });
+
+    if (!response.ok) {
+      console.warn('Route API returned non-OK status:', response.status);
+      return [];
+    }
+
+    const data = await response.json();
+
+    if (data.success && data.route?.coordinates) {
+      return data.route.coordinates;
+    }
+
+    return [];
+  } catch (error) {
+    console.warn('Failed to fetch route coordinates:', error.message);
+    return [];
+  }
 };
 
 /**
@@ -249,8 +309,15 @@ export async function GET(request, { params }) {
       park: parksMap[stop.park_code] || null,
     }));
 
+    // Fetch route coordinates for the map
+    const origin =
+      trip.origin_lat && trip.origin_lng
+        ? { lat: trip.origin_lat, lng: trip.origin_lng }
+        : null;
+    const routeCoordinates = await fetchRouteCoordinates(origin, trip.trip_stops);
+
     // Transform trip data
-    const transformedTrip = transformTrip(trip);
+    const transformedTrip = transformTrip(trip, routeCoordinates);
 
     // Generate PDF
     const { buffer, filename } = await generateTripPdf(transformedTrip);
