@@ -11,6 +11,7 @@ import WeatherAlerts from '@/components/weather/WeatherAlerts';
 import { ProductCarousel } from '@/components/products/ProductCard';
 import NearbyPlaces from '@/components/parks/NearbyPlaces';
 import ParkReviews from '@/components/parks/ParkReviews';
+import UserPhotos from '@/components/parks/UserPhotos';
 
 // Dynamically import the map component to avoid SSR issues with Leaflet
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -25,6 +26,7 @@ const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
  */
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'photos', label: 'Photos' },
   { id: 'map', label: 'Map' },
   { id: 'weather', label: 'Weather Events' },
   { id: 'activities', label: 'Activities' },
@@ -338,6 +340,11 @@ export default function ParkDetailClient({
             <NearbyPlaces parkCode={park.park_code} />
           </div>
         </div>
+      )}
+
+      {/* Photos Tab */}
+      {activeTab === 'photos' && (
+        <UserPhotos parkCode={park.park_code} />
       )}
 
       {/* Reviews Tab */}
