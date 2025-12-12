@@ -81,6 +81,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -101,6 +102,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -166,6 +168,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', user_metadata: { avatar_url: null } },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -320,6 +323,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-1' }, // Same as comment-1 author
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -340,6 +344,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-999' }, // Different user
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
 
@@ -394,6 +399,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-1' }, // Same as comment-1 author
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -467,6 +473,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: null,
         session: null,
+        accessToken: null,
         loading: false,
       });
     });
@@ -515,6 +522,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'my-secret-token' },
+        accessToken: 'my-secret-token',
         loading: false,
       });
 
@@ -554,6 +562,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: null,
+        accessToken: null,
         loading: false,
       });
 
@@ -567,6 +576,7 @@ describe('MediaComments Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });

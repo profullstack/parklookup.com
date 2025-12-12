@@ -195,6 +195,19 @@ export function AuthProvider({ children }) {
     await fetchSession();
   };
 
+  /**
+   * Get the access token from session or localStorage
+   * This is a convenience getter for components that need the token
+   */
+  const getAccessToken = useCallback(() => {
+    // First try session
+    if (session?.access_token) {
+      return session.access_token;
+    }
+    // Fallback to localStorage
+    return getStoredToken();
+  }, [session]);
+
   const value = {
     user,
     session,
@@ -204,6 +217,9 @@ export function AuthProvider({ children }) {
     signOut,
     refreshSession,
     isAuthenticated: !!user,
+    // Convenience getter for access token
+    accessToken: session?.access_token || getStoredToken(),
+    getAccessToken,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

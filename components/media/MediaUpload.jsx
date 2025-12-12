@@ -18,8 +18,7 @@ const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
  * Allows users to upload photos and videos for a park
  */
 export default function MediaUpload({ parkCode, onUploadComplete, onCancel }) {
-  const { user, session } = useAuth();
-  const accessToken = session?.access_token;
+  const { user, accessToken } = useAuth();
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [title, setTitle] = useState('');

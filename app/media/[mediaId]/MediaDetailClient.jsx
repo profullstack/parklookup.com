@@ -42,8 +42,7 @@ const formatRelativeTime = (dateString) => {
  */
 export default function MediaDetailClient({ media }) {
   const router = useRouter();
-  const { user, session } = useAuth();
-  const accessToken = session?.access_token;
+  const { user, accessToken } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(media.likes_count || 0);
   const [isLiking, setIsLiking] = useState(false);

@@ -84,6 +84,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -104,6 +105,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -158,6 +160,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
       mockGetParkMedia.mockResolvedValue({ media: [], error: null });
@@ -183,6 +186,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: null,
         session: null,
+        accessToken: null,
         loading: false,
       });
 
@@ -199,6 +203,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -254,6 +259,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
@@ -318,6 +324,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'my-secret-token' },
+        accessToken: 'my-secret-token',
         loading: false,
       });
 
@@ -329,6 +336,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: null,
+        accessToken: null,
         loading: false,
       });
 
@@ -342,6 +350,7 @@ describe('MediaGrid Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });

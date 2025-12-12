@@ -29,10 +29,12 @@ vi.mock('next/link', () => ({
 // Mock useAuth hook
 const mockUser = { id: 'user-123' };
 const mockSession = { access_token: 'test-token' };
+const mockAccessToken = 'test-token';
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: vi.fn(() => ({
     user: mockUser,
     session: mockSession,
+    accessToken: mockAccessToken,
   })),
 }));
 
@@ -98,6 +100,7 @@ describe('MediaDetailClient', () => {
     useAuth.mockReturnValue({
       user: mockUser,
       session: mockSession,
+      accessToken: mockAccessToken,
     });
   });
 
@@ -220,7 +223,7 @@ describe('MediaDetailClient', () => {
     });
 
     it('should not allow liking when not authenticated', () => {
-      useAuth.mockReturnValue({ user: null, session: null });
+      useAuth.mockReturnValue({ user: null, session: null, accessToken: null });
       render(<MediaDetailClient media={mockMedia} />);
       
       const likeButton = screen.getByRole('button', { name: /5/i });
@@ -241,6 +244,7 @@ describe('MediaDetailClient', () => {
       useAuth.mockReturnValue({
         user: { id: 'other-user' },
         session: mockSession,
+        accessToken: mockAccessToken,
       });
       render(<MediaDetailClient media={mockMedia} />);
       

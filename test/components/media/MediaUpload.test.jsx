@@ -40,6 +40,7 @@ describe('MediaUpload Component', () => {
       mockUseAuth.mockReturnValue({
         user: null,
         session: null,
+        accessToken: null,
         loading: false,
       });
     });
@@ -63,6 +64,7 @@ describe('MediaUpload Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123', email: 'test@example.com' },
         session: { access_token: 'test-token-123' },
+        accessToken: 'test-token-123',
         loading: false,
       });
     });
@@ -405,6 +407,7 @@ describe('MediaUpload Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'my-secret-token' },
+        accessToken: 'my-secret-token',
         loading: false,
       });
 
@@ -424,6 +427,7 @@ describe('MediaUpload Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: null,
+        accessToken: null,
         loading: false,
       });
 
@@ -445,6 +449,7 @@ describe('MediaUpload Component', () => {
       mockUseAuth.mockReturnValue({
         user: { id: 'user-123' },
         session: { access_token: 'test-token' },
+        accessToken: 'test-token',
         loading: false,
       });
     });
