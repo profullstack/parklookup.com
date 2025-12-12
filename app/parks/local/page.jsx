@@ -173,18 +173,18 @@ export default async function LocalParksPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-blue-600 to-blue-800 text-white py-16">
+      <section className="bg-gradient-to-br from-green-600 to-green-800 text-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">County & City Parks</h1>
-            <p className="text-xl text-blue-100 max-w-2xl mx-auto mb-6">
+            <p className="text-xl text-green-100 max-w-2xl mx-auto mb-6">
               Discover {totalCount.toLocaleString()} local parks across America. From neighborhood
               playgrounds to regional recreation areas.
             </p>
             <div className="flex flex-wrap justify-center gap-4">
               <Link
                 href="/parks/county"
-                className="inline-flex items-center px-6 py-3 bg-white text-blue-700 font-semibold rounded-lg hover:bg-blue-50 transition-colors"
+                className="inline-flex items-center px-6 py-3 bg-white text-green-700 font-semibold rounded-lg hover:bg-green-50 transition-colors"
               >
                 <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path
@@ -260,9 +260,9 @@ export default async function LocalParksPage() {
           <div className="grid md:grid-cols-2 gap-6">
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                   <svg
-                    className="w-6 h-6 text-blue-600"
+                    className="w-6 h-6 text-green-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -284,7 +284,7 @@ export default async function LocalParksPage() {
               </p>
               <Link
                 href="/parks/county"
-                className="inline-flex items-center mt-4 text-blue-600 hover:text-blue-700 font-medium"
+                className="inline-flex items-center mt-4 text-green-600 hover:text-green-700 font-medium"
               >
                 Browse County Parks
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,9 +300,9 @@ export default async function LocalParksPage() {
 
             <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
                   <svg
-                    className="w-6 h-6 text-purple-600"
+                    className="w-6 h-6 text-green-600"
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
@@ -324,7 +324,7 @@ export default async function LocalParksPage() {
               </p>
               <Link
                 href="/parks/city"
-                className="inline-flex items-center mt-4 text-purple-600 hover:text-purple-700 font-medium"
+                className="inline-flex items-center mt-4 text-green-600 hover:text-green-700 font-medium"
               >
                 Browse City Parks
                 <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
