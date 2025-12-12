@@ -7,7 +7,7 @@ import ParkDetailClient from './ParkDetailClient';
 /**
  * Valid tab names for park detail pages
  */
-const VALID_TABS = ['overview', 'map', 'weather', 'activities', 'reviews', 'info'];
+const VALID_TABS = ['overview', 'map', 'weather', 'activities', 'reviews', 'info', 'photos'];
 const DEFAULT_TAB = 'overview';
 
 /**
@@ -78,6 +78,7 @@ export async function generateMetadata({ params }) {
     activities: ' - Activities & Nearby Places',
     reviews: ' - Reviews & Ratings',
     info: ' - Park Information',
+    photos: ' - User Photos & Videos',
   };
 
   const tabDescriptions = {
@@ -87,6 +88,7 @@ export async function generateMetadata({ params }) {
     activities: `Discover activities and nearby places at ${park.full_name}`,
     reviews: `Read reviews and ratings for ${park.full_name}`,
     info: `Get entrance fees, operating hours, and contact information for ${park.full_name}`,
+    photos: `View user-contributed photos and videos of ${park.full_name}`,
   };
 
   return {
