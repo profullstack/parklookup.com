@@ -6,6 +6,9 @@
 import Link from 'next/link';
 import { createServiceClient } from '@/lib/supabase/server';
 
+// Force dynamic rendering to prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'City Parks by State | ParkLookup',
   description:

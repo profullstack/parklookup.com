@@ -7,6 +7,9 @@ import Link from 'next/link';
 import { createServiceClient } from '@/lib/supabase/server';
 import LocalParkCard from '@/components/parks/LocalParkCard';
 
+// Force dynamic rendering to prevent static generation during build
+export const dynamic = 'force-dynamic';
+
 export const metadata = {
   title: 'County & City Parks | ParkLookup',
   description:
