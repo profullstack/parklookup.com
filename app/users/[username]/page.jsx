@@ -9,11 +9,25 @@ export async function generateMetadata({ params }) {
   const { username } = await params;
   const supabase = createServiceClient();
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('display_name, username')
-    .ilike('username', username)
-    .single();
+  // Check if the param is a UUID (user ID) or username
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
+
+  let profile;
+  if (isUUID) {
+    const result = await supabase
+      .from('profiles')
+      .select('display_name, username')
+      .eq('id', username)
+      .single();
+    profile = result.data;
+  } else {
+    const result = await supabase
+      .from('profiles')
+      .select('display_name, username')
+      .ilike('username', username)
+      .single();
+    profile = result.data;
+  }
 
   if (!profile) {
     return {
@@ -30,17 +44,37 @@ export async function generateMetadata({ params }) {
 /**
  * User Profile Page
  * Shows user profile with their photos and follow functionality
+ * Supports lookup by username or user ID (UUID) for backward compatibility
  */
 export default async function UserProfilePage({ params }) {
   const { username } = await params;
   const supabase = createServiceClient();
 
-  // Fetch user profile by username (case-insensitive)
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .ilike('username', username)
-    .single();
+  // Check if the param is a UUID (user ID) or username
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(username);
+
+  let profile;
+  let error;
+
+  if (isUUID) {
+    // Lookup by user ID
+    const result = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', username)
+      .single();
+    profile = result.data;
+    error = result.error;
+  } else {
+    // Lookup by username (case-insensitive)
+    const result = await supabase
+      .from('profiles')
+      .select('*')
+      .ilike('username', username)
+      .single();
+    profile = result.data;
+    error = result.error;
+  }
 
   if (error || !profile) {
     notFound();

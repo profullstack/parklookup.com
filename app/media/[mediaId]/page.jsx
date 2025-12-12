@@ -76,7 +76,7 @@ export default async function MediaDetailPage({ params }) {
   // Fetch profile separately
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, display_name, avatar_url, bio')
+    .select('id, username, display_name, avatar_url, bio')
     .eq('id', media.user_id)
     .single();
 
