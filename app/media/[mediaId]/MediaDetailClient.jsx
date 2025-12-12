@@ -108,8 +108,9 @@ export default function MediaDetailClient({ media }) {
     }
 
     // Redirect to park page (use park_code directly or from nps_parks for backward compatibility)
-    const parkCode = media.park_code || media.nps_parks?.park_code;
-    router.push(parkCode ? `/parks/${parkCode}/photos` : '/');
+    // Use park ID for the unified /park/:id URL pattern
+    const parkId = media.park_id || media.nps_parks?.id;
+    router.push(parkId ? `/park/${parkId}/photos` : '/');
   };
 
   return (
@@ -275,7 +276,7 @@ export default function MediaDetailClient({ media }) {
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Taken at</p>
                   <Link
-                    href={`/parks/${media.park?.park_code || media.nps_parks?.park_code}`}
+                    href={`/park/${media.park?.id || media.nps_parks?.id}`}
                     className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

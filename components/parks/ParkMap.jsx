@@ -354,7 +354,7 @@ export function ParksMap({ parks = [], zoom = 4, className = '' }) {
                 )}
                 <br />
                 <a
-                  href={`/parks/${park.park_code}`}
+                  href={`/park/${park.id}`}
                   className="text-sm text-blue-600 hover:underline"
                 >
                   View Details

@@ -212,7 +212,7 @@ export default function StatePage() {
               {parks.map((park) => (
                 <Link
                   key={park.id}
-                  href={`/parks/${park.park_code}`}
+                  href={`/park/${park.id}`}
                   className="bg-white rounded-lg shadow-sm overflow-hidden hover:shadow-md transition-shadow"
                 >
                   {getParkImage(park) ? (
@@ -241,7 +241,7 @@ export default function StatePage() {
               {parks.map((park) => (
                 <Link
                   key={park.id}
-                  href={`/parks/${park.park_code}`}
+                  href={`/park/${park.id}`}
                   className="flex items-center gap-4 p-4 hover:bg-gray-50 transition-colors"
                 >
                   {getParkImage(park) ? (

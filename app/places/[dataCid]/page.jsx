@@ -533,7 +533,7 @@ export default function PlaceDetailPage() {
               {parks.map((park) => (
                 <Link
                   key={park.id}
-                  href={`/parks/${park.park_code}`}
+                  href={`/park/${park.id}`}
                   className="flex items-center gap-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 hover:shadow-md transition-shadow"
                 >
                   {park.images?.[0] && (

@@ -101,7 +101,7 @@ function FeedItem({ item, onLikeToggle, currentUserId }) {
               <>
                 <span>•</span>
                 <Link
-                  href={`/parks/${item.park_code}`}
+                  href={`/park/${item.park_id}`}
                   className="hover:text-green-600 truncate"
                 >
                   {item.park_name}

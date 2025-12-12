@@ -62,7 +62,9 @@ export async function GET(request) {
 
     // If filtering for images, we need to fetch more and filter server-side
     // because JSONB array emptiness can't be easily checked in PostgREST
-    const fetchLimit = hasImages ? Math.max(limit * 3, 100) : limit;
+    // We need to fetch a LOT more because most local parks don't have images
+    // and they come first alphabetically
+    const fetchLimit = hasImages ? Math.max(limit * 50, 500) : limit;
 
     const { data: parks, error, count } = await query
       .order('full_name')

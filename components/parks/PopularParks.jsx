@@ -28,6 +28,13 @@ export default function PopularParks() {
         
         const data = await response.json();
         
+        console.log('PopularParks: API response:', {
+          total: data.total,
+          parksCount: data.parks?.length,
+          hasImages: data.hasImages,
+          error: data.error,
+        });
+        
         // Helper function to get the image URL from a park
         // The API already filtered for parks with images, but we still need to extract the URL
         const getImageUrl = (park) => {
@@ -135,8 +142,8 @@ export default function PopularParks() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {parks.map((park) => (
             <Link
-              key={park.park_code}
-              href={`/parks/${park.park_code}`}
+              key={park.id}
+              href={`/park/${park.id}`}
               className="group block bg-white rounded-xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
             >
               <div className="relative h-48 overflow-hidden">

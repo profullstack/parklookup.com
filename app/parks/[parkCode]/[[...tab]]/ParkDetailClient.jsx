@@ -67,11 +67,12 @@ export default function ParkDetailClient({
       </div>
 
       {/* Tabs - using Links for SSR-friendly navigation */}
+      {/* Use /park/:id URL pattern for all parks */}
       <div className="flex overflow-x-auto border-b border-gray-200 dark:border-gray-700 mb-6 -mx-4 px-4">
         {TABS.map((tab) => (
           <Link
             key={tab.id}
-            href={`/parks/${park.park_code}${tab.id === 'overview' ? '' : `/${tab.id}`}`}
+            href={`/park/${park.id}${tab.id === 'overview' ? '' : `/${tab.id}`}`}
             className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               activeTab === tab.id
                 ? 'border-green-600 text-green-600'

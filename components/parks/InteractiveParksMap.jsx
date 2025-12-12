@@ -233,8 +233,8 @@ function getParkUrl(park) {
     return `/parks/city/${park.state.toLowerCase()}/${encodeURIComponent(park.city.toLowerCase().replace(/\s+/g, '-'))}/${park.slug}`;
   }
   
-  // National and state parks use park_code
-  return `/parks/${park.park_code}`;
+  // All parks use the unified /park/:id URL pattern
+  return `/park/${park.id}`;
 }
 
 /**
