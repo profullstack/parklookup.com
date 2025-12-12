@@ -6,6 +6,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { formatTripForPdf, generateTripPdf } from '@/lib/pdf/trip-pdf-generator';
 
+// Mock fs/promises
+vi.mock('fs/promises', () => ({
+  readFile: vi.fn().mockRejectedValue(new Error('Font file not found')),
+}));
+
+// Mock @pdf-lib/fontkit
+vi.mock('@pdf-lib/fontkit', () => ({
+  default: {},
+}));
+
 // Mock pdf-lib
 vi.mock('pdf-lib', () => {
   const mockPage = {
@@ -23,6 +33,7 @@ vi.mock('pdf-lib', () => {
     getPageCount: vi.fn().mockReturnValue(1),
     getPage: vi.fn().mockReturnValue(mockPage),
     save: vi.fn().mockResolvedValue(new Uint8Array([37, 80, 68, 70])), // %PDF
+    registerFontkit: vi.fn(),
   };
 
   return {
