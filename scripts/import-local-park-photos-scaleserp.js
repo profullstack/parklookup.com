@@ -31,7 +31,7 @@ loadEnv();
 
 // Get environment variables
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-const { SUPABASE_SERVICE_ROLE_KEY, SCALESERP_API_KEY } = process.env;
+const { SUPABASE_SERVICE_ROLE_KEY, SCALESERP_API_KEY, VALUESERP_API_KEY } = process.env;
 
 /** Delay between API requests to avoid rate limiting (ms) */
 const REQUEST_DELAY = 1000;
@@ -41,6 +41,9 @@ const MAX_PHOTOS_PER_PARK = 5;
 
 /** ScaleSERP API base URL */
 const SCALESERP_BASE_URL = 'https://api.scaleserp.com/search';
+
+/** ValueSERP API base URL (cheaper, used for image search fallback) */
+const VALUESERP_BASE_URL = 'https://api.valueserp.com/search';
 
 /**
  * Parse command line arguments
@@ -89,6 +92,11 @@ const validateEnv = () => {
     console.error('❌ Missing required environment variables:');
     missing.forEach((v) => console.error(`   - ${v}`));
     process.exit(1);
+  }
+
+  // ValueSERP is optional but recommended for cheaper image search
+  if (!VALUESERP_API_KEY) {
+    console.warn('⚠️  VALUESERP_API_KEY not set - will use ScaleSERP for image search (more expensive)');
   }
 };
 
@@ -159,6 +167,56 @@ const getPlacePhotos = async (dataId) => {
     search_type: 'place_photos',
     data_id: dataId,
   });
+};
+
+/**
+ * Make a request to ValueSERP API (cheaper than ScaleSERP)
+ */
+const makeValueSerpRequest = async (params) => {
+  const searchParams = new URLSearchParams({
+    api_key: VALUESERP_API_KEY,
+    ...params,
+  });
+
+  const url = `${VALUESERP_BASE_URL}?${searchParams.toString()}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`ValueSERP API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+
+  if (data.request_info?.success === false) {
+    throw new Error(`ValueSERP API error: ${data.request_info.message || 'Unknown error'}`);
+  }
+
+  return data;
+};
+
+/**
+ * Search for images using ValueSERP (cheaper) or ScaleSERP (fallback)
+ * This is a fallback when place_photos doesn't return full-size images
+ */
+const searchImages = async (query) => {
+  const params = {
+    search_type: 'images',
+    q: query,
+    google_domain: 'google.com',
+    gl: 'us',
+    hl: 'en',
+    num: 10,
+  };
+
+  // Use ValueSERP if available (cheaper), otherwise fall back to ScaleSERP
+  if (VALUESERP_API_KEY) {
+    console.log(`   💰 Using ValueSERP for image search (cheaper)`);
+    return makeValueSerpRequest(params);
+  } else {
+    console.log(`   💸 Using ScaleSERP for image search (no ValueSERP key)`);
+    return makeScaleSerpRequest(params);
+  }
 };
 
 /**
@@ -246,14 +304,41 @@ const insertParkPhotos = async (supabase, parkId, photos, isPrimary = false) => 
     return 0;
   }
 
-  const records = photos.map((photo, index) => ({
-    park_id: parkId,
-    source: 'other', // ScaleSERP/Google Places photos use 'other' source
-    image_url: photo.image,
-    thumb_url: photo.thumbnail,
-    title: photo.title || null,
-    is_primary: isPrimary && index === 0,
-  }));
+  // Log first photo structure for debugging
+  if (photos.length > 0) {
+    console.log(`   📋 Photo structure: ${JSON.stringify(Object.keys(photos[0]))}`);
+  }
+
+  // Filter and map photos - ScaleSERP may use different field names
+  const records = photos
+    .map((photo, index) => {
+      // Try different possible field names for image URL
+      // Do NOT use thumbnail as fallback - we want full-size images only
+      const imageUrl = photo.image || photo.original || photo.link || photo.url;
+      const thumbUrl = photo.thumbnail || photo.thumb || imageUrl;
+      
+      if (!imageUrl) {
+        console.log(`   ⚠️  Photo ${index} has no full-size image (only thumbnail):`, JSON.stringify(photo).substring(0, 200));
+        return null;
+      }
+
+      return {
+        park_id: parkId,
+        source: 'other', // ScaleSERP/Google Places photos use 'other' source
+        image_url: imageUrl,
+        thumb_url: thumbUrl,
+        title: photo.title || photo.name || null,
+        is_primary: isPrimary && index === 0,
+      };
+    })
+    .filter(Boolean); // Remove null entries
+
+  if (records.length === 0) {
+    console.log(`   ⚠️  No valid photos to insert after filtering`);
+    return 0;
+  }
+
+  console.log(`   📝 Inserting ${records.length} valid photos...`);
 
   const { data, error } = await supabase
     .from('park_photos')
@@ -264,7 +349,7 @@ const insertParkPhotos = async (supabase, parkId, photos, isPrimary = false) => 
     .select('id');
 
   if (error) {
-    console.warn(`⚠️  Failed to insert photos:`, error.message);
+    console.warn(`   ⚠️  Failed to insert photos:`, error.message);
     return 0;
   }
 
@@ -332,15 +417,40 @@ const processPark = async (supabase, park, options) => {
     console.log(`   📋 data_id: ${details.data_id}`);
 
     // Fetch photos using data_id
-    console.log(`   ⏳ Fetching photos...`);
+    console.log(`   ⏳ Fetching place photos...`);
     await sleep(REQUEST_DELAY);
     const photosResult = await getPlacePhotos(details.data_id);
-    const photos = photosResult?.place_photos_results || [];
+    let photos = photosResult?.place_photos_results || [];
 
-    console.log(`   📷 Found ${photos.length} photos`);
+    console.log(`   📷 Found ${photos.length} place photos`);
+
+    // Check if we have full-size images (not just thumbnails)
+    const fullSizePhotos = photos.filter(p => p.image || p.original || p.link || p.url);
+    console.log(`   📷 ${fullSizePhotos.length} have full-size images`);
+
+    // If no full-size images from place_photos, try Google Images search
+    if (fullSizePhotos.length === 0) {
+      console.log(`   🔄 No full-size images from place_photos, trying Google Images search...`);
+      await sleep(REQUEST_DELAY);
+      
+      const imageQuery = `${park.name} park ${cityName || countyName || ''} ${stateName}`;
+      const imagesResult = await searchImages(imageQuery);
+      const imageResults = imagesResult?.image_results || [];
+      
+      console.log(`   📷 Google Images returned ${imageResults.length} results`);
+      
+      // Convert image results to photo format
+      photos = imageResults.map(img => ({
+        image: img.original || img.link,
+        thumbnail: img.thumbnail,
+        title: img.title,
+      }));
+    } else {
+      photos = fullSizePhotos;
+    }
 
     if (photos.length === 0) {
-      console.log(`   🔴 Matched but NO PHOTOS found on Google Places`);
+      console.log(`   🔴 No photos found from either source`);
       return result;
     }
 
