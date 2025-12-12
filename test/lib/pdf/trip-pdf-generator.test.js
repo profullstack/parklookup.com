@@ -16,6 +16,11 @@ vi.mock('@pdf-lib/fontkit', () => ({
   default: {},
 }));
 
+// Mock static map generator
+vi.mock('@/lib/map/static-map-generator', () => ({
+  generateStaticMap: vi.fn().mockResolvedValue(null),
+}));
+
 // Mock pdf-lib
 vi.mock('pdf-lib', () => {
   const mockPage = {
