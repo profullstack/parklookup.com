@@ -63,9 +63,18 @@ export default function PopularParks() {
         
         console.log('PopularParks: Received', parksWithImageUrls.length, 'parks with images from API');
         
-        setParks(parksWithImageUrls);
+        // Filter out parks without valid image URLs
+        const validParks = parksWithImageUrls.filter(park => park.validatedImageUrl);
+        console.log('PopularParks: After filtering for valid images:', validParks.length, 'parks');
+        
+        if (validParks.length === 0 && parksWithImageUrls.length > 0) {
+          console.warn('PopularParks: All parks were filtered out due to missing image URLs');
+          console.log('PopularParks: Sample park data:', JSON.stringify(parksWithImageUrls[0], null, 2));
+        }
+        
+        setParks(validParks);
       } catch (err) {
-        console.error('Error fetching popular parks:', err);
+        console.error('PopularParks: Error fetching popular parks:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -102,8 +111,14 @@ export default function PopularParks() {
     );
   }
 
-  if (error || parks.length === 0) {
-    return null; // Don't show section if there's an error or no parks
+  if (error) {
+    console.error('PopularParks: Rendering null due to error:', error);
+    return null;
+  }
+  
+  if (parks.length === 0) {
+    console.log('PopularParks: Rendering null due to empty parks array');
+    return null;
   }
 
   return (
