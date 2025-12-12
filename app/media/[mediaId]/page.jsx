@@ -9,13 +9,10 @@ export async function generateMetadata({ params }) {
   const { mediaId } = await params;
   const supabase = createServiceClient();
 
+  // Fetch media without relationship joins (park_id FK was removed)
   const { data: media } = await supabase
     .from('user_media')
-    .select(`
-      *,
-      profiles:user_id (display_name),
-      nps_parks:park_id (full_name, park_code)
-    `)
+    .select('*')
     .eq('id', mediaId)
     .eq('status', 'ready')
     .single();
@@ -26,8 +23,24 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  const title = media.title || `Photo at ${media.nps_parks?.full_name || 'Park'}`;
-  const description = media.description || `Shared by ${media.profiles?.display_name || 'a visitor'}`;
+  // Fetch profile separately
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('display_name')
+    .eq('id', media.user_id)
+    .single();
+
+  // Fetch park separately using park_code
+  const { data: park } = media.park_code
+    ? await supabase
+        .from('all_parks')
+        .select('full_name, park_code')
+        .eq('park_code', media.park_code)
+        .single()
+    : { data: null };
+
+  const title = media.title || `Photo at ${park?.full_name || 'Park'}`;
+  const description = media.description || `Shared by ${profile?.display_name || 'a visitor'}`;
 
   return {
     title: `${title} | ParkLookup`,
@@ -48,23 +61,10 @@ export default async function MediaDetailPage({ params }) {
   const { mediaId } = await params;
   const supabase = createServiceClient();
 
-  // Fetch media with related data
+  // Fetch media without relationship joins (park_id FK was removed)
   const { data: media, error } = await supabase
     .from('user_media')
-    .select(`
-      *,
-      profiles:user_id (
-        id,
-        display_name,
-        avatar_url,
-        bio
-      ),
-      nps_parks:park_id (
-        id,
-        park_code,
-        full_name
-      )
-    `)
+    .select('*')
     .eq('id', mediaId)
     .eq('status', 'ready')
     .single();
@@ -72,6 +72,26 @@ export default async function MediaDetailPage({ params }) {
   if (error || !media) {
     notFound();
   }
+
+  // Fetch profile separately
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url, bio')
+    .eq('id', media.user_id)
+    .single();
+
+  // Fetch park separately using park_code (supports all park types)
+  const { data: park } = media.park_code
+    ? await supabase
+        .from('all_parks')
+        .select('id, park_code, full_name')
+        .eq('park_code', media.park_code)
+        .single()
+    : { data: null };
+
+  // Attach profile and park to media object for compatibility
+  media.profiles = profile;
+  media.park = park;
 
   // Get public URLs
   const { data: mediaUrl } = supabase.storage
@@ -100,6 +120,8 @@ export default async function MediaDetailPage({ params }) {
     thumbnail_url: thumbnailUrl?.publicUrl,
     likes_count: likesCount || 0,
     comments_count: commentsCount || 0,
+    // Keep backward compatibility with nps_parks reference
+    nps_parks: park,
   };
 
   return <MediaDetailClient media={mediaWithUrls} />;

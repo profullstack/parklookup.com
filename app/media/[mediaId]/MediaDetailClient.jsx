@@ -42,7 +42,8 @@ const formatRelativeTime = (dateString) => {
  */
 export default function MediaDetailClient({ media }) {
   const router = useRouter();
-  const { user, accessToken } = useAuth();
+  const { user, session } = useAuth();
+  const accessToken = session?.access_token;
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(media.likes_count || 0);
   const [isLiking, setIsLiking] = useState(false);
@@ -107,8 +108,9 @@ export default function MediaDetailClient({ media }) {
       return;
     }
 
-    // Redirect to park page
-    router.push(`/parks/${media.nps_parks?.park_code}/photos`);
+    // Redirect to park page (use park_code directly or from nps_parks for backward compatibility)
+    const parkCode = media.park_code || media.nps_parks?.park_code;
+    router.push(parkCode ? `/parks/${parkCode}/photos` : '/');
   };
 
   return (
@@ -270,11 +272,11 @@ export default function MediaDetailClient({ media }) {
               )}
 
               {/* Park link */}
-              {media.nps_parks && (
+              {(media.park || media.nps_parks) && (
                 <div className="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
                   <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Taken at</p>
                   <Link
-                    href={`/parks/${media.nps_parks.park_code}`}
+                    href={`/parks/${media.park?.park_code || media.nps_parks?.park_code}`}
                     className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -291,7 +293,7 @@ export default function MediaDetailClient({ media }) {
                         d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
                       />
                     </svg>
-                    {media.nps_parks.full_name}
+                    {media.park?.full_name || media.nps_parks?.full_name}
                   </Link>
                 </div>
               )}
