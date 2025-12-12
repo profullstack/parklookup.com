@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Card, { CardContent } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -638,9 +638,19 @@ function RecommendedProductsSection({ products }) {
  * @param {Function} props.onRegenerate - Regenerate handler
  * @param {Function} props.onDelete - Delete handler
  * @param {boolean} props.isRegenerating - Regenerating state
+ * @param {boolean} props.isPro - Whether user has pro subscription
+ * @param {string} props.accessToken - User's access token for API calls
  */
-export default function TripDetail({ trip, onRegenerate, onDelete, isRegenerating = false }) {
+export default function TripDetail({
+  trip,
+  onRegenerate,
+  onDelete,
+  isRegenerating = false,
+  isPro = false,
+  accessToken = null,
+}) {
   const {
+    id,
     title,
     origin,
     startDate,
@@ -655,6 +665,60 @@ export default function TripDetail({ trip, onRegenerate, onDelete, isRegeneratin
     estimatedBudget,
     recommendedProducts = [],
   } = trip;
+
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState(null);
+
+  /**
+   * Handle PDF export
+   */
+  const handleExportPdf = useCallback(async () => {
+    if (!isPro || !accessToken || !id) {
+      return;
+    }
+
+    try {
+      setIsExportingPdf(true);
+      setPdfError(null);
+
+      const response = await fetch(`/api/trips/${id}/pdf`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to generate PDF');
+      }
+
+      // Get the filename from Content-Disposition header
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let filename = 'trip-plan.pdf';
+      if (contentDisposition) {
+        const match = contentDisposition.match(/filename="(.+)"/);
+        if (match) {
+          filename = match[1];
+        }
+      }
+
+      // Create blob and download
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Error exporting PDF:', err);
+      setPdfError(err.message);
+    } finally {
+      setIsExportingPdf(false);
+    }
+  }, [isPro, accessToken, id]);
 
   return (
     <div className="space-y-6">
@@ -695,7 +759,37 @@ export default function TripDetail({ trip, onRegenerate, onDelete, isRegeneratin
           </div>
 
           {/* Actions */}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            {/* PDF Export Button - Pro Feature */}
+            {isPro && accessToken && (
+              <Button
+                onClick={handleExportPdf}
+                disabled={isExportingPdf}
+                variant="outline"
+                className="text-green-600 border-green-300 hover:bg-green-50"
+              >
+                {isExportingPdf ? '📄 Generating...' : '📄 Export PDF'}
+              </Button>
+            )}
+            {/* Upgrade prompt for non-pro users */}
+            {!isPro && (
+              <div className="relative group">
+                <Button
+                  variant="outline"
+                  className="text-gray-400 border-gray-200 cursor-not-allowed"
+                  disabled
+                >
+                  📄 Export PDF
+                  <span className="ml-1 text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded">
+                    PRO
+                  </span>
+                </Button>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">
+                  Upgrade to Pro to export trips as PDF
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-900" />
+                </div>
+              </div>
+            )}
             {onRegenerate && (
               <Button
                 onClick={onRegenerate}
@@ -716,6 +810,15 @@ export default function TripDetail({ trip, onRegenerate, onDelete, isRegeneratin
             )}
           </div>
         </div>
+
+        {/* PDF Export Error */}
+        {pdfError && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700">
+              <span className="font-medium">Error:</span> {pdfError}
+            </p>
+          </div>
+        )}
 
         {/* Summary */}
         {summary && (

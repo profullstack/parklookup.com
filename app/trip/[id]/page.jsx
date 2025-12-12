@@ -9,6 +9,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { useProfile } from '@/hooks/useProfile';
 import TripDetail from '@/components/trips/TripDetail';
 import TripMap from '@/components/trips/TripMap';
 import Card, { CardContent } from '@/components/ui/Card';
@@ -18,6 +19,7 @@ export default function TripDetailPage() {
   const params = useParams();
   const { id } = params;
   const { session, loading: authLoading, isAuthenticated } = useAuth();
+  const { isPro } = useProfile();
   
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -217,6 +219,8 @@ export default function TripDetailPage() {
           trip={trip}
           onRegenerate={handleRegenerate}
           onDelete={() => setShowDeleteConfirm(true)}
+          isPro={isPro}
+          accessToken={session?.access_token}
         />
       </div>
 
