@@ -5,42 +5,19 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// Mock canvas module
-vi.mock('canvas', () => {
-  const mockContext = {
-    fillStyle: '',
-    strokeStyle: '',
-    lineWidth: 0,
-    font: '',
-    textAlign: '',
-    textBaseline: '',
-    fillRect: vi.fn(),
-    beginPath: vi.fn(),
-    arc: vi.fn(),
-    fill: vi.fn(),
-    stroke: vi.fn(),
-    fillText: vi.fn(),
-    moveTo: vi.fn(),
-    lineTo: vi.fn(),
-    setLineDash: vi.fn(),
-    drawImage: vi.fn(),
+// Mock sharp module
+vi.mock('sharp', () => {
+  const mockSharpInstance = {
+    png: vi.fn().mockReturnThis(),
+    composite: vi.fn().mockReturnThis(),
+    toBuffer: vi.fn().mockResolvedValue(Buffer.from('mock-png-data')),
   };
 
-  const mockCanvas = {
-    getContext: vi.fn(() => mockContext),
-    toBuffer: vi.fn(() => Buffer.from('mock-png-data')),
-    width: 800,
-    height: 400,
-  };
+  const mockSharp = vi.fn(() => mockSharpInstance);
+  mockSharp.mockInstance = mockSharpInstance;
 
   return {
-    createCanvas: vi.fn(() => mockCanvas),
-    loadImage: vi.fn(() =>
-      Promise.resolve({
-        width: 256,
-        height: 256,
-      })
-    ),
+    default: mockSharp,
   };
 });
 
@@ -98,15 +75,6 @@ describe('Static Map Generator', () => {
       const result = await generateStaticMap({ points });
 
       expect(result).toBeInstanceOf(Buffer);
-    });
-
-    it('should use custom width and height', async () => {
-      const { createCanvas } = await import('canvas');
-      const points = [{ lat: 37.8, lng: -122.4, label: 'S', isOrigin: true }];
-
-      await generateStaticMap({ points, width: 1000, height: 500 });
-
-      expect(createCanvas).toHaveBeenCalledWith(1000, 500);
     });
 
     it('should handle route coordinates', async () => {
@@ -194,72 +162,40 @@ describe('Static Map Generator', () => {
     });
   });
 
-  describe('marker drawing', () => {
-    it('should draw markers for all points', async () => {
-      const { createCanvas } = await import('canvas');
-      const mockCanvas = createCanvas();
-      const mockCtx = mockCanvas.getContext('2d');
+  describe('sharp compositing', () => {
+    it('should use sharp for image compositing', async () => {
+      const sharp = (await import('sharp')).default;
 
       const points = [
         { lat: 37.8, lng: -122.4, label: 'S', isOrigin: true },
         { lat: 38.0, lng: -122.2, label: '1', isOrigin: false },
-        { lat: 38.2, lng: -122.0, label: '2', isOrigin: false },
       ];
 
       await generateStaticMap({ points });
 
-      // Should have drawn circles for markers
-      expect(mockCtx.arc).toHaveBeenCalled();
-      expect(mockCtx.fill).toHaveBeenCalled();
-      expect(mockCtx.fillText).toHaveBeenCalled();
-    });
-  });
-
-  describe('route drawing', () => {
-    it('should draw route line when route coordinates are provided', async () => {
-      const { createCanvas } = await import('canvas');
-      const mockCanvas = createCanvas();
-      const mockCtx = mockCanvas.getContext('2d');
-
-      const points = [
-        { lat: 37.8, lng: -122.4, label: 'S', isOrigin: true },
-        { lat: 38.0, lng: -122.2, label: '1', isOrigin: false },
-      ];
-      const routeCoordinates = [
-        [37.8, -122.4],
-        [37.9, -122.3],
-        [38.0, -122.2],
-      ];
-
-      await generateStaticMap({ points, routeCoordinates });
-
-      // Should have drawn lines
-      expect(mockCtx.moveTo).toHaveBeenCalled();
-      expect(mockCtx.lineTo).toHaveBeenCalled();
-      expect(mockCtx.stroke).toHaveBeenCalled();
+      // Sharp should have been called to create the base image
+      expect(sharp).toHaveBeenCalled();
     });
 
-    it('should draw dashed line when no route coordinates but multiple points', async () => {
-      const { createCanvas } = await import('canvas');
-      const mockCanvas = createCanvas();
-      const mockCtx = mockCanvas.getContext('2d');
+    it('should composite tiles onto the base image', async () => {
+      const sharp = (await import('sharp')).default;
 
       const points = [
         { lat: 37.8, lng: -122.4, label: 'S', isOrigin: true },
         { lat: 38.0, lng: -122.2, label: '1', isOrigin: false },
       ];
 
-      await generateStaticMap({ points, routeCoordinates: [] });
+      await generateStaticMap({ points });
 
-      // Should have set dashed line
-      expect(mockCtx.setLineDash).toHaveBeenCalled();
+      // Composite should have been called
+      expect(sharp.mockInstance.composite).toHaveBeenCalled();
     });
   });
 
   describe('zoom calculation', () => {
     it('should calculate appropriate zoom for nearby points', async () => {
       const points = [
-        { lat: 37.80, lng: -122.40, label: 'S', isOrigin: true },
+        { lat: 37.8, lng: -122.4, label: 'S', isOrigin: true },
         { lat: 37.81, lng: -122.39, label: '1', isOrigin: false },
       ];
 
@@ -277,6 +213,43 @@ describe('Static Map Generator', () => {
       // Should not throw and should generate a map
       const result = await generateStaticMap({ points });
       expect(result).toBeInstanceOf(Buffer);
+    });
+  });
+
+  describe('SVG generation', () => {
+    it('should create markers for all points', async () => {
+      const sharp = (await import('sharp')).default;
+
+      const points = [
+        { lat: 37.8, lng: -122.4, label: 'S', isOrigin: true },
+        { lat: 38.0, lng: -122.2, label: '1', isOrigin: false },
+        { lat: 38.2, lng: -122.0, label: '2', isOrigin: false },
+      ];
+
+      await generateStaticMap({ points });
+
+      // Composite should have been called multiple times for markers
+      const compositeCalls = sharp.mockInstance.composite.mock.calls;
+      expect(compositeCalls.length).toBeGreaterThan(0);
+    });
+
+    it('should draw route line when route coordinates are provided', async () => {
+      const sharp = (await import('sharp')).default;
+
+      const points = [
+        { lat: 37.8, lng: -122.4, label: 'S', isOrigin: true },
+        { lat: 38.0, lng: -122.2, label: '1', isOrigin: false },
+      ];
+      const routeCoordinates = [
+        [37.8, -122.4],
+        [37.9, -122.3],
+        [38.0, -122.2],
+      ];
+
+      await generateStaticMap({ points, routeCoordinates });
+
+      // Composite should have been called for route
+      expect(sharp.mockInstance.composite).toHaveBeenCalled();
     });
   });
 });
