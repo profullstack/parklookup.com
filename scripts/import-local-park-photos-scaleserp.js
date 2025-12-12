@@ -175,6 +175,20 @@ const getPlaceDetails = async (dataCid) => {
  * Fetches parks that need photo matching
  */
 const fetchParksToProcess = async (supabase, options) => {
+  // First, get parks that already have photos (to exclude them unless --force)
+  let parksWithPhotos = new Set();
+  
+  if (!options.force) {
+    const { data: photoParkIds } = await supabase
+      .from('park_photos')
+      .select('park_id')
+      .not('park_id', 'is', null);
+    
+    if (photoParkIds) {
+      parksWithPhotos = new Set(photoParkIds.map(p => p.park_id));
+    }
+  }
+
   let query = supabase
     .from('local_parks')
     .select(`
@@ -198,12 +212,6 @@ const fetchParksToProcess = async (supabase, options) => {
     query = query.eq('states.code', options.state);
   }
 
-  // Only process parks without photos unless force is set
-  if (!options.force) {
-    // Check if park has any photos in park_photos table
-    query = query.is('primary_photo_url', null);
-  }
-
   // Apply offset
   if (options.offset > 0) {
     query = query.range(options.offset, options.offset + (options.limit || 1000) - 1);
@@ -219,11 +227,19 @@ const fetchParksToProcess = async (supabase, options) => {
     throw new Error(`Failed to fetch parks: ${error.message}`);
   }
 
-  return data || [];
+  // Filter out parks that already have photos (unless --force)
+  let parks = data || [];
+  if (!options.force && parksWithPhotos.size > 0) {
+    parks = parks.filter(p => !parksWithPhotos.has(p.id));
+  }
+
+  return parks;
 };
 
 /**
  * Inserts photos for a park
+ * Note: source must be one of: 'wikimedia', 'nps', 'user', 'other'
+ * We use 'other' for ScaleSERP/Google Places photos
  */
 const insertParkPhotos = async (supabase, parkId, photos, isPrimary = false) => {
   if (!photos || photos.length === 0) {
@@ -232,7 +248,7 @@ const insertParkPhotos = async (supabase, parkId, photos, isPrimary = false) => 
 
   const records = photos.map((photo, index) => ({
     park_id: parkId,
-    source: 'scaleserp',
+    source: 'other', // ScaleSERP/Google Places photos use 'other' source
     image_url: photo.image,
     thumb_url: photo.thumbnail,
     title: photo.title || null,
@@ -250,14 +266,6 @@ const insertParkPhotos = async (supabase, parkId, photos, isPrimary = false) => 
   if (error) {
     console.warn(`⚠️  Failed to insert photos:`, error.message);
     return 0;
-  }
-
-  // Update primary_photo_url on the park if we added photos
-  if (data?.length > 0 && isPrimary && photos[0]?.thumbnail) {
-    await supabase
-      .from('local_parks')
-      .update({ primary_photo_url: photos[0].thumbnail })
-      .eq('id', parkId);
   }
 
   return data?.length ?? 0;
@@ -279,12 +287,16 @@ const processPark = async (supabase, park, options) => {
     const cityName = park.cities?.name;
     const countyName = park.counties?.name;
     
+    console.log(`\n   📍 Searching for "${park.name}" in ${cityName || countyName || ''}, ${stateName}...`);
+    
     // Search for the park on Google Places
     const searchResult = await searchPark(park.name, cityName || countyName, stateName);
     const places = searchResult?.places_results || [];
 
+    console.log(`   📊 Search returned ${places.length} results`);
+
     if (places.length === 0) {
-      console.log(`\n   ⚪ "${park.name}" - No Google Places match found`);
+      console.log(`   ⚪ No Google Places match found`);
       return result;
     }
 
@@ -292,12 +304,13 @@ const processPark = async (supabase, park, options) => {
     const bestMatch = places[0];
     
     if (!bestMatch.data_cid) {
-      console.log(`\n   ⚪ "${park.name}" - No data_cid in search result`);
+      console.log(`   ⚪ No data_cid in search result`);
       return result;
     }
 
     result.matched = true;
-    console.log(`\n   🔍 "${park.name}" - Found: "${bestMatch.title}" (${bestMatch.address || 'no address'})`);
+    console.log(`   🔍 Found: "${bestMatch.title}" (${bestMatch.address || 'no address'})`);
+    console.log(`   📋 data_cid: ${bestMatch.data_cid}`);
 
     if (options.dryRun) {
       console.log(`   [DRY RUN] Would fetch photos for "${bestMatch.title}"`);
@@ -305,22 +318,29 @@ const processPark = async (supabase, park, options) => {
     }
 
     // Get place details to obtain data_id (required for photos)
+    console.log(`   ⏳ Fetching place details...`);
     await sleep(REQUEST_DELAY);
     const detailsResult = await getPlaceDetails(bestMatch.data_cid);
     const details = detailsResult?.place_details || {};
 
     if (!details.data_id) {
-      console.log(`   ⚠️  "${park.name}" - Could not get data_id from place details`);
+      console.log(`   ⚠️  Could not get data_id from place details`);
+      console.log(`   📋 Details response keys: ${Object.keys(detailsResult || {}).join(', ')}`);
       return result;
     }
 
+    console.log(`   📋 data_id: ${details.data_id}`);
+
     // Fetch photos using data_id
+    console.log(`   ⏳ Fetching photos...`);
     await sleep(REQUEST_DELAY);
     const photosResult = await getPlacePhotos(details.data_id);
     const photos = photosResult?.place_photos_results || [];
 
+    console.log(`   📷 Found ${photos.length} photos`);
+
     if (photos.length === 0) {
-      console.log(`   🔴 "${park.name}" - Matched but NO PHOTOS found on Google Places`);
+      console.log(`   🔴 Matched but NO PHOTOS found on Google Places`);
       return result;
     }
 
@@ -328,15 +348,16 @@ const processPark = async (supabase, park, options) => {
     const limitedPhotos = photos.slice(0, MAX_PHOTOS_PER_PARK);
     
     // Insert photos
+    console.log(`   ⏳ Inserting ${limitedPhotos.length} photos into database...`);
     const added = await insertParkPhotos(supabase, park.id, limitedPhotos, true);
     result.photosAdded = added;
     result.photoSources.push(`google_places(${added})`);
 
-    console.log(`   🟢 "${park.name}" - Added ${added} photos from Google Places`);
+    console.log(`   🟢 Added ${added} photos from Google Places`);
 
   } catch (error) {
     result.error = error.message;
-    console.log(`\n   ❌ "${park.name}" - Error: ${error.message}`);
+    console.log(`   ❌ Error: ${error.message}`);
   }
 
   return result;
