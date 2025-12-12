@@ -4,16 +4,16 @@ import { createAnonClient } from '@/lib/supabase/server';
 import LocalParkDetailClient from '@/components/parks/LocalParkDetailClient';
 
 /**
- * Fetches a local park by state and slug
+ * Fetches a local park by state slug and park slug
  */
-async function getLocalPark(stateCode, parkSlug) {
+async function getLocalPark(stateSlug, parkSlug) {
   const supabase = createAnonClient();
 
-  // Get state ID
+  // Get state by slug
   const { data: state } = await supabase
     .from('states')
     .select('id, name, code')
-    .eq('code', stateCode.toUpperCase())
+    .eq('slug', stateSlug)
     .single();
 
   if (!state) {

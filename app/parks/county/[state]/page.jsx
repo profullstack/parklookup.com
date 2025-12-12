@@ -16,7 +16,7 @@ import { createClient } from '@/lib/supabase/server';
 export async function generateMetadata({ params }) {
   const { state } = await params;
 
-  const supabase = await createClient();
+  const supabase = createClient();
 
   const { data: stateData } = await supabase
     .from('states')
@@ -52,7 +52,7 @@ export async function generateMetadata({ params }) {
  * Fetch counties with park counts for a state
  */
 async function getStateCounties(stateSlug) {
-  const supabase = await createClient();
+  const supabase = createClient();
 
   // Get state info
   const { data: stateData, error: stateError } = await supabase

@@ -17,7 +17,7 @@ import { LocalParkGrid } from '@/components/parks/LocalParkCard';
 export async function generateMetadata({ params }) {
   const { state, county } = await params;
 
-  const supabase = await createClient();
+  const supabase = createClient();
 
   // Fetch county and state info
   const { data: countyData } = await supabase
@@ -60,7 +60,7 @@ export async function generateMetadata({ params }) {
  * Fetch parks for a county
  */
 async function getCountyParks(state, county, page = 1, limit = 24) {
-  const supabase = await createClient();
+  const supabase = createClient();
   const offset = (page - 1) * limit;
 
   // First get county info

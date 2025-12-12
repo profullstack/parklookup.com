@@ -16,7 +16,7 @@ import LocalParkDetailClient from '@/components/parks/LocalParkDetailClient';
 export async function generateMetadata({ params }) {
   const { state, county, parkSlug } = await params;
 
-  const supabase = await createClient();
+  const supabase = createClient();
 
   // Fetch park data
   const { data: park } = await supabase
@@ -80,7 +80,7 @@ export async function generateStaticParams() {
  * Fetch park data from database
  */
 async function getParkData(state, county, parkSlug) {
-  const supabase = await createClient();
+  const supabase = createClient();
 
   // Fetch park with all related data
   const { data: park, error } = await supabase
