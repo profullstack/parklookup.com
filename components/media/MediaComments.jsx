@@ -322,7 +322,26 @@ export default function MediaComments({ mediaId }) {
   };
 
   const handleDelete = (commentId) => {
-    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    setComments((prev) => {
+      // First, try to filter from top-level comments
+      const filtered = prev.filter((c) => c.id !== commentId);
+      
+      // If the comment was found at top level, return filtered array
+      if (filtered.length !== prev.length) {
+        return filtered;
+      }
+      
+      // Otherwise, look for the comment in replies and remove it
+      return prev.map((comment) => {
+        if (comment.replies?.length > 0) {
+          return {
+            ...comment,
+            replies: comment.replies.filter((reply) => reply.id !== commentId),
+          };
+        }
+        return comment;
+      });
+    });
   };
 
   const handleUpdate = (commentId, updatedComment) => {

@@ -255,25 +255,33 @@ export async function POST(request) {
         throw new Error(`Failed to upload media: ${uploadError.message}`);
       }
 
-      // Upload thumbnail
-      const { error: thumbUploadError } = await supabase.storage
-        .from('media-thumbnails')
-        .upload(thumbnailPath, processed.thumbnailBuffer, {
-          contentType: 'image/jpeg',
-          upsert: false,
-        });
+      // Upload thumbnail (if available)
+      let thumbUploadError = null;
+      if (processed.thumbnailBuffer) {
+        const { error } = await supabase.storage
+          .from('media-thumbnails')
+          .upload(thumbnailPath, processed.thumbnailBuffer, {
+            contentType: 'image/jpeg',
+            upsert: false,
+          });
+        thumbUploadError = error;
 
-      if (thumbUploadError) {
-        console.error('Failed to upload thumbnail:', thumbUploadError);
-        // Continue without thumbnail
+        if (thumbUploadError) {
+          console.error('Failed to upload thumbnail:', thumbUploadError);
+          // Continue without thumbnail
+        }
+      } else {
+        // No thumbnail available (e.g., video without FFmpeg)
+        console.warn('No thumbnail generated for media');
       }
 
       // Update media record with processed info
+      const hasThumbnail = processed.thumbnailBuffer && !thumbUploadError;
       const { data: updatedMedia, error: updateError } = await supabase
         .from('user_media')
         .update({
           storage_path: storagePath,
-          thumbnail_path: thumbUploadError ? null : thumbnailPath,
+          thumbnail_path: hasThumbnail ? thumbnailPath : null,
           mime_type: processed.mimeType,
           width: processed.width,
           height: processed.height,
