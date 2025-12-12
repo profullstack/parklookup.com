@@ -44,6 +44,7 @@ const parseArgs = () => {
     all: false,
     limit: null,
     dryRun: false,
+    force: false,
   };
 
   for (const arg of args) {
@@ -55,6 +56,8 @@ const parseArgs = () => {
       options.limit = parseInt(arg.split('=')[1], 10);
     } else if (arg === '--dry-run') {
       options.dryRun = true;
+    } else if (arg === '--force') {
+      options.force = true;
     }
   }
 
@@ -149,6 +152,90 @@ const getOrCreateCountyId = async (supabase, stateId, countyName) => {
 };
 
 /**
+ * Fetches or creates city ID
+ */
+const getOrCreateCityId = async (supabase, stateId, cityName) => {
+  if (!cityName) return null;
+
+  const slug = cityName
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, '')
+    .replace(/\s+/g, '-');
+
+  // Try to find existing city
+  const { data: existing } = await supabase
+    .from('cities')
+    .select('id')
+    .eq('state_id', stateId)
+    .eq('slug', slug)
+    .single();
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Create new city
+  const { data: created, error } = await supabase
+    .from('cities')
+    .insert({
+      state_id: stateId,
+      name: cityName,
+      slug,
+    })
+    .select('id')
+    .single();
+
+  if (error) {
+    console.warn(`⚠️  Failed to create city: ${cityName}`, error.message);
+    return null;
+  }
+
+  return created.id;
+};
+
+/**
+ * Extracts city name from park data
+ * Looks at operator, name, and other tags to determine the city
+ */
+const extractCityName = (park) => {
+  const operator = (park.managing_agency || '').toLowerCase();
+  const name = (park.name || '').toLowerCase();
+  const rawData = park.raw_data || {};
+  
+  // Check for explicit city tag in raw OSM data
+  if (rawData['addr:city']) {
+    return rawData['addr:city'];
+  }
+  
+  // Check operator for city name patterns
+  // e.g., "City of Los Angeles", "Los Angeles Parks", "San Francisco Recreation"
+  const cityOfMatch = operator.match(/city\s+of\s+([^,]+)/i);
+  if (cityOfMatch) {
+    return cityOfMatch[1].trim();
+  }
+  
+  // Check for "Town of X" pattern
+  const townOfMatch = operator.match(/town\s+of\s+([^,]+)/i);
+  if (townOfMatch) {
+    return townOfMatch[1].trim();
+  }
+  
+  // Check for "Village of X" pattern
+  const villageOfMatch = operator.match(/village\s+of\s+([^,]+)/i);
+  if (villageOfMatch) {
+    return villageOfMatch[1].trim();
+  }
+  
+  // Check for "X Parks Department", "X Parks and Recreation", etc.
+  const parksDeptMatch = operator.match(/^([^-]+?)\s+(?:parks?|recreation|rec)/i);
+  if (parksDeptMatch && !parksDeptMatch[1].toLowerCase().includes('county')) {
+    return parksDeptMatch[1].trim();
+  }
+  
+  return null;
+};
+
+/**
  * Logs an import event to the database
  */
 const logImport = async (supabase, status, metadata = {}) => {
@@ -225,6 +312,15 @@ const upsertParks = async (supabase, parks, stateId, options = {}) => {
         }
       }
 
+      // Get or create city if park type is 'city' or operator suggests a city
+      let cityId = null;
+      if (park.park_type === 'city') {
+        const cityName = extractCityName(park);
+        if (cityName) {
+          cityId = await getOrCreateCityId(supabase, stateId, cityName);
+        }
+      }
+
       // Store OSM ID in padus_id field for now (legacy field repurposed)
       // The osm_id column may not be available in all environments
       records.push({
@@ -234,6 +330,7 @@ const upsertParks = async (supabase, parks, stateId, options = {}) => {
         managing_agency: park.managing_agency,
         state_id: stateId,
         county_id: countyId,
+        city_id: cityId,
         latitude: park.latitude,
         longitude: park.longitude,
         access: park.access,
@@ -265,6 +362,35 @@ const upsertParks = async (supabase, parks, stateId, options = {}) => {
 };
 
 /**
+ * Deletes existing parks for a state (used with --force option)
+ */
+const deleteStateParks = async (supabase, stateId, stateCode, dryRun = false) => {
+  if (dryRun) {
+    const { count } = await supabase
+      .from('local_parks')
+      .select('*', { count: 'exact', head: true })
+      .eq('state_id', stateId);
+    console.log(`   [DRY RUN] Would delete ${count || 0} existing parks for ${stateCode}`);
+    return count || 0;
+  }
+
+  const { data, error } = await supabase
+    .from('local_parks')
+    .delete()
+    .eq('state_id', stateId)
+    .select('id');
+
+  if (error) {
+    console.error(`   ❌ Failed to delete existing parks: ${error.message}`);
+    return 0;
+  }
+
+  const deletedCount = data?.length || 0;
+  console.log(`   🗑️  Deleted ${deletedCount} existing parks for ${stateCode}`);
+  return deletedCount;
+};
+
+/**
  * Imports parks for a single state
  */
 const importStateParks = async (supabase, stateCode, options = {}) => {
@@ -273,7 +399,14 @@ const importStateParks = async (supabase, stateCode, options = {}) => {
   // Get state ID
   const stateId = await getStateId(supabase, stateCode);
   if (!stateId) {
-    return { fetched: 0, inserted: 0, errors: [{ error: `State not found: ${stateCode}` }] };
+    return { fetched: 0, inserted: 0, deleted: 0, errors: [{ error: `State not found: ${stateCode}` }] };
+  }
+
+  // Delete existing parks if --force is specified
+  let deletedCount = 0;
+  if (options.force) {
+    console.log('   🔄 Force mode: deleting existing parks...');
+    deletedCount = await deleteStateParks(supabase, stateId, stateCode, options.dryRun);
   }
 
   // Fetch parks from OpenStreetMap via Overpass API
@@ -294,6 +427,7 @@ const importStateParks = async (supabase, stateCode, options = {}) => {
   return {
     fetched: parks.length,
     inserted: results.inserted,
+    deleted: deletedCount,
     errors: results.errors,
   };
 };
@@ -313,6 +447,13 @@ const main = async () => {
     console.log('  node scripts/import-local-parks.js --state=CA');
     console.log('  node scripts/import-local-parks.js --all');
     console.log('  node scripts/import-local-parks.js --state=CA --limit=100 --dry-run');
+    console.log('  node scripts/import-local-parks.js --state=CA --force');
+    console.log('\nOptions:');
+    console.log('  --state=XX    Import parks for a specific state (e.g., --state=CA)');
+    console.log('  --all         Import parks for all states');
+    console.log('  --limit=N     Limit number of parks per state (for testing)');
+    console.log('  --dry-run     Show what would be imported without saving');
+    console.log('  --force       Delete existing parks for the state before importing');
     process.exit(0);
   }
 
@@ -335,6 +476,7 @@ try {
     states: 0,
     fetched: 0,
     inserted: 0,
+    deleted: 0,
     errors: [],
   };
 
@@ -350,6 +492,7 @@ try {
         totalResults.states++;
         totalResults.fetched += results.fetched;
         totalResults.inserted += results.inserted;
+        totalResults.deleted += results.deleted || 0;
         totalResults.errors.push(...results.errors);
 
         // Add delay between states to avoid rate limiting (Overpass API)
@@ -387,11 +530,17 @@ try {
     console.log('📊 Import Summary:');
     console.log(`   - States processed: ${totalResults.states}`);
     console.log(`   - Parks fetched: ${totalResults.fetched}`);
+    if (options.force) {
+      console.log(`   - Parks deleted: ${totalResults.deleted}`);
+    }
     console.log(`   - Parks upserted: ${totalResults.inserted}`);
     console.log(`   - Errors: ${totalResults.errors.length}`);
     console.log(`   - Duration: ${((endTime - startTime) / 1000).toFixed(2)}s`);
     if (options.dryRun) {
       console.log('   - Mode: DRY RUN (no data saved)');
+    }
+    if (options.force) {
+      console.log('   - Mode: FORCE (deleted existing parks before import)');
     }
     console.log('='.repeat(50));
 
