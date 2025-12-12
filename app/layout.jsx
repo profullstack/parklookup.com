@@ -3,9 +3,9 @@ import './globals.css';
 import { Providers } from '@/components/Providers';
 
 export const metadata = {
-  title: 'ParkLookup - Discover National Parks',
+  title: 'ParkLookup - Discover State and National Parks',
   description:
-    'Discover and explore U.S. National Parks. Search, save favorites, and plan your next adventure.',
+    'Discover and explore U.S. National and State Parks. Search, save favorites, and plan your next adventure.',
   keywords: 'national parks, state parks, hiking, camping, outdoors, nature, travel',
   appleWebApp: {
     capable: true,

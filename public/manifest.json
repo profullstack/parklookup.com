@@ -1,7 +1,7 @@
 {
-  "name": "ParkLookup - Discover National Parks",
+  "name": "ParkLookup - Discover National and State Parks",
   "short_name": "ParkLookup",
-  "description": "Discover and explore U.S. National Parks. Search, save favorites, and plan your next adventure.",
+  "description": "Discover and explore U.S. National and State Parks. Search, save favorites, and plan your next adventure.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

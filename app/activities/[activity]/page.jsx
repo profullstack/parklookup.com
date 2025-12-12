@@ -105,10 +105,10 @@ export async function generateMetadata({ params }) {
 
   return {
     title: `${displayName} Parks | ParkLookup`,
-    description: `Discover national parks and campgrounds where you can enjoy ${displayName.toLowerCase()}. Find the perfect destination for your next outdoor adventure.`,
+    description: `Discover national and state parks and campgrounds where you can enjoy ${displayName.toLowerCase()}. Find the perfect destination for your next outdoor adventure.`,
     openGraph: {
       title: `${displayName} Parks | ParkLookup`,
-      description: `Discover national parks and campgrounds where you can enjoy ${displayName.toLowerCase()}.`,
+      description: `Discover national and state parks and campgrounds where you can enjoy ${displayName.toLowerCase()}.`,
     },
   };
 }
