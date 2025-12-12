@@ -119,14 +119,31 @@ export async function GET(request) {
     
     // Process the subscription if we found one
     if (stripeSubscription) {
-      // Update the database with the correct subscription ID if it's different
-      if (stripeSubscription.id !== profile.stripe_subscription_id) {
-        console.log(`Updating subscription ID in DB from ${profile.stripe_subscription_id} to ${stripeSubscription.id}`);
+      // Determine if user should be pro based on subscription status
+      const isActiveSub = stripeSubscription.status === 'active' || stripeSubscription.status === 'trialing';
+      
+      // Update the database with the correct subscription info if anything is out of sync
+      const needsUpdate =
+        stripeSubscription.id !== profile.stripe_subscription_id ||
+        stripeSubscription.status !== profile.subscription_status ||
+        (isActiveSub && profile.subscription_tier !== 'pro');
+      
+      if (needsUpdate) {
+        console.log(`Syncing subscription data in DB:`, {
+          oldSubId: profile.stripe_subscription_id,
+          newSubId: stripeSubscription.id,
+          oldStatus: profile.subscription_status,
+          newStatus: stripeSubscription.status,
+          oldTier: profile.subscription_tier,
+          newTier: isActiveSub ? 'pro' : 'free',
+        });
         await supabase
           .from('profiles')
           .update({
             stripe_subscription_id: stripeSubscription.id,
             subscription_status: stripeSubscription.status,
+            subscription_tier: isActiveSub ? 'pro' : 'free',
+            is_pro: isActiveSub,
             updated_at: new Date().toISOString(),
           })
           .eq('id', user.id);
@@ -271,11 +288,14 @@ export async function GET(request) {
       description: invoice.lines.data[0]?.description || 'Subscription payment',
     }));
 
+    // Determine isPro based on the actual Stripe subscription status (not just DB)
+    const isPro = stripeSubscription && (stripeSubscription.status === 'active' || stripeSubscription.status === 'trialing');
+    
     return NextResponse.json({
       subscription,
       payments,
       hasStripeCustomer: true,
-      isPro: profile.subscription_tier === 'pro' && profile.subscription_status === 'active',
+      isPro,
     });
   } catch (error) {
     console.error('Error fetching payment data:', error);

@@ -178,6 +178,7 @@ const handleCheckoutSessionCompleted = async (supabase, session) => {
     stripe_subscription_id: subscription,
     subscription_status: 'active',
     subscription_tier: 'pro',
+    is_pro: true,
   });
 
   console.log(`Checkout completed for user ${user.id}, subscription: ${subscription}`);
@@ -207,6 +208,8 @@ const handleInvoicePaid = async (supabase, invoice) => {
   // Build update object - only include subscription_id if we have it
   const updates = {
     subscription_status: 'active',
+    subscription_tier: 'pro',
+    is_pro: true,
   };
   
   if (subscriptionId) {
@@ -256,17 +259,20 @@ const handleSubscriptionUpdated = async (supabase, subscription) => {
     throw new Error('User not found');
   }
 
-  // Determine subscription tier from price
+  // Determine subscription tier and is_pro from status
   const priceId = items?.data?.[0]?.price?.id;
   let subscriptionTier = 'free';
+  let isPro = false;
 
   if (status === 'active' || status === 'trialing') {
     subscriptionTier = 'pro';
+    isPro = true;
   }
 
   await updateUserSubscription(supabase, user.id, {
     subscription_status: status,
     subscription_tier: subscriptionTier,
+    is_pro: isPro,
     stripe_subscription_id: subscription.id,
     stripe_price_id: priceId,
     subscription_period_start: current_period_start
@@ -299,6 +305,7 @@ const handleSubscriptionDeleted = async (supabase, subscription) => {
   await updateUserSubscription(supabase, user.id, {
     subscription_status: 'canceled',
     subscription_tier: 'free',
+    is_pro: false,
     stripe_subscription_id: null,
     stripe_price_id: null,
     subscription_period_start: null,

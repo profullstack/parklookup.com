@@ -24,6 +24,7 @@ vi.mock('stripe', () => {
 });
 
 // Mock Supabase client
+const mockUpdateResult = { data: null, error: null };
 const mockSupabaseClient = {
   auth: {
     getUser: vi.fn(),
@@ -32,6 +33,9 @@ const mockSupabaseClient = {
   select: vi.fn(),
   eq: vi.fn(),
   single: vi.fn(),
+  update: vi.fn(() => ({
+    eq: vi.fn().mockResolvedValue(mockUpdateResult),
+  })),
 };
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -100,8 +104,30 @@ describe('Payments API Route', () => {
     vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', 'test-service-key');
     vi.stubEnv('NEXT_PUBLIC_SUPABASE_ANON_KEY', 'test-anon-key');
 
-    // Setup mock chain
-    mockSupabaseClient.from.mockReturnValue(mockSupabaseClient);
+    // Setup mock chain for select operations
+    const mockSelectChain = {
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+    };
+    
+    // Setup mock chain for update operations
+    const mockUpdateChain = {
+      eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+    };
+    
+    // Make from() return different chains based on what's called next
+    mockSupabaseClient.from.mockImplementation(() => ({
+      select: mockSelectChain.select.mockReturnValue({
+        eq: mockSelectChain.eq.mockReturnValue({
+          single: mockSelectChain.single,
+        }),
+      }),
+      update: vi.fn().mockReturnValue({
+        eq: mockUpdateChain.eq,
+      }),
+    }));
+    
     mockSupabaseClient.select.mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.eq.mockReturnValue(mockSupabaseClient);
     mockSupabaseClient.single.mockResolvedValue({ data: mockProfile, error: null });
@@ -184,10 +210,19 @@ describe('Payments API Route', () => {
 
       it('should return empty data when user has no Stripe customer', async () => {
         vi.resetModules();
-        mockSupabaseClient.single.mockResolvedValue({
-          data: { ...mockProfile, stripe_customer_id: null },
-          error: null,
-        });
+        
+        // Override the mock chain to return profile without stripe_customer_id
+        const profileWithoutStripe = { ...mockProfile, stripe_customer_id: null };
+        mockSupabaseClient.from.mockImplementation(() => ({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: profileWithoutStripe, error: null }),
+            }),
+          }),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }));
         mockStripeSubscriptionsList.mockResolvedValue({ data: [] });
 
         const { GET } = await import('@/app/api/payments/route.js');
@@ -466,10 +501,18 @@ describe('Payments API Route', () => {
 
       it('should return 500 when profile fetch fails', async () => {
         vi.resetModules();
-        mockSupabaseClient.single.mockResolvedValue({
-          data: null,
-          error: { message: 'Database error' },
-        });
+        
+        // Override the mock chain to return an error
+        mockSupabaseClient.from.mockImplementation(() => ({
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({ data: null, error: { message: 'Database error' } }),
+            }),
+          }),
+          update: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ data: null, error: null }),
+          }),
+        }));
 
         const { GET } = await import('@/app/api/payments/route.js');
 

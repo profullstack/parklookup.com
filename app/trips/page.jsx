@@ -54,6 +54,7 @@ export default function TripsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [pagination, setPagination] = useState(null);
+  const [isPro, setIsPro] = useState(false);
 
   /**
    * Fetch user trips
@@ -83,6 +84,22 @@ export default function TripsPage() {
       const data = await response.json();
       setTrips(data.trips || []);
       setPagination(data.pagination);
+      
+      // Also check pro status from profile API
+      try {
+        const profileResponse = await fetch('/api/profile', {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        });
+        if (profileResponse.ok) {
+          const profileData = await profileResponse.json();
+          const profile = profileData.profile;
+          setIsPro(profile?.is_pro || profile?.subscription_tier === 'pro');
+        }
+      } catch (profileErr) {
+        console.error('Error fetching profile:', profileErr);
+      }
     } catch (err) {
       console.error('Error fetching trips:', err);
       setError(err.message);
@@ -278,8 +295,8 @@ export default function TripsPage() {
           </>
         )}
 
-        {/* Free Tier Notice */}
-        {!loading && trips.length > 0 && trips.length >= 1 && (
+        {/* Free Tier Notice - only show for non-pro users */}
+        {!loading && !isPro && trips.length > 0 && trips.length >= 1 && (
           <div className="mt-8 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
             <div className="flex items-center gap-4">
               <div className="flex-shrink-0">
@@ -299,6 +316,25 @@ export default function TripsPage() {
               >
                 Upgrade
               </Button>
+            </div>
+          </div>
+        )}
+        
+        {/* Pro User Badge */}
+        {!loading && isPro && trips.length > 0 && (
+          <div className="mt-8 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg p-4">
+            <div className="flex items-center gap-4">
+              <div className="flex-shrink-0">
+                <span className="text-3xl">⭐</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-semibold text-purple-900">
+                  Pro Member
+                </h3>
+                <p className="text-sm text-purple-700">
+                  You have unlimited trip creation and premium features
+                </p>
+              </div>
             </div>
           </div>
         )}
