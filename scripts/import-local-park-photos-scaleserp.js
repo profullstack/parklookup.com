@@ -220,6 +220,69 @@ const searchImages = async (query) => {
 };
 
 /**
+ * Validate if a URL returns an image by checking content-type via HEAD request
+ * @param {string} url - The URL to validate
+ * @param {number} timeout - Timeout in milliseconds (default 5000)
+ * @returns {Promise<{isValid: boolean, contentType: string|null}>}
+ */
+const validateImageUrl = async (url, timeout = 5000) => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    
+    const response = await fetch(url, {
+      method: 'HEAD',
+      signal: controller.signal,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; ParkLookup/1.0)',
+      },
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      return { isValid: false, contentType: null };
+    }
+    
+    const contentType = response.headers.get('content-type') || '';
+    const isImage = contentType.startsWith('image/');
+    
+    return { isValid: isImage, contentType };
+  } catch (error) {
+    // Timeout, network error, or CORS issue
+    return { isValid: false, contentType: null };
+  }
+};
+
+/**
+ * Validate multiple image URLs in parallel batches of 10
+ * @param {Array<{url: string, ...rest}>} images - Array of image objects with url property
+ * @param {number} batchSize - Number of concurrent requests per batch (default 10)
+ * @returns {Promise<Array<{url: string, isValid: boolean, contentType: string|null, ...rest}>>}
+ */
+const validateImageUrls = async (images, batchSize = 10) => {
+  const results = [];
+  
+  // Process in batches of 10 for controlled parallelism
+  for (let i = 0; i < images.length; i += batchSize) {
+    const batch = images.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(async (img) => {
+        const imageUrl = img.image || img.original || img.url;
+        if (!imageUrl) {
+          return { ...img, isValid: false, contentType: null };
+        }
+        const validation = await validateImageUrl(imageUrl);
+        return { ...img, ...validation };
+      })
+    );
+    results.push(...batchResults);
+  }
+  
+  return results;
+};
+
+/**
  * Get place details to obtain data_id (needed for photos)
  */
 const getPlaceDetails = async (dataCid) => {
@@ -445,25 +508,38 @@ const processPark = async (supabase, park, options) => {
         console.log(`   📋 First image URL: ${imageResults[0].image || imageResults[0].original || 'none'}`);
       }
       
-      // Convert image results to photo format
-      // Note: 'link' is the source page URL, NOT the image URL
-      // Use 'image' or 'original' for the actual image file URL
-      photos = imageResults
+      // Filter out results without image URLs
+      const candidateImages = imageResults.filter(img => {
+        const imageUrl = img.image || img.original;
+        if (!imageUrl) {
+          return false;
+        }
+        return true;
+      });
+      
+      console.log(`   📷 ${candidateImages.length} candidates with image URLs`);
+      
+      // Validate image URLs using HEAD requests to check content-type
+      // This catches URLs that don't have obvious image extensions but still return images
+      console.log(`   🔍 Validating image URLs via HEAD requests...`);
+      const validatedImages = await validateImageUrls(candidateImages);
+      
+      let validCount = 0;
+      let invalidCount = 0;
+      
+      photos = validatedImages
         .filter(img => {
-          // Only include results that have an actual image URL (not just a page link)
-          const imageUrl = img.image || img.original;
-          if (!imageUrl) {
-            console.log(`   ⚠️  Skipping result with no image URL: ${img.title?.substring(0, 50)}`);
+          if (img.isValid) {
+            validCount++;
+            return true;
+          } else {
+            invalidCount++;
+            const imageUrl = img.image || img.original;
+            if (invalidCount <= 3) {
+              console.log(`   ⚠️  Invalid image (${img.contentType || 'no response'}): ${imageUrl?.substring(0, 60)}...`);
+            }
             return false;
           }
-          // Verify it looks like an image URL
-          const isImageUrl = /\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/i.test(imageUrl) ||
-                            imageUrl.includes('googleusercontent.com') ||
-                            imageUrl.includes('gstatic.com');
-          if (!isImageUrl) {
-            console.log(`   ⚠️  URL doesn't look like an image: ${imageUrl.substring(0, 80)}`);
-          }
-          return isImageUrl;
         })
         .map(img => ({
           image: img.image || img.original,
@@ -471,7 +547,7 @@ const processPark = async (supabase, park, options) => {
           title: img.title,
         }));
       
-      console.log(`   📷 ${photos.length} valid image URLs after filtering`);
+      console.log(`   📷 ${validCount} valid images, ${invalidCount} invalid after HEAD validation`);
     } else {
       photos = fullSizePhotos;
     }
