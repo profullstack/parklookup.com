@@ -10,6 +10,7 @@ import WeatherForecast from '@/components/weather/WeatherForecast';
 import WeatherAlerts from '@/components/weather/WeatherAlerts';
 import { ProductCarousel } from '@/components/products/ProductCard';
 import NearbyPlaces from '@/components/parks/NearbyPlaces';
+import NearbyParks from '@/components/parks/NearbyParks';
 import ParkReviews from '@/components/parks/ParkReviews';
 import UserPhotos from '@/components/parks/UserPhotos';
 
@@ -338,6 +339,23 @@ export default function ParkDetailClient({
               Restaurants, entertainment, lodging, and more near the park
             </p>
             <NearbyPlaces parkCode={park.park_code} />
+          </div>
+
+          {/* Nearby Parks */}
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+              Nearby Parks
+            </h2>
+            <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+              Other national and state parks in the area
+            </p>
+            <NearbyParks
+              latitude={parseFloat(park.latitude)}
+              longitude={parseFloat(park.longitude)}
+              currentParkCode={park.park_code}
+              radius={150}
+              limit={6}
+            />
           </div>
         </div>
       )}
