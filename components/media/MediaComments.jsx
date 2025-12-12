@@ -276,7 +276,8 @@ function Comment({ comment, mediaId, currentUserId, accessToken, onDelete, onUpd
  * Displays and manages comments for a media item
  */
 export default function MediaComments({ mediaId }) {
-  const { user, accessToken } = useAuth();
+  const { user, session } = useAuth();
+  const accessToken = session?.access_token;
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

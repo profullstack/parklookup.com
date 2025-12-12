@@ -199,7 +199,8 @@ function MediaCard({ media, onLikeToggle, currentUserId }) {
  * Displays a grid of user-contributed photos and videos for a park
  */
 export default function MediaGrid({ parkCode, initialMedia = [], showUploadPrompt = true }) {
-  const { user, accessToken } = useAuth();
+  const { user, session } = useAuth();
+  const accessToken = session?.access_token;
   const [media, setMedia] = useState(initialMedia);
   const [loading, setLoading] = useState(initialMedia.length === 0);
   const [error, setError] = useState(null);
