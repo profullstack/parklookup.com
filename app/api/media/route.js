@@ -73,22 +73,10 @@ export async function GET(request) {
       resolvedParkId = park.id;
     }
 
-    // Build query
+    // Build query - fetch media without relationship joins
     let query = supabase
       .from('user_media')
-      .select(
-        `
-        *,
-        profiles:user_id (
-          display_name,
-          avatar_url
-        ),
-        nps_parks:park_id (
-          park_code,
-          full_name
-        )
-      `
-      )
+      .select('*')
       .eq('status', 'ready')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -108,9 +96,28 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Failed to fetch media' }, { status: 500 });
     }
 
-    // Get likes and comments counts
+    if (!media || media.length === 0) {
+      return NextResponse.json({ media: [] });
+    }
+
+    // Get unique user IDs and park IDs
+    const userIds = [...new Set(media.map((m) => m.user_id))];
+    const parkIds = [...new Set(media.map((m) => m.park_id).filter(Boolean))];
     const mediaIds = media.map((m) => m.id);
 
+    // Fetch profiles separately
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', userIds);
+
+    // Fetch parks separately
+    const { data: parks } = await supabase
+      .from('all_parks')
+      .select('id, park_code, full_name')
+      .in('id', parkIds);
+
+    // Fetch likes and comments counts
     const { data: likeCounts } = await supabase
       .from('media_likes')
       .select('media_id')
@@ -121,26 +128,37 @@ export async function GET(request) {
       .select('media_id')
       .in('media_id', mediaIds);
 
-    // Count likes and comments per media
-    const likeCountMap = {};
-    const commentCountMap = {};
+    // Create lookup maps
+    const profileMap = {};
+    profiles?.forEach((p) => {
+      profileMap[p.id] = p;
+    });
 
+    const parkMap = {};
+    parks?.forEach((p) => {
+      parkMap[p.id] = p;
+    });
+
+    const likeCountMap = {};
     likeCounts?.forEach((like) => {
       likeCountMap[like.media_id] = (likeCountMap[like.media_id] || 0) + 1;
     });
 
+    const commentCountMap = {};
     commentCounts?.forEach((comment) => {
       commentCountMap[comment.media_id] = (commentCountMap[comment.media_id] || 0) + 1;
     });
 
-    // Add counts to media
-    const mediaWithCounts = media.map((m) => ({
+    // Combine data
+    const mediaWithDetails = media.map((m) => ({
       ...m,
+      profiles: profileMap[m.user_id] || null,
+      park: parkMap[m.park_id] || null,
       likes_count: likeCountMap[m.id] || 0,
       comments_count: commentCountMap[m.id] || 0,
     }));
 
-    return NextResponse.json({ media: mediaWithCounts });
+    return NextResponse.json({ media: mediaWithDetails });
   } catch (error) {
     console.error('Error in GET /api/media:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

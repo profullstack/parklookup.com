@@ -105,19 +105,7 @@ export async function GET(request) {
     // Public/discover feed - show recent media from all users
     const { data: media, error } = await supabase
       .from('user_media')
-      .select(
-        `
-        *,
-        profiles:user_id (
-          display_name,
-          avatar_url
-        ),
-        nps_parks:park_id (
-          park_code,
-          full_name
-        )
-      `
-      )
+      .select('*')
       .eq('status', 'ready')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
@@ -127,9 +115,31 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Failed to fetch feed' }, { status: 500 });
     }
 
-    // Get likes and comments counts
+    if (!media || media.length === 0) {
+      return NextResponse.json({
+        media: [],
+        feed_type: 'discover',
+      });
+    }
+
+    // Get unique user IDs and park IDs
+    const userIds = [...new Set(media.map((m) => m.user_id))];
+    const parkIds = [...new Set(media.map((m) => m.park_id).filter(Boolean))];
     const mediaIds = media.map((m) => m.id);
 
+    // Fetch profiles separately
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url')
+      .in('id', userIds);
+
+    // Fetch parks separately
+    const { data: parks } = await supabase
+      .from('all_parks')
+      .select('id, park_code, full_name')
+      .in('id', parkIds);
+
+    // Fetch likes and comments counts
     const { data: likeCounts } = await supabase
       .from('media_likes')
       .select('media_id')
@@ -140,14 +150,23 @@ export async function GET(request) {
       .select('media_id')
       .in('media_id', mediaIds);
 
-    // Count likes and comments per media
-    const likeCountMap = {};
-    const commentCountMap = {};
+    // Create lookup maps
+    const profileMap = {};
+    profiles?.forEach((p) => {
+      profileMap[p.id] = p;
+    });
 
+    const parkMap = {};
+    parks?.forEach((p) => {
+      parkMap[p.id] = p;
+    });
+
+    const likeCountMap = {};
     likeCounts?.forEach((like) => {
       likeCountMap[like.media_id] = (likeCountMap[like.media_id] || 0) + 1;
     });
 
+    const commentCountMap = {};
     commentCounts?.forEach((comment) => {
       commentCountMap[comment.media_id] = (commentCountMap[comment.media_id] || 0) + 1;
     });
@@ -161,6 +180,9 @@ export async function GET(request) {
       const { data: thumbnailUrl } = item.thumbnail_path
         ? supabase.storage.from('media-thumbnails').getPublicUrl(item.thumbnail_path)
         : { data: null };
+
+      const profile = profileMap[item.user_id];
+      const park = parkMap[item.park_id];
 
       return {
         media_id: item.id,
@@ -177,10 +199,10 @@ export async function GET(request) {
         created_at: item.created_at,
         likes_count: likeCountMap[item.id] || 0,
         comments_count: commentCountMap[item.id] || 0,
-        user_display_name: item.profiles?.display_name,
-        user_avatar_url: item.profiles?.avatar_url,
-        park_name: item.nps_parks?.full_name,
-        park_code: item.nps_parks?.park_code,
+        user_display_name: profile?.display_name,
+        user_avatar_url: profile?.avatar_url,
+        park_name: park?.full_name,
+        park_code: park?.park_code,
         url: mediaUrl?.publicUrl,
         thumbnail_url: thumbnailUrl?.publicUrl,
       };
