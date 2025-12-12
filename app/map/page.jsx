@@ -25,22 +25,37 @@ const MapWithNoSSR = dynamic(
  */
 export default function MapPage() {
   const [parks, setParks] = useState([]);
+  const [localParks, setLocalParks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [userLocation, setUserLocation] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   const [locationError, setLocationError] = useState(null);
+  const [showLocalParks, setShowLocalParks] = useState(true);
 
-  // Fetch all parks
+  // Fetch all parks (national, state, and local)
   useEffect(() => {
-    async function fetchParks() {
+    async function fetchAllParks() {
       try {
-        const response = await fetch('/api/parks?limit=500');
-        if (!response.ok) {
+        // Fetch national and state parks
+        const parksResponse = await fetch('/api/parks?limit=500');
+        if (!parksResponse.ok) {
           throw new Error('Failed to fetch parks');
         }
-        const data = await response.json();
-        setParks(data.parks || []);
+        const parksData = await parksResponse.json();
+        setParks(parksData.parks || []);
+
+        // Fetch local parks (county and city)
+        try {
+          const localResponse = await fetch('/api/local-parks?limit=1000');
+          if (localResponse.ok) {
+            const localData = await localResponse.json();
+            setLocalParks(localData.parks || []);
+          }
+        } catch (localErr) {
+          // Local parks are optional, don't fail if they can't be loaded
+          console.warn('Could not load local parks:', localErr.message);
+        }
       } catch (err) {
         setError(err.message);
       } finally {
@@ -48,7 +63,7 @@ export default function MapPage() {
       }
     }
 
-    fetchParks();
+    fetchAllParks();
   }, []);
 
   // Handle location lookup
@@ -99,7 +114,7 @@ export default function MapPage() {
             <div>
               <h1 className="text-3xl font-bold">Park Map</h1>
               <p className="text-green-100">
-                {loading ? 'Loading parks...' : `${parks.length} parks to explore`}
+                {loading ? 'Loading parks...' : `${parks.length + (showLocalParks ? localParks.length : 0)} parks to explore`}
               </p>
             </div>
 
@@ -194,16 +209,35 @@ export default function MapPage() {
         ) : (
           <MapWithNoSSR
             parks={parks}
+            localParks={showLocalParks ? localParks : []}
             userLocation={userLocation}
             loading={loading}
           />
         )}
       </div>
 
-      {/* Legend */}
+      {/* Legend and Controls */}
       <div className="container mx-auto px-4 pb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm">
-          <h3 className="font-semibold text-gray-800 dark:text-white mb-2">Map Legend</h3>
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-3">
+            <h3 className="font-semibold text-gray-800 dark:text-white">Map Legend</h3>
+            
+            {/* Toggle for local parks */}
+            {localParks.length > 0 && (
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showLocalParks}
+                  onChange={(e) => setShowLocalParks(e.target.checked)}
+                  className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                />
+                <span className="text-sm text-gray-600 dark:text-gray-400">
+                  Show Local Parks ({localParks.length})
+                </span>
+              </label>
+            )}
+          </div>
+          
           <div className="flex flex-wrap gap-4 text-sm">
             <div className="flex items-center gap-2">
               <div className="w-4 h-4 bg-green-600 rounded-full"></div>
@@ -213,6 +247,18 @@ export default function MapPage() {
               <div className="w-4 h-4 bg-purple-600 rounded-full"></div>
               <span className="text-gray-600 dark:text-gray-400">State Park</span>
             </div>
+            {showLocalParks && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-orange-600 rounded-full"></div>
+                  <span className="text-gray-600 dark:text-gray-400">County Park</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 bg-teal-600 rounded-full"></div>
+                  <span className="text-gray-600 dark:text-gray-400">City Park</span>
+                </div>
+              </>
+            )}
             {userLocation && (
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 bg-blue-600 rounded-full"></div>

@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-le
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
-// State park marker icon (different color for state parks)
+// State park marker icon (purple for state parks)
 const StateParkIcon = L.divIcon({
   className: 'custom-state-park-marker',
   html: `
@@ -24,7 +24,7 @@ const StateParkIcon = L.divIcon({
   popupAnchor: [0, -24],
 });
 
-// Custom park marker icon (National Parks)
+// Custom park marker icon (green for National Parks)
 const ParkIcon = L.divIcon({
   className: 'custom-park-marker',
   html: `
@@ -41,6 +41,44 @@ const ParkIcon = L.divIcon({
   iconSize: [24, 24],
   iconAnchor: [12, 24],
   popupAnchor: [0, -24],
+});
+
+// County park marker icon (orange for county parks)
+const CountyParkIcon = L.divIcon({
+  className: 'custom-county-park-marker',
+  html: `
+    <div style="
+      background-color: #ea580c;
+      width: 20px;
+      height: 20px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    "></div>
+  `,
+  iconSize: [20, 20],
+  iconAnchor: [10, 20],
+  popupAnchor: [0, -20],
+});
+
+// City park marker icon (teal for city parks)
+const CityParkIcon = L.divIcon({
+  className: 'custom-city-park-marker',
+  html: `
+    <div style="
+      background-color: #0d9488;
+      width: 20px;
+      height: 20px;
+      border-radius: 50% 50% 50% 0;
+      transform: rotate(-45deg);
+      border: 2px solid white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    "></div>
+  `,
+  iconSize: [20, 20],
+  iconAnchor: [10, 20],
+  popupAnchor: [0, -20],
 });
 
 // User location marker icon
@@ -147,13 +185,67 @@ function useAddressLookup() {
 }
 
 /**
+ * Determine park type from park object
+ * @param {Object} park - Park object
+ * @returns {string} Park type: 'national', 'state', 'county', or 'city'
+ */
+function getParkType(park) {
+  // Local parks have park_type field
+  if (park.park_type === 'county') return 'county';
+  if (park.park_type === 'city') return 'city';
+  
+  // State parks from wikidata or with State Park designation
+  if (park.source === 'wikidata' || park.designation === 'State Park') return 'state';
+  
+  // Default to national park
+  return 'national';
+}
+
+/**
+ * Get the appropriate icon for a park type
+ * @param {string} parkType - Park type
+ * @returns {L.DivIcon} Leaflet icon
+ */
+function getParkIcon(parkType) {
+  switch (parkType) {
+    case 'county':
+      return CountyParkIcon;
+    case 'city':
+      return CityParkIcon;
+    case 'state':
+      return StateParkIcon;
+    default:
+      return ParkIcon;
+  }
+}
+
+/**
+ * Get the URL for a park detail page
+ * @param {Object} park - Park object
+ * @returns {string} URL path
+ */
+function getParkUrl(park) {
+  // Local parks have different URL structure
+  if (park.park_type === 'county' && park.state && park.county && park.slug) {
+    return `/parks/county/${park.state.toLowerCase()}/${encodeURIComponent(park.county.toLowerCase().replace(/\s+/g, '-'))}/${park.slug}`;
+  }
+  if (park.park_type === 'city' && park.state && park.city && park.slug) {
+    return `/parks/city/${park.state.toLowerCase()}/${encodeURIComponent(park.city.toLowerCase().replace(/\s+/g, '-'))}/${park.slug}`;
+  }
+  
+  // National and state parks use park_code
+  return `/parks/${park.park_code}`;
+}
+
+/**
  * InteractiveParksMap component - displays parks on a map with user location support
  * @param {Object} props
- * @param {Array} props.parks - Array of park objects
+ * @param {Array} props.parks - Array of park objects (national and state parks)
+ * @param {Array} props.localParks - Array of local park objects (county and city parks)
  * @param {Object} props.userLocation - User's location {lat, lng}
  * @param {boolean} props.loading - Loading state
  */
-export default function InteractiveParksMap({ parks = [], userLocation = null, loading = false }) {
+export default function InteractiveParksMap({ parks = [], localParks = [], userLocation = null, loading = false }) {
   const mapRef = useRef(null);
   const { addressCache, loadingAddresses, fetchAddress } = useAddressLookup();
 
@@ -161,20 +253,27 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
   const defaultCenter = [39.8283, -98.5795];
   const defaultZoom = 4;
 
-  // Filter parks with valid coordinates
-  const validParks = useMemo(() => parks.filter(
+  // Combine and filter parks with valid coordinates
+  const allParks = useMemo(() => {
+    const combined = [
+      ...parks.map(p => ({ ...p, _source: 'parks' })),
+      ...localParks.map(p => ({ ...p, _source: 'local' }))
+    ];
+    
+    return combined.filter(
       (p) =>
         p.latitude &&
         p.longitude &&
         !isNaN(parseFloat(p.latitude)) &&
         !isNaN(parseFloat(p.longitude))
-    ), [parks]);
+    );
+  }, [parks, localParks]);
 
   // Filter parks within 100 miles of user location
   const nearbyParks = useMemo(() => {
-    if (!userLocation) {return validParks;}
+    if (!userLocation) {return allParks;}
 
-    return validParks.filter((park) => {
+    return allParks.filter((park) => {
       const distance = calculateDistance(
         userLocation.lat,
         userLocation.lng,
@@ -183,10 +282,10 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
       );
       return distance <= RADIUS_MILES;
     });
-  }, [validParks, userLocation]);
+  }, [allParks, userLocation]);
 
   // Parks to display (nearby if user location set, otherwise all)
-  const displayParks = userLocation ? nearbyParks : validParks;
+  const displayParks = userLocation ? nearbyParks : allParks;
 
   if (loading) {
     return (
@@ -248,7 +347,7 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
           const parkId = park.id || park.park_code;
           const lat = parseFloat(park.latitude);
           const lng = parseFloat(park.longitude);
-          const isStatePark = park.source === 'wikidata' || park.designation === 'State Park';
+          const parkType = getParkType(park);
 
           const distance = userLocation
             ? calculateDistance(
@@ -261,9 +360,9 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
 
           return (
             <Marker
-              key={parkId}
+              key={`${park._source || 'park'}-${parkId}`}
               position={[lat, lng]}
-              icon={isStatePark ? StateParkIcon : ParkIcon}
+              icon={getParkIcon(parkType)}
               eventHandlers={{
                 popupopen: () => {
                   // Fetch address when popup opens
@@ -277,7 +376,7 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
                   distance={distance}
                   address={addressCache[parkId]}
                   isLoading={loadingAddresses[parkId]}
-                  isStatePark={isStatePark}
+                  parkType={parkType}
                 />
               </Popup>
             </Marker>
@@ -299,23 +398,65 @@ export default function InteractiveParksMap({ parks = [], userLocation = null, l
 }
 
 /**
+ * Get color classes for park type
+ * @param {string} parkType - Park type
+ * @returns {Object} Color classes
+ */
+function getParkColors(parkType) {
+  switch (parkType) {
+    case 'county':
+      return {
+        text: 'text-orange-700',
+        link: 'text-orange-600',
+        badge: 'bg-orange-100 text-orange-700',
+        label: 'County Park'
+      };
+    case 'city':
+      return {
+        text: 'text-teal-700',
+        link: 'text-teal-600',
+        badge: 'bg-teal-100 text-teal-700',
+        label: 'City Park'
+      };
+    case 'state':
+      return {
+        text: 'text-purple-700',
+        link: 'text-purple-600',
+        badge: 'bg-purple-100 text-purple-700',
+        label: 'State Park'
+      };
+    default:
+      return {
+        text: 'text-green-700',
+        link: 'text-green-600',
+        badge: 'bg-green-100 text-green-700',
+        label: 'National Park'
+      };
+  }
+}
+
+/**
  * Park popup content component
  */
-function ParkPopupContent({ park, distance, address, isLoading, isStatePark }) {
-  const colorClass = isStatePark ? 'text-purple-700' : 'text-green-700';
-  const linkColorClass = isStatePark ? 'text-purple-600' : 'text-green-600';
+function ParkPopupContent({ park, distance, address, isLoading, parkType }) {
+  const colors = getParkColors(parkType);
+  const parkUrl = getParkUrl(park);
 
   return (
     <div className="text-center min-w-[180px]">
-      <strong className={colorClass}>{park.full_name || park.name}</strong>
+      <strong className={colors.text}>{park.full_name || park.name}</strong>
 
       {/* Park type badge */}
-      {isStatePark && (
+      <br />
+      <span className={`inline-block px-2 py-0.5 text-xs ${colors.badge} rounded-full mt-1`}>
+        {colors.label}
+      </span>
+
+      {/* Managing agency for local parks */}
+      {park.managing_agency && (
         <>
           <br />
-          <span className="inline-block px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full mt-1">
-            State Park
-          </span>
+          <span className="text-xs text-gray-500">{park.managing_agency}</span>
         </>
       )}
 
@@ -329,6 +470,11 @@ function ParkPopupContent({ park, distance, address, isLoading, isStatePark }) {
         <>
           <br />
           <span className="text-sm text-gray-600">📍 {address}</span>
+        </>
+      ) : park.county && park.state ? (
+        <>
+          <br />
+          <span className="text-sm text-gray-600">{park.county}, {park.state}</span>
         </>
       ) : park.states ? (
         <>
@@ -348,8 +494,8 @@ function ParkPopupContent({ park, distance, address, isLoading, isStatePark }) {
       {/* View details link */}
       <br />
       <a
-        href={`/parks/${park.park_code}`}
-        className={`text-sm ${linkColorClass} hover:underline font-medium`}
+        href={parkUrl}
+        className={`text-sm ${colors.link} hover:underline font-medium`}
       >
         View Details →
       </a>
