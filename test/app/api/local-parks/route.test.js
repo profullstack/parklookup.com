@@ -15,12 +15,21 @@ const createChainableMock = (finalResult) => {
     or: vi.fn(() => chainable),
     order: vi.fn(() => chainable),
     range: vi.fn(() => Promise.resolve(finalResult)),
-    single: vi.fn(() => Promise.resolve(finalResult)),
+    single: vi.fn(() => chainable),
     textSearch: vi.fn(() => chainable),
     not: vi.fn(() => chainable),
     in: vi.fn(() => chainable),
+    then: vi.fn((resolve) => resolve(finalResult)),
   };
   return chainable;
+};
+
+// Create a mock that returns different results for different tables
+const createMultiTableMock = (tableResults) => {
+  return vi.fn((tableName) => {
+    const result = tableResults[tableName] || { data: null, error: null };
+    return createChainableMock(result);
+  });
 };
 
 // Mock local parks data
@@ -89,8 +98,8 @@ const mockSingleParkData = {
 // Mock Supabase client
 let mockSupabaseClient;
 
-vi.mock('@/lib/supabase/client', () => ({
-  createServerClient: vi.fn(() => mockSupabaseClient),
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: vi.fn(() => mockSupabaseClient),
 }));
 
 describe('Local Parks API Route', () => {
@@ -179,7 +188,7 @@ describe('Local Parks API Route', () => {
       expect(response.status).toBe(500);
     });
 
-    it('should query local_parks_with_location view', async () => {
+    it('should query local_parks table', async () => {
       vi.resetModules();
       const fromMock = vi.fn(() => createChainableMock(mockLocalParksData));
       mockSupabaseClient = {
@@ -191,7 +200,7 @@ describe('Local Parks API Route', () => {
       const request = new Request('http://localhost:8080/api/local-parks');
       await GET(request);
 
-      expect(fromMock).toHaveBeenCalledWith('local_parks_with_location');
+      expect(fromMock).toHaveBeenCalledWith('local_parks');
     });
 
     it('should return parks with park_type field', async () => {
@@ -218,7 +227,10 @@ describe('Local Parks Single Park API', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockSupabaseClient = {
-      from: vi.fn(() => createChainableMock(mockSingleParkData)),
+      from: createMultiTableMock({
+        local_parks: mockSingleParkData,
+        park_photos: { data: mockSingleParkData.data?.photos || [], error: null },
+      }),
     };
   });
 
@@ -227,37 +239,69 @@ describe('Local Parks Single Park API', () => {
   });
 
   describe('GET /api/local-parks/[id]', () => {
-    it('should return a single park by ID', async () => {
+    it('should return a single park by UUID', async () => {
       vi.resetModules();
       mockSupabaseClient = {
-        from: vi.fn(() => createChainableMock(mockSingleParkData)),
+        from: createMultiTableMock({
+          local_parks: mockSingleParkData,
+          park_photos: { data: mockSingleParkData.data?.photos || [], error: null },
+        }),
       };
 
       const { GET } = await import('@/app/api/local-parks/[id]/route.js');
 
-      const request = new Request('http://localhost:8080/api/local-parks/1');
-      const response = await GET(request, { params: { id: '1' } });
+      // Use a valid UUID format
+      const request = new Request('http://localhost:8080/api/local-parks/12345678-1234-1234-1234-123456789012');
+      const response = await GET(request, { params: Promise.resolve({ id: '12345678-1234-1234-1234-123456789012' }) });
       const data = await response.json();
 
       expect(response.status).toBe(200);
       expect(data).toHaveProperty('park');
     });
 
-    it('should return 404 for non-existent park', async () => {
+    it('should return a single park by slug with state', async () => {
       vi.resetModules();
       mockSupabaseClient = {
-        from: vi.fn(() =>
-          createChainableMock({
-            data: null,
-            error: { code: 'PGRST116' },
-          })
-        ),
+        from: createMultiTableMock({
+          local_parks: mockSingleParkData,
+          park_photos: { data: mockSingleParkData.data?.photos || [], error: null },
+        }),
       };
 
       const { GET } = await import('@/app/api/local-parks/[id]/route.js');
 
-      const request = new Request('http://localhost:8080/api/local-parks/nonexistent');
-      const response = await GET(request, { params: { id: 'nonexistent' } });
+      const request = new Request('http://localhost:8080/api/local-parks/central-park?state=NY');
+      const response = await GET(request, { params: Promise.resolve({ id: 'central-park' }) });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data).toHaveProperty('park');
+    });
+
+    it('should return 400 when using slug without state', async () => {
+      vi.resetModules();
+      const { GET } = await import('@/app/api/local-parks/[id]/route.js');
+
+      const request = new Request('http://localhost:8080/api/local-parks/central-park');
+      const response = await GET(request, { params: Promise.resolve({ id: 'central-park' }) });
+
+      expect(response.status).toBe(400);
+    });
+
+    it('should return 404 for non-existent park', async () => {
+      vi.resetModules();
+      mockSupabaseClient = {
+        from: createMultiTableMock({
+          local_parks: { data: null, error: { code: 'PGRST116' } },
+          park_photos: { data: [], error: null },
+        }),
+      };
+
+      const { GET } = await import('@/app/api/local-parks/[id]/route.js');
+
+      // Use a valid UUID format for non-existent park
+      const request = new Request('http://localhost:8080/api/local-parks/00000000-0000-0000-0000-000000000000');
+      const response = await GET(request, { params: Promise.resolve({ id: '00000000-0000-0000-0000-000000000000' }) });
 
       expect(response.status).toBe(404);
     });
@@ -267,7 +311,7 @@ describe('Local Parks Single Park API', () => {
       const { GET } = await import('@/app/api/local-parks/[id]/route.js');
 
       const request = new Request('http://localhost:8080/api/local-parks/');
-      const response = await GET(request, { params: { id: '' } });
+      const response = await GET(request, { params: Promise.resolve({ id: '' }) });
 
       expect(response.status).toBe(400);
     });
@@ -275,13 +319,17 @@ describe('Local Parks Single Park API', () => {
     it('should include photos in response', async () => {
       vi.resetModules();
       mockSupabaseClient = {
-        from: vi.fn(() => createChainableMock(mockSingleParkData)),
+        from: createMultiTableMock({
+          local_parks: mockSingleParkData,
+          park_photos: { data: mockSingleParkData.data?.photos || [], error: null },
+        }),
       };
 
       const { GET } = await import('@/app/api/local-parks/[id]/route.js');
 
-      const request = new Request('http://localhost:8080/api/local-parks/1');
-      const response = await GET(request, { params: { id: '1' } });
+      // Use a valid UUID format
+      const request = new Request('http://localhost:8080/api/local-parks/12345678-1234-1234-1234-123456789012');
+      const response = await GET(request, { params: Promise.resolve({ id: '12345678-1234-1234-1234-123456789012' }) });
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -316,22 +364,33 @@ describe('Local Parks Search API', () => {
       expect(data).toHaveProperty('parks');
     });
 
-    it('should return all parks if no query provided', async () => {
+    it('should return 400 if no query provided', async () => {
       const { GET } = await import('@/app/api/local-parks/search/route.js');
 
       const request = new Request('http://localhost:8080/api/local-parks/search');
       const response = await GET(request);
       const data = await response.json();
 
-      expect(response.status).toBe(200);
-      expect(data).toHaveProperty('parks');
-      expect(data).toHaveProperty('total');
+      expect(response.status).toBe(400);
+      expect(data).toHaveProperty('error');
+      expect(data.error).toContain('at least 2 characters');
     });
 
-    it('should support state filtering', async () => {
+    it('should return 400 if query is too short', async () => {
       const { GET } = await import('@/app/api/local-parks/search/route.js');
 
-      const request = new Request('http://localhost:8080/api/local-parks/search?state=CA');
+      const request = new Request('http://localhost:8080/api/local-parks/search?q=a');
+      const response = await GET(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(400);
+      expect(data).toHaveProperty('error');
+    });
+
+    it('should support state filtering with query', async () => {
+      const { GET } = await import('@/app/api/local-parks/search/route.js');
+
+      const request = new Request('http://localhost:8080/api/local-parks/search?q=park&state=CA');
       const response = await GET(request);
       const data = await response.json();
 
@@ -339,10 +398,10 @@ describe('Local Parks Search API', () => {
       expect(data).toHaveProperty('parks');
     });
 
-    it('should support park_type filtering', async () => {
+    it('should support park_type filtering with query', async () => {
       const { GET } = await import('@/app/api/local-parks/search/route.js');
 
-      const request = new Request('http://localhost:8080/api/local-parks/search?park_type=city');
+      const request = new Request('http://localhost:8080/api/local-parks/search?q=park&park_type=city');
       const response = await GET(request);
       const data = await response.json();
 
@@ -350,7 +409,7 @@ describe('Local Parks Search API', () => {
       expect(data).toHaveProperty('parks');
     });
 
-    it('should support proximity search with lat/lng', async () => {
+    it('should support proximity search with lat/lng and query', async () => {
       vi.resetModules();
       mockSupabaseClient = {
         from: vi.fn(() => createChainableMock(mockLocalParksData)),
@@ -360,7 +419,7 @@ describe('Local Parks Search API', () => {
               {
                 id: '1',
                 name: 'Central Park',
-                distance_km: 5.2,
+                distance_miles: 5.2,
               },
             ],
             error: null,
@@ -371,7 +430,7 @@ describe('Local Parks Search API', () => {
       const { GET } = await import('@/app/api/local-parks/search/route.js');
 
       const request = new Request(
-        'http://localhost:8080/api/local-parks/search?lat=40.7829&lng=-73.9654&radius=50'
+        'http://localhost:8080/api/local-parks/search?q=central&lat=40.7829&lng=-73.9654&radius=50'
       );
       const response = await GET(request);
       const data = await response.json();

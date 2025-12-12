@@ -141,6 +141,7 @@ export function ParkPlaceholder({ parkType = 'default', className = '', size = '
 
   return (
     <div
+      data-testid="park-placeholder"
       className={`absolute inset-0 flex items-center justify-center ${styles.bgColor} ${className}`}
     >
       <IconComponent className={`${iconSize} ${styles.iconColor}`} />

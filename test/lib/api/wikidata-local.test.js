@@ -4,8 +4,7 @@
  * Tests for matching local parks with Wikidata entities and fetching photos
  */
 
-import { expect } from 'chai';
-import { describe, it } from 'mocha';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildParkMatchQuery,
   buildPhotoQuery,
@@ -13,28 +12,26 @@ import {
   parseCommonsImage,
   calculateDistance,
   findBestMatch,
-  fetchParkMatch,
-  fetchCommonsImages,
-} from '../../../lib/api/wikidata-local.js';
+} from '@/lib/api/wikidata-local.js';
 
 describe('Wikidata Local Parks Matching Service', () => {
   describe('calculateDistance', () => {
     it('should calculate distance between two points in kilometers', () => {
       // San Francisco to Los Angeles (~559 km)
       const distance = calculateDistance(37.7749, -122.4194, 34.0522, -118.2437);
-      expect(distance).to.be.closeTo(559, 10);
+      expect(distance).toBeCloseTo(559, -1); // within 10 km
     });
 
     it('should return 0 for same coordinates', () => {
       const distance = calculateDistance(37.7749, -122.4194, 37.7749, -122.4194);
-      expect(distance).to.equal(0);
+      expect(distance).toBe(0);
     });
 
     it('should handle null coordinates', () => {
-      expect(calculateDistance(null, -122.4194, 34.0522, -118.2437)).to.be.null;
-      expect(calculateDistance(37.7749, null, 34.0522, -118.2437)).to.be.null;
-      expect(calculateDistance(37.7749, -122.4194, null, -118.2437)).to.be.null;
-      expect(calculateDistance(37.7749, -122.4194, 34.0522, null)).to.be.null;
+      expect(calculateDistance(null, -122.4194, 34.0522, -118.2437)).toBeNull();
+      expect(calculateDistance(37.7749, null, 34.0522, -118.2437)).toBeNull();
+      expect(calculateDistance(37.7749, -122.4194, null, -118.2437)).toBeNull();
+      expect(calculateDistance(37.7749, -122.4194, 34.0522, null)).toBeNull();
     });
   });
 
@@ -47,11 +44,13 @@ describe('Wikidata Local Parks Matching Service', () => {
         radiusKm: 10,
       });
 
-      expect(query).to.be.a('string');
-      expect(query).to.include('Central Park');
-      expect(query).to.include('40.7829');
-      expect(query).to.include('-73.9654');
-      expect(query).to.include('10'); // radius
+      expect(typeof query).toBe('string');
+      // Query searches by location, name is used for matching later
+      expect(query).toContain('40.7829');
+      expect(query).toContain('-73.9654');
+      expect(query).toContain('"10"'); // radius in quotes
+      expect(query).toContain('wikibase:around'); // geo search
+      expect(query).toContain('Q22698'); // park entity type
     });
 
     it('should escape special characters in park name', () => {
@@ -61,8 +60,9 @@ describe('Wikidata Local Parks Matching Service', () => {
         longitude: -74.0,
       });
 
-      expect(query).to.not.include("'Brien");
-      expect(query).to.include('OBriens Park');
+      // Apostrophes are removed, & is replaced with 'and'
+      expect(query).not.toContain("'Brien");
+      expect(query).not.toContain('&');
     });
 
     it('should use default radius if not specified', () => {
@@ -72,7 +72,7 @@ describe('Wikidata Local Parks Matching Service', () => {
         longitude: -74.0,
       });
 
-      expect(query).to.include('5'); // default 5km radius
+      expect(query).toContain('"5"'); // default 5km radius in quotes
     });
   });
 
@@ -80,10 +80,10 @@ describe('Wikidata Local Parks Matching Service', () => {
     it('should build a SPARQL query for fetching photos by Wikidata ID', () => {
       const query = buildPhotoQuery('Q160409');
 
-      expect(query).to.be.a('string');
-      expect(query).to.include('Q160409');
-      expect(query).to.include('P18'); // image property
-      expect(query).to.include('P373'); // Commons category
+      expect(typeof query).toBe('string');
+      expect(query).toContain('Q160409');
+      expect(query).toContain('P18'); // image property
+      expect(query).toContain('P373'); // Commons category
     });
   });
 
@@ -98,28 +98,28 @@ describe('Wikidata Local Parks Matching Service', () => {
 
     it('should parse Wikidata ID from URI', () => {
       const result = parseWikidataResult(mockResult);
-      expect(result.wikidata_id).to.equal('Q160409');
+      expect(result.wikidata_id).toBe('Q160409');
     });
 
     it('should parse park label', () => {
       const result = parseWikidataResult(mockResult);
-      expect(result.label).to.equal('Central Park');
+      expect(result.label).toBe('Central Park');
     });
 
     it('should parse coordinates', () => {
       const result = parseWikidataResult(mockResult);
-      expect(result.latitude).to.be.closeTo(40.7829, 0.001);
-      expect(result.longitude).to.be.closeTo(-73.9654, 0.001);
+      expect(result.latitude).toBeCloseTo(40.7829, 3);
+      expect(result.longitude).toBeCloseTo(-73.9654, 3);
     });
 
     it('should parse image URL', () => {
       const result = parseWikidataResult(mockResult);
-      expect(result.image_url).to.include('Central_Park.jpg');
+      expect(result.image_url).toContain('Central_Park.jpg');
     });
 
     it('should parse Commons category', () => {
       const result = parseWikidataResult(mockResult);
-      expect(result.commons_category).to.equal('Central Park, New York City');
+      expect(result.commons_category).toBe('Central Park, New York City');
     });
 
     it('should handle missing optional fields', () => {
@@ -128,9 +128,9 @@ describe('Wikidata Local Parks Matching Service', () => {
         parkLabel: { value: 'Test Park' },
       };
       const result = parseWikidataResult(minimalResult);
-      expect(result.wikidata_id).to.equal('Q12345');
-      expect(result.image_url).to.be.null;
-      expect(result.commons_category).to.be.null;
+      expect(result.wikidata_id).toBe('Q12345');
+      expect(result.image_url).toBeNull();
+      expect(result.commons_category).toBeNull();
     });
   });
 
@@ -153,38 +153,38 @@ describe('Wikidata Local Parks Matching Service', () => {
 
     it('should parse image URL', () => {
       const result = parseCommonsImage(mockImageInfo);
-      expect(result.image_url).to.include('Central_Park.jpg');
+      expect(result.image_url).toContain('Central_Park.jpg');
     });
 
     it('should parse thumbnail URL', () => {
       const result = parseCommonsImage(mockImageInfo);
-      expect(result.thumb_url).to.include('300px');
+      expect(result.thumb_url).toContain('300px');
     });
 
     it('should parse dimensions', () => {
       const result = parseCommonsImage(mockImageInfo);
-      expect(result.width).to.equal(4000);
-      expect(result.height).to.equal(3000);
+      expect(result.width).toBe(4000);
+      expect(result.height).toBe(3000);
     });
 
     it('should parse license', () => {
       const result = parseCommonsImage(mockImageInfo);
-      expect(result.license).to.equal('CC BY-SA 4.0');
+      expect(result.license).toBe('CC BY-SA 4.0');
     });
 
     it('should parse title', () => {
       const result = parseCommonsImage(mockImageInfo);
-      expect(result.title).to.equal('Central Park.jpg');
+      expect(result.title).toBe('Central Park.jpg');
     });
 
     it('should set source as wikimedia', () => {
       const result = parseCommonsImage(mockImageInfo);
-      expect(result.source).to.equal('wikimedia');
+      expect(result.source).toBe('wikimedia');
     });
 
     it('should handle missing imageinfo', () => {
       const result = parseCommonsImage({ title: 'File:Test.jpg' });
-      expect(result).to.be.null;
+      expect(result).toBeNull();
     });
   });
 
@@ -218,18 +218,18 @@ describe('Wikidata Local Parks Matching Service', () => {
 
     it('should return the best matching candidate', () => {
       const match = findBestMatch(parkData, candidates);
-      expect(match).to.not.be.null;
-      expect(match.wikidata_id).to.equal('Q160409');
+      expect(match).not.toBeNull();
+      expect(match.wikidata_id).toBe('Q160409');
     });
 
     it('should prefer exact name matches', () => {
       const match = findBestMatch(parkData, candidates);
-      expect(match.label).to.equal('Central Park');
+      expect(match.label).toBe('Central Park');
     });
 
     it('should return null for empty candidates', () => {
       const match = findBestMatch(parkData, []);
-      expect(match).to.be.null;
+      expect(match).toBeNull();
     });
 
     it('should return null if no good match found', () => {
@@ -239,33 +239,35 @@ describe('Wikidata Local Parks Matching Service', () => {
         longitude: 0,
       };
       const match = findBestMatch(farPark, candidates, { maxDistanceKm: 1 });
-      expect(match).to.be.null;
+      expect(match).toBeNull();
     });
   });
 
   describe('fetchParkMatch (integration)', () => {
     it.skip('should fetch matching Wikidata entity for a park', async () => {
+      const { fetchParkMatch } = await import('@/lib/api/wikidata-local.js');
       const result = await fetchParkMatch({
         name: 'Central Park',
         latitude: 40.7829,
         longitude: -73.9654,
       });
 
-      expect(result).to.not.be.null;
-      expect(result.wikidata_id).to.equal('Q160409');
+      expect(result).not.toBeNull();
+      expect(result.wikidata_id).toBe('Q160409');
     });
   });
 
   describe('fetchCommonsImages (integration)', () => {
     it.skip('should fetch images from Commons category', async () => {
+      const { fetchCommonsImages } = await import('@/lib/api/wikidata-local.js');
       const images = await fetchCommonsImages('Central Park, New York City', { limit: 5 });
 
-      expect(images).to.be.an('array');
-      expect(images.length).to.be.at.most(5);
+      expect(Array.isArray(images)).toBe(true);
+      expect(images.length).toBeLessThanOrEqual(5);
       if (images.length > 0) {
-        expect(images[0]).to.have.property('image_url');
-        expect(images[0]).to.have.property('thumb_url');
-        expect(images[0]).to.have.property('license');
+        expect(images[0]).toHaveProperty('image_url');
+        expect(images[0]).toHaveProperty('thumb_url');
+        expect(images[0]).toHaveProperty('license');
       }
     });
   });

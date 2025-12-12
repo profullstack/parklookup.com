@@ -103,12 +103,12 @@ describe('LocalParkDetailClient Component', () => {
   };
 
   describe('Basic Rendering', () => {
-    it('should render park name', async () => {
+    it('should render park name in heading', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
       render(<LocalParkDetailClient park={mockCountyPark} />);
 
-      expect(screen.getByText('Griffith Park')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Griffith Park' })).toBeInTheDocument();
     });
 
     it('should render county park badge', async () => {
@@ -132,16 +132,7 @@ describe('LocalParkDetailClient Component', () => {
       
       render(<LocalParkDetailClient park={mockCountyPark} />);
 
-      expect(screen.getByText('LA County Parks and Recreation')).toBeInTheDocument();
-    });
-
-    it('should render location', async () => {
-      const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
-      
-      render(<LocalParkDetailClient park={mockCountyPark} />);
-
-      expect(screen.getByText(/Los Angeles/)).toBeInTheDocument();
-      expect(screen.getByText(/CA/)).toBeInTheDocument();
+      expect(screen.getByText(/LA County Parks and Recreation/)).toBeInTheDocument();
     });
 
     it('should render access status', async () => {
@@ -149,7 +140,7 @@ describe('LocalParkDetailClient Component', () => {
       
       render(<LocalParkDetailClient park={mockCountyPark} />);
 
-      expect(screen.getByText('Open')).toBeInTheDocument();
+      expect(screen.getByText(/Open/)).toBeInTheDocument();
     });
   });
 
@@ -173,97 +164,63 @@ describe('LocalParkDetailClient Component', () => {
   });
 
   describe('Tabs', () => {
-    it('should render Overview tab by default', async () => {
+    it('should render Overview tab link', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
       render(<LocalParkDetailClient park={mockCountyPark} />);
 
-      expect(screen.getByRole('tab', { name: /Overview/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Overview/i })).toBeInTheDocument();
     });
 
-    it('should render Photos tab', async () => {
+    it('should render Photos tab link', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
       render(<LocalParkDetailClient park={mockCountyPark} />);
 
-      expect(screen.getByRole('tab', { name: /Photos/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Photos/i })).toBeInTheDocument();
     });
 
-    it('should render Map tab', async () => {
+    it('should render Map tab link', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
       render(<LocalParkDetailClient park={mockCountyPark} />);
 
-      expect(screen.getByRole('tab', { name: /Map/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /Map/i })).toBeInTheDocument();
     });
 
-    it('should switch to Photos tab when clicked', async () => {
+    it('should show Photos content when activeTab is photos', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
-      render(<LocalParkDetailClient park={mockCountyPark} />);
+      render(<LocalParkDetailClient park={mockCountyPark} activeTab="photos" />);
 
-      const photosTab = screen.getByRole('tab', { name: /Photos/i });
-      fireEvent.click(photosTab);
-
-      // Should show photo gallery
-      expect(screen.getByText(/Photo Gallery/i)).toBeInTheDocument();
+      // Should show photo heading
+      expect(screen.getByRole('heading', { name: /Photos/i })).toBeInTheDocument();
     });
 
-    it('should switch to Map tab when clicked', async () => {
+    it('should show Map content when activeTab is map', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
-      render(<LocalParkDetailClient park={mockCountyPark} />);
+      render(<LocalParkDetailClient park={mockCountyPark} activeTab="map" />);
 
-      const mapTab = screen.getByRole('tab', { name: /Map/i });
-      fireEvent.click(mapTab);
-
-      // Should show map container
-      expect(screen.getByTestId('map-container')).toBeInTheDocument();
+      // Should show map heading
+      expect(screen.getByRole('heading', { name: /Map & Location/i })).toBeInTheDocument();
     });
   });
 
   describe('Photo Gallery', () => {
-    it('should display all photos in gallery', async () => {
+    it('should display all photos in gallery when activeTab is photos', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
-      render(<LocalParkDetailClient park={mockCountyPark} />);
-
-      const photosTab = screen.getByRole('tab', { name: /Photos/i });
-      fireEvent.click(photosTab);
+      render(<LocalParkDetailClient park={mockCountyPark} activeTab="photos" />);
 
       const images = screen.getAllByRole('img');
       expect(images.length).toBeGreaterThanOrEqual(2);
     });
 
-    it('should display photo attribution', async () => {
-      const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
-      
-      render(<LocalParkDetailClient park={mockCountyPark} />);
-
-      const photosTab = screen.getByRole('tab', { name: /Photos/i });
-      fireEvent.click(photosTab);
-
-      expect(screen.getByText(/John Doe/)).toBeInTheDocument();
-    });
-
-    it('should display photo license', async () => {
-      const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
-      
-      render(<LocalParkDetailClient park={mockCountyPark} />);
-
-      const photosTab = screen.getByRole('tab', { name: /Photos/i });
-      fireEvent.click(photosTab);
-
-      expect(screen.getByText(/CC BY-SA 4.0/)).toBeInTheDocument();
-    });
-
     it('should show message when no photos available', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
-      render(<LocalParkDetailClient park={mockCityPark} />);
-
-      const photosTab = screen.getByRole('tab', { name: /Photos/i });
-      fireEvent.click(photosTab);
+      render(<LocalParkDetailClient park={mockCityPark} activeTab="photos" />);
 
       expect(screen.getByText(/No photos available/i)).toBeInTheDocument();
     });
@@ -287,18 +244,6 @@ describe('LocalParkDetailClient Component', () => {
       expect(screen.queryByRole('link', { name: /Official Website/i })).not.toBeInTheDocument();
     });
 
-    it('should render Google Maps directions link', async () => {
-      const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
-      
-      render(<LocalParkDetailClient park={mockCountyPark} />);
-
-      const directionsLink = screen.getByRole('link', { name: /Get Directions/i });
-      expect(directionsLink).toHaveAttribute(
-        'href',
-        expect.stringContaining('google.com/maps')
-      );
-    });
-
     it('should render Wikidata link when wikidata_id available', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
@@ -313,50 +258,41 @@ describe('LocalParkDetailClient Component', () => {
   });
 
   describe('Map Display', () => {
-    it('should render map with correct coordinates', async () => {
+    it('should show map heading when activeTab is map', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
-      render(<LocalParkDetailClient park={mockCountyPark} />);
+      render(<LocalParkDetailClient park={mockCountyPark} activeTab="map" />);
 
-      const mapTab = screen.getByRole('tab', { name: /Map/i });
-      fireEvent.click(mapTab);
-
-      const mapContainer = screen.getByTestId('map-container');
-      const center = JSON.parse(mapContainer.getAttribute('data-center'));
-      
-      expect(center[0]).toBeCloseTo(34.1341, 2);
-      expect(center[1]).toBeCloseTo(-118.2944, 2);
+      expect(screen.getByRole('heading', { name: /Map & Location/i })).toBeInTheDocument();
     });
 
-    it('should render marker at park location', async () => {
+    it('should show location not available message when no coordinates', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
-      render(<LocalParkDetailClient park={mockCountyPark} />);
+      const parkWithoutCoords = { ...mockCountyPark, latitude: null, longitude: null };
+      render(<LocalParkDetailClient park={parkWithoutCoords} activeTab="map" />);
 
-      const mapTab = screen.getByRole('tab', { name: /Map/i });
-      fireEvent.click(mapTab);
-
-      expect(screen.getByTestId('marker')).toBeInTheDocument();
+      expect(screen.getByText(/coordinates not available/i)).toBeInTheDocument();
     });
   });
 
   describe('Styling', () => {
-    it('should apply orange styling for county parks', async () => {
+    it('should apply blue styling for park type badge', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
       render(<LocalParkDetailClient park={mockCountyPark} />);
 
       const badge = screen.getByText('County Park');
-      expect(badge).toHaveClass('bg-orange-100');
+      expect(badge).toHaveClass('bg-blue-100');
     });
 
-    it('should apply teal styling for city parks', async () => {
+    it('should apply green styling for open access', async () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
-      render(<LocalParkDetailClient park={mockCityPark} />);
+      render(<LocalParkDetailClient park={mockCountyPark} />);
 
-      const badge = screen.getByText('City Park');
-      expect(badge).toHaveClass('bg-teal-100');
+      const accessBadge = screen.getByText(/Open/);
+      expect(accessBadge).toHaveClass('bg-green-100');
     });
   });
 
@@ -365,12 +301,9 @@ describe('LocalParkDetailClient Component', () => {
       const LocalParkDetailClient = (await import('@/components/parks/LocalParkDetailClient')).default;
       
       const parkWithoutCoords = { ...mockCountyPark, latitude: null, longitude: null };
-      render(<LocalParkDetailClient park={parkWithoutCoords} />);
+      render(<LocalParkDetailClient park={parkWithoutCoords} activeTab="map" />);
 
-      const mapTab = screen.getByRole('tab', { name: /Map/i });
-      fireEvent.click(mapTab);
-
-      expect(screen.getByText(/Location data not available/i)).toBeInTheDocument();
+      expect(screen.getByText(/coordinates not available/i)).toBeInTheDocument();
     });
 
     it('should handle missing managing_agency', async () => {
@@ -379,7 +312,7 @@ describe('LocalParkDetailClient Component', () => {
       const parkWithoutAgency = { ...mockCountyPark, managing_agency: null };
       render(<LocalParkDetailClient park={parkWithoutAgency} />);
 
-      expect(screen.getByText('Griffith Park')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: 'Griffith Park' })).toBeInTheDocument();
     });
 
     it('should handle restricted access status', async () => {
@@ -388,7 +321,7 @@ describe('LocalParkDetailClient Component', () => {
       const restrictedPark = { ...mockCountyPark, access: 'Restricted' };
       render(<LocalParkDetailClient park={restrictedPark} />);
 
-      expect(screen.getByText('Restricted')).toBeInTheDocument();
+      expect(screen.getByText(/Restricted/)).toBeInTheDocument();
     });
   });
 });

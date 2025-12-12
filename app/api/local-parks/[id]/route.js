@@ -11,7 +11,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 
 /**
  * Validates if a string is a valid UUID
@@ -35,7 +35,7 @@ export async function GET(request, { params }) {
     }
 
     // Create Supabase client
-    const supabase = await createClient();
+    const supabase = createServiceClient();
 
     let query = supabase
       .from('local_parks')

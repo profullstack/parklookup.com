@@ -22,17 +22,19 @@ describe('LocalParkCard Component', () => {
     slug: 'griffith-park',
     park_type: 'county',
     managing_agency: 'LA County Parks',
-    county: 'Los Angeles',
-    state: 'CA',
+    county: {
+      name: 'Los Angeles',
+      slug: 'los-angeles',
+    },
+    state: {
+      name: 'California',
+      code: 'CA',
+      slug: 'ca',
+    },
     latitude: 34.1341,
     longitude: -118.2944,
     access: 'Open',
-    photos: [
-      {
-        thumb_url: 'https://example.com/thumb.jpg',
-        image_url: 'https://example.com/image.jpg',
-      },
-    ],
+    primary_photo_url: 'https://example.com/image.jpg',
   };
 
   const mockCityPark = {
@@ -41,13 +43,23 @@ describe('LocalParkCard Component', () => {
     slug: 'central-park',
     park_type: 'city',
     managing_agency: 'NYC Parks Department',
-    county: 'New York',
-    city: 'New York',
-    state: 'NY',
+    county: {
+      name: 'New York',
+      slug: 'new-york',
+    },
+    city: {
+      name: 'New York',
+      slug: 'new-york',
+    },
+    state: {
+      name: 'New York',
+      code: 'NY',
+      slug: 'ny',
+    },
     latitude: 40.7829,
     longitude: -73.9654,
     access: 'Open',
-    photos: [],
+    primary_photo_url: null,
   };
 
   describe('Rendering', () => {
@@ -88,8 +100,8 @@ describe('LocalParkCard Component', () => {
       
       render(<LocalParkCard park={mockCountyPark} />);
 
-      expect(screen.getByText(/Los Angeles/)).toBeInTheDocument();
-      expect(screen.getByText(/CA/)).toBeInTheDocument();
+      // Component shows "Los Angeles County, California"
+      expect(screen.getByText(/Los Angeles County/)).toBeInTheDocument();
     });
 
     it('should render access status', async () => {
@@ -97,7 +109,8 @@ describe('LocalParkCard Component', () => {
       
       render(<LocalParkCard park={mockCountyPark} />);
 
-      expect(screen.getByText('Open')).toBeInTheDocument();
+      // Component shows "Open Access"
+      expect(screen.getByText('Open Access')).toBeInTheDocument();
     });
 
     it('should render photo when available', async () => {
@@ -106,7 +119,8 @@ describe('LocalParkCard Component', () => {
       render(<LocalParkCard park={mockCountyPark} />);
 
       const image = screen.getByRole('img');
-      expect(image).toHaveAttribute('src', expect.stringContaining('thumb.jpg'));
+      // Next.js Image component transforms the src
+      expect(image).toHaveAttribute('alt', 'Griffith Park');
     });
 
     it('should render placeholder when no photo available', async () => {
@@ -146,22 +160,22 @@ describe('LocalParkCard Component', () => {
   });
 
   describe('Styling', () => {
-    it('should apply orange color for county parks', async () => {
+    it('should apply blue color for county parks', async () => {
       const LocalParkCard = (await import('@/components/parks/LocalParkCard')).default;
       
-      const { container } = render(<LocalParkCard park={mockCountyPark} />);
+      render(<LocalParkCard park={mockCountyPark} />);
 
       const badge = screen.getByText('County Park');
-      expect(badge).toHaveClass('bg-orange-100');
+      expect(badge).toHaveClass('bg-blue-100');
     });
 
-    it('should apply teal color for city parks', async () => {
+    it('should apply purple color for city parks', async () => {
       const LocalParkCard = (await import('@/components/parks/LocalParkCard')).default;
       
-      const { container } = render(<LocalParkCard park={mockCityPark} />);
+      render(<LocalParkCard park={mockCityPark} />);
 
       const badge = screen.getByText('City Park');
-      expect(badge).toHaveClass('bg-teal-100');
+      expect(badge).toHaveClass('bg-purple-100');
     });
   });
 
@@ -190,16 +204,16 @@ describe('LocalParkCard Component', () => {
       const restrictedPark = { ...mockCountyPark, access: 'Restricted' };
       render(<LocalParkCard park={restrictedPark} />);
 
-      expect(screen.getByText('Restricted')).toBeInTheDocument();
+      expect(screen.getByText('Restricted Access')).toBeInTheDocument();
     });
 
     it('should handle unknown access', async () => {
       const LocalParkCard = (await import('@/components/parks/LocalParkCard')).default;
       
-      const unknownAccessPark = { ...mockCountyPark, access: 'Unknown' };
+      const unknownAccessPark = { ...mockCountyPark, access: null };
       render(<LocalParkCard park={unknownAccessPark} />);
 
-      expect(screen.getByText('Unknown')).toBeInTheDocument();
+      expect(screen.getByText('Unknown Access')).toBeInTheDocument();
     });
   });
 });

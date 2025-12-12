@@ -289,19 +289,41 @@ describe('InteractiveParksMap Component', () => {
   describe('User Location', () => {
     const userLocation = { lat: 37.7749, lng: -122.4194 };
 
+    // Parks within 100 miles of San Francisco (very close parks)
+    const nearbyParks = [
+      {
+        id: '1',
+        park_code: 'muwo',
+        full_name: 'Muir Woods National Monument',
+        latitude: 37.8970,
+        longitude: -122.5811,
+        states: 'CA',
+        source: 'nps',
+      },
+      {
+        id: '2',
+        park_code: 'goga',
+        full_name: 'Golden Gate National Recreation Area',
+        latitude: 37.8199,
+        longitude: -122.4783,
+        states: 'CA',
+        source: 'nps',
+      },
+    ];
+
     it('should render user location marker', async () => {
       const InteractiveParksMap = (await import('@/components/parks/InteractiveParksMap')).default;
       
       render(
-        <InteractiveParksMap 
-          parks={mockNationalParks} 
-          userLocation={userLocation} 
+        <InteractiveParksMap
+          parks={nearbyParks}
+          userLocation={userLocation}
         />
       );
 
-      // Should have user marker + park markers
+      // Should have user marker + park markers (2 parks + 1 user = 3)
       const markers = screen.getAllByTestId('marker');
-      expect(markers.length).toBeGreaterThan(2);
+      expect(markers.length).toBe(3);
     });
 
     it('should render radius circle around user location', async () => {

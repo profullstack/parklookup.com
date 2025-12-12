@@ -14,7 +14,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 
 /** Default page size */
 const DEFAULT_LIMIT = 20;
@@ -44,7 +44,7 @@ export async function GET(request) {
     const offset = (page - 1) * limit;
 
     // Create Supabase client
-    const supabase = await createClient();
+    const supabase = createServiceClient();
 
     // Build query
     let query = supabase
