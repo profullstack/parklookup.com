@@ -100,6 +100,15 @@ vi.mock('@/components/parks/ParkReviews', () => ({
   ),
 }));
 
+// Mock UserPhotos
+vi.mock('@/components/parks/UserPhotos', () => ({
+  default: ({ parkCode }) => (
+    <div data-testid="user-photos" data-park-code={parkCode}>
+      User Photos
+    </div>
+  ),
+}));
+
 // Mock park data
 const mockNpsPark = {
   id: 'park-uuid-1',
@@ -573,7 +582,9 @@ describe('ParkDetailClient', () => {
         />
       );
 
-      expect(screen.getByText('Photos')).toBeInTheDocument();
+      // Photos tab should always be visible (for user-contributed content)
+      const photosElements = screen.getAllByText('Photos');
+      expect(photosElements.length).toBeGreaterThan(0);
       // Should show images starting from index 1 (skip hero image)
       const images = screen.getAllByRole('img');
       expect(images.length).toBeGreaterThan(0);
@@ -595,10 +606,12 @@ describe('ParkDetailClient', () => {
 
       // State parks with only 1 image should still show the gallery
       // This ensures state park photos are visible in the gallery section
-      expect(screen.getByText('Photos')).toBeInTheDocument();
+      // Photos tab is always visible for user-contributed content
+      const photosElements = screen.getAllByText('Photos');
+      expect(photosElements.length).toBeGreaterThan(0);
     });
 
-    it('should not display gallery when no images', () => {
+    it('should not display gallery section when no images but Photos tab still visible', () => {
       render(
         <ParkDetailClient
           park={mockStatePark}
@@ -612,7 +625,50 @@ describe('ParkDetailClient', () => {
         />
       );
 
-      expect(screen.queryByText('Photos')).not.toBeInTheDocument();
+      // Photos tab should still be visible for user-contributed content
+      // but the gallery section with park images should not be shown
+      const photosTab = screen.getByRole('link', { name: 'Photos' });
+      expect(photosTab).toBeInTheDocument();
+      // The gallery heading should not be present when no images
+      const galleryHeadings = screen.queryAllByRole('heading', { name: 'Photos' });
+      expect(galleryHeadings.length).toBe(0);
+    });
+  });
+
+  describe('Photos Tab', () => {
+    it('should display user photos component on photos tab', () => {
+      render(
+        <ParkDetailClient
+          park={mockNpsPark}
+          activeTab="photos"
+          products={[]}
+          hasCoordinates={true}
+          images={mockNpsPark.images}
+          activities={mockNpsPark.activities}
+          entranceFees={mockNpsPark.entrance_fees}
+          operatingHours={mockNpsPark.operating_hours}
+        />
+      );
+
+      expect(screen.getByTestId('user-photos')).toBeInTheDocument();
+    });
+
+    it('should link to photos tab URL', () => {
+      render(
+        <ParkDetailClient
+          park={mockNpsPark}
+          activeTab="overview"
+          products={[]}
+          hasCoordinates={true}
+          images={mockNpsPark.images}
+          activities={mockNpsPark.activities}
+          entranceFees={mockNpsPark.entrance_fees}
+          operatingHours={mockNpsPark.operating_hours}
+        />
+      );
+
+      const photosTab = screen.getByRole('link', { name: 'Photos' });
+      expect(photosTab).toHaveAttribute('href', '/parks/yell/photos');
     });
   });
 
