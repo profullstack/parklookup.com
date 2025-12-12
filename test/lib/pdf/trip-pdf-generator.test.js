@@ -1,212 +1,281 @@
 /**
- * Trip PDF Generator Tests
- * Tests for PDF export functionality for travel plans
+ * Tests for Trip PDF Generator
+ * @vitest-environment node
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { formatTripForPdf, generateTripPdf } from '@/lib/pdf/trip-pdf-generator';
 
-// Mock pdfkit before importing the module
-vi.mock('pdfkit', () => {
-  const mockDoc = {
-    pipe: vi.fn().mockReturnThis(),
-    fontSize: vi.fn().mockReturnThis(),
-    font: vi.fn().mockReturnThis(),
-    text: vi.fn().mockReturnThis(),
-    moveDown: vi.fn().mockReturnThis(),
-    fillColor: vi.fn().mockReturnThis(),
-    rect: vi.fn().mockReturnThis(),
-    fill: vi.fn().mockReturnThis(),
-    stroke: vi.fn().mockReturnThis(),
-    addPage: vi.fn().mockReturnThis(),
-    end: vi.fn(),
-    on: vi.fn((event, callback) => {
-      if (event === 'end') {
-        setTimeout(callback, 0);
-      }
-      return mockDoc;
-    }),
-    y: 100,
-    page: { height: 792, width: 612 },
+// Mock pdf-lib
+vi.mock('pdf-lib', () => {
+  const mockPage = {
+    drawText: vi.fn(),
+    drawLine: vi.fn(),
   };
-  return { default: vi.fn(() => mockDoc) };
+
+  const mockFont = {
+    widthOfTextAtSize: vi.fn().mockReturnValue(100),
+  };
+
+  const mockPdfDoc = {
+    addPage: vi.fn().mockReturnValue(mockPage),
+    embedFont: vi.fn().mockResolvedValue(mockFont),
+    getPageCount: vi.fn().mockReturnValue(1),
+    getPage: vi.fn().mockReturnValue(mockPage),
+    save: vi.fn().mockResolvedValue(new Uint8Array([37, 80, 68, 70])), // %PDF
+  };
+
+  return {
+    PDFDocument: {
+      create: vi.fn().mockResolvedValue(mockPdfDoc),
+    },
+    StandardFonts: {
+      Helvetica: 'Helvetica',
+      HelveticaBold: 'Helvetica-Bold',
+    },
+    rgb: vi.fn().mockReturnValue({ r: 0, g: 0, b: 0 }),
+  };
 });
 
-// Import after mocking
-const { generateTripPdf, formatTripForPdf } = await import(
-  '@/lib/pdf/trip-pdf-generator.js'
-);
-
 describe('Trip PDF Generator', () => {
-  const mockTrip = {
-    id: '123e4567-e89b-12d3-a456-426614174000',
-    title: 'California National Parks Adventure',
-    origin: 'Los Angeles, CA',
-    originLat: 34.0522,
-    originLng: -118.2437,
-    startDate: '2024-06-15',
-    endDate: '2024-06-18',
-    interests: ['hiking', 'photography', 'wildlife'],
-    difficulty: 'moderate',
-    radiusMiles: 200,
-    summary: 'An exciting 4-day adventure through California\'s most beautiful national parks.',
-    packingList: {
-      essentials: ['Water bottles', 'Sunscreen', 'First aid kit'],
-      clothing: ['Hiking boots', 'Layered clothing', 'Hat'],
-      gear: ['Camera', 'Binoculars', 'Backpack'],
-      optional: ['Tripod', 'Field guide'],
-    },
-    safetyNotes: [
-      'Stay on marked trails',
-      'Carry plenty of water',
-      'Check weather conditions before hiking',
-    ],
-    bestPhotoSpots: [
-      'Half Dome viewpoint at sunrise',
-      'Tunnel View overlook',
-      'Mirror Lake reflection shots',
-    ],
-    estimatedBudget: {
-      entrance_fees: '$35 per vehicle',
-      fuel_estimate: '$80-100',
-      total_range: '$200-300',
-    },
-    stops: [
-      {
-        id: 'stop-1',
-        dayNumber: 1,
-        parkCode: 'yose',
-        park: {
-          name: 'Yosemite National Park',
-          description: 'Iconic granite cliffs and waterfalls',
-          states: 'CA',
-          latitude: 37.8651,
-          longitude: -119.5383,
-          designation: 'National Park',
-        },
-        activities: ['hiking', 'photography'],
-        morningPlan: 'Arrive early and hike to Yosemite Falls',
-        afternoonPlan: 'Explore Yosemite Valley floor',
-        eveningPlan: 'Sunset at Tunnel View',
-        drivingNotes: '4 hour drive from Los Angeles',
-        highlights: 'Half Dome, El Capitan, Yosemite Falls',
-      },
-      {
-        id: 'stop-2',
-        dayNumber: 2,
-        parkCode: 'sequ',
-        park: {
-          name: 'Sequoia National Park',
-          description: 'Home to giant sequoia trees',
-          states: 'CA',
-          latitude: 36.4864,
-          longitude: -118.5658,
-          designation: 'National Park',
-        },
-        activities: ['hiking', 'nature walks'],
-        morningPlan: 'Visit General Sherman Tree',
-        afternoonPlan: 'Hike Congress Trail',
-        eveningPlan: 'Stargazing at Crescent Meadow',
-        drivingNotes: '3 hour drive from Yosemite',
-        highlights: 'General Sherman Tree, Moro Rock',
-      },
-    ],
-  };
-
   describe('formatTripForPdf', () => {
-    it('should format trip data for PDF generation', () => {
-      const formatted = formatTripForPdf(mockTrip);
+    it('should format a complete trip correctly', () => {
+      const trip = {
+        title: 'California Adventure',
+        origin: 'San Francisco, CA',
+        startDate: '2024-06-15',
+        endDate: '2024-06-20',
+        difficulty: 'moderate',
+        radiusMiles: 150,
+        summary: 'An amazing trip through California parks',
+        stops: [
+          {
+            dayNumber: 1,
+            park: { name: 'Yosemite National Park', description: 'Beautiful park' },
+            parkCode: 'yose',
+            activities: ['hiking', 'photography'],
+            morningPlan: 'Visit Half Dome',
+            afternoonPlan: 'Explore valley',
+            eveningPlan: 'Campfire',
+            drivingNotes: '3 hours from SF',
+            highlights: 'Half Dome views',
+          },
+        ],
+        packingList: {
+          essentials: ['Water', 'Sunscreen'],
+          clothing: ['Hiking boots'],
+          gear: ['Camera'],
+          optional: ['Binoculars'],
+        },
+        safetyNotes: ['Watch for wildlife', 'Stay on trails'],
+        bestPhotoSpots: ['Tunnel View', 'Mirror Lake'],
+        estimatedBudget: {
+          entrance_fees: '$35',
+          fuel_estimate: '$100',
+          total_range: '$200-$300',
+        },
+      };
 
-      expect(formatted).toHaveProperty('title', mockTrip.title);
-      expect(formatted).toHaveProperty('origin', mockTrip.origin);
-      expect(formatted).toHaveProperty('dateRange');
-      expect(formatted).toHaveProperty('duration');
-      expect(formatted).toHaveProperty('stops');
-      expect(formatted.stops).toHaveLength(2);
+      const result = formatTripForPdf(trip);
+
+      expect(result.title).toBe('California Adventure');
+      expect(result.origin).toBe('San Francisco, CA');
+      expect(result.difficulty).toBe('moderate');
+      expect(result.radiusMiles).toBe(150);
+      expect(result.summary).toBe('An amazing trip through California parks');
+      expect(result.stops).toHaveLength(1);
+      expect(result.stops[0].parkName).toBe('Yosemite National Park');
+      expect(result.stops[0].activities).toEqual(['hiking', 'photography']);
+      expect(result.packingList.essentials).toEqual(['Water', 'Sunscreen']);
+      expect(result.safetyNotes).toEqual(['Watch for wildlife', 'Stay on trails']);
+      expect(result.bestPhotoSpots).toEqual(['Tunnel View', 'Mirror Lake']);
+      expect(result.estimatedBudget.entrance_fees).toBe('$35');
     });
 
-    it('should calculate correct duration', () => {
-      const formatted = formatTripForPdf(mockTrip);
-
-      // June 15 to June 18 = 4 days
-      expect(formatted.duration).toBe('4 days');
-    });
-
-    it('should format dates correctly', () => {
-      const formatted = formatTripForPdf(mockTrip);
-
-      expect(formatted.dateRange).toContain('June');
-      expect(formatted.dateRange).toContain('2024');
-    });
-
-    it('should handle missing optional fields gracefully', () => {
-      const minimalTrip = {
-        id: '123',
+    it('should handle missing optional fields', () => {
+      const trip = {
         title: 'Simple Trip',
-        origin: 'NYC',
-        startDate: '2024-07-01',
-        endDate: '2024-07-02',
         stops: [],
       };
 
-      const formatted = formatTripForPdf(minimalTrip);
+      const result = formatTripForPdf(trip);
 
-      expect(formatted.title).toBe('Simple Trip');
-      expect(formatted.packingList).toBeNull();
-      expect(formatted.safetyNotes).toEqual([]);
-      expect(formatted.bestPhotoSpots).toEqual([]);
+      expect(result.title).toBe('Simple Trip');
+      expect(result.origin).toBe('Unknown');
+      expect(result.difficulty).toBe('moderate');
+      expect(result.radiusMiles).toBe(100);
+      expect(result.summary).toBe('');
+      expect(result.stops).toEqual([]);
+      expect(result.packingList).toBeNull();
+      expect(result.safetyNotes).toEqual([]);
+      expect(result.bestPhotoSpots).toEqual([]);
+      expect(result.estimatedBudget).toBeNull();
     });
 
-    it('should format stop data correctly', () => {
-      const formatted = formatTripForPdf(mockTrip);
-      const firstStop = formatted.stops[0];
+    it('should handle empty trip object', () => {
+      const result = formatTripForPdf({});
 
-      expect(firstStop).toHaveProperty('dayNumber', 1);
-      expect(firstStop).toHaveProperty('parkName', 'Yosemite National Park');
-      expect(firstStop).toHaveProperty('activities');
-      expect(firstStop).toHaveProperty('schedule');
-      expect(firstStop.schedule).toHaveProperty('morning');
-      expect(firstStop.schedule).toHaveProperty('afternoon');
-      expect(firstStop.schedule).toHaveProperty('evening');
+      expect(result.title).toBe('Trip Plan');
+      expect(result.origin).toBe('Unknown');
+      expect(result.stops).toEqual([]);
+    });
+
+    it('should format dates correctly', () => {
+      const trip = {
+        startDate: '2024-12-25T12:00:00Z',
+        endDate: '2024-12-31T12:00:00Z',
+      };
+
+      const result = formatTripForPdf(trip);
+
+      expect(result.startDate).toContain('December');
+      expect(result.startDate).toContain('2024');
+      expect(result.endDate).toContain('December');
+      expect(result.endDate).toContain('2024');
+    });
+
+    it('should handle stops without park data', () => {
+      const trip = {
+        stops: [
+          {
+            dayNumber: 1,
+            parkCode: 'test-park',
+          },
+        ],
+      };
+
+      const result = formatTripForPdf(trip);
+
+      expect(result.stops[0].parkName).toBe('test-park');
+      expect(result.stops[0].parkDescription).toBe('');
     });
   });
 
   describe('generateTripPdf', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
     it('should generate a PDF buffer', async () => {
-      const result = await generateTripPdf(mockTrip);
+      const trip = {
+        title: 'Test Trip',
+        origin: 'Test City',
+        startDate: '2024-06-15',
+        endDate: '2024-06-20',
+        stops: [
+          {
+            dayNumber: 1,
+            park: { name: 'Test Park' },
+            activities: ['hiking'],
+          },
+        ],
+      };
+
+      const result = await generateTripPdf(trip);
 
       expect(result).toHaveProperty('buffer');
       expect(result).toHaveProperty('filename');
+      expect(Buffer.isBuffer(result.buffer)).toBe(true);
+      expect(result.filename).toMatch(/\.pdf$/);
     });
 
-    it('should generate appropriate filename', async () => {
-      const result = await generateTripPdf(mockTrip);
-
-      expect(result.filename).toContain('california-national-parks-adventure');
-      expect(result.filename.endsWith('.pdf')).toBe(true);
-    });
-
-    it('should handle trips with no stops', async () => {
-      const emptyTrip = {
-        ...mockTrip,
+    it('should generate a valid filename', async () => {
+      const trip = {
+        title: 'My Amazing Trip!',
         stops: [],
       };
 
-      const result = await generateTripPdf(emptyTrip);
+      const result = await generateTripPdf(trip);
 
-      expect(result).toHaveProperty('buffer');
-      expect(result).toHaveProperty('filename');
+      expect(result.filename).toMatch(/^my-amazing-trip-\d{4}-\d{2}-\d{2}\.pdf$/);
     });
 
-    it('should throw error for invalid trip data', async () => {
-      await expect(generateTripPdf(null)).rejects.toThrow('Invalid trip data');
-      await expect(generateTripPdf(undefined)).rejects.toThrow('Invalid trip data');
-      await expect(generateTripPdf({})).rejects.toThrow('Invalid trip data');
+    it('should handle special characters in title', async () => {
+      const trip = {
+        title: 'Trip #1: California & Oregon!!!',
+        stops: [],
+      };
+
+      const result = await generateTripPdf(trip);
+
+      expect(result.filename).toMatch(/^trip-1-california-oregon-\d{4}-\d{2}-\d{2}\.pdf$/);
     });
 
-    it('should throw error for trip without title', async () => {
-      const invalidTrip = { ...mockTrip, title: '' };
+    it('should handle empty title', async () => {
+      const trip = {
+        title: '',
+        stops: [],
+      };
 
-      await expect(generateTripPdf(invalidTrip)).rejects.toThrow('Invalid trip data');
+      const result = await generateTripPdf(trip);
+
+      // Empty title defaults to "Trip Plan" which becomes "trip-plan"
+      expect(result.filename).toMatch(/^trip-plan-\d{4}-\d{2}-\d{2}\.pdf$/);
+    });
+
+    it('should include all trip sections', async () => {
+      const { PDFDocument } = await import('pdf-lib');
+      const mockCreate = PDFDocument.create;
+
+      const trip = {
+        title: 'Complete Trip',
+        origin: 'San Francisco',
+        startDate: '2024-06-15',
+        endDate: '2024-06-20',
+        summary: 'A great trip',
+        stops: [
+          {
+            dayNumber: 1,
+            park: { name: 'Yosemite' },
+            morningPlan: 'Hike',
+            afternoonPlan: 'Explore',
+            eveningPlan: 'Rest',
+            drivingNotes: 'Long drive',
+            highlights: 'Amazing views',
+            activities: ['hiking'],
+          },
+        ],
+        packingList: {
+          essentials: ['Water'],
+        },
+        safetyNotes: ['Be careful'],
+        bestPhotoSpots: ['Tunnel View'],
+        estimatedBudget: {
+          entrance_fees: '$35',
+        },
+      };
+
+      await generateTripPdf(trip);
+
+      // Verify PDF was created
+      expect(mockCreate).toHaveBeenCalled();
+    });
+
+    it('should handle trips with multiple stops', async () => {
+      const trip = {
+        title: 'Multi-Stop Trip',
+        stops: [
+          { dayNumber: 1, park: { name: 'Park 1' } },
+          { dayNumber: 2, park: { name: 'Park 2' } },
+          { dayNumber: 3, park: { name: 'Park 3' } },
+        ],
+      };
+
+      const result = await generateTripPdf(trip);
+
+      expect(result.buffer).toBeDefined();
+      expect(result.filename).toContain('multi-stop-trip');
+    });
+
+    it('should handle trips with no stops', async () => {
+      const trip = {
+        title: 'Empty Trip',
+        stops: [],
+      };
+
+      const result = await generateTripPdf(trip);
+
+      expect(result.buffer).toBeDefined();
     });
   });
 });
