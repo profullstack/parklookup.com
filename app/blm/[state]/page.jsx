@@ -7,6 +7,11 @@ import BLMMap from '@/components/blm/BLMMap';
 /**
  * US States with BLM land
  */
+/**
+ * Force dynamic rendering to avoid build-time Supabase client issues
+ */
+export const dynamic = 'force-dynamic';
+
 const STATE_INFO = {
   ak: { code: 'AK', name: 'Alaska', fullName: 'Alaska' },
   az: { code: 'AZ', name: 'Arizona', fullName: 'Arizona' },
@@ -21,15 +26,6 @@ const STATE_INFO = {
   wa: { code: 'WA', name: 'Washington', fullName: 'Washington' },
   wy: { code: 'WY', name: 'Wyoming', fullName: 'Wyoming' },
 };
-
-/**
- * Generate static params for all states
- */
-export async function generateStaticParams() {
-  return Object.keys(STATE_INFO).map((state) => ({
-    state,
-  }));
-}
 
 /**
  * Generate metadata for SEO
