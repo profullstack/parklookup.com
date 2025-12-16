@@ -1,16 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import dynamic from 'next/dynamic';
 import BLMCard from '@/components/blm/BLMCard';
-
-// Dynamically import the map component to avoid SSR issues
-const BLMMap = dynamic(() => import('@/components/blm/BLMMap'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-64 md:h-96 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-lg" />
-  ),
-});
+import BLMMap from '@/components/blm/BLMMap';
 
 /**
  * US States with BLM land

@@ -142,6 +142,9 @@ const nextConfig = {
   },
   // Ensure proper handling of ESM
   transpilePackages: ['@supabase/supabase-js'],
+  // Empty turbopack config to silence Next.js 16 warning about webpack config
+  // The next-pwa plugin adds webpack config, but we want to use Turbopack
+  turbopack: {},
 };
 
 export default withPWA(nextConfig);
