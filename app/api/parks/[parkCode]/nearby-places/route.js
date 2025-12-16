@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/client';
+import { createServiceClient } from '@/lib/supabase/server';
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
  */
 export async function GET(request, { params }) {
   try {
-    const { parkCode } = params;
+    const { parkCode } = await params;
 
     if (!parkCode) {
       return NextResponse.json({ error: 'Park code is required' }, { status: 400 });
@@ -27,7 +27,7 @@ export async function GET(request, { params }) {
     const category = searchParams.get('category');
     const limit = parseInt(searchParams.get('limit') || '20', 10);
 
-    const supabase = createServerClient();
+    const supabase = createServiceClient();
 
     // First, get the park ID from the park code
     const { data: park, error: parkError } = await supabase

@@ -12,7 +12,7 @@ import { createServiceClient } from '@/lib/supabase/server';
  */
 export async function GET(request, { params }) {
   try {
-    const { parkCode } = params;
+    const { parkCode } = await params;
     const { searchParams } = new URL(request.url);
 
     const radius = Math.min(parseInt(searchParams.get('radius') || '50000', 10), 100000);

@@ -43,7 +43,8 @@ export async function GET(request, { params }) {
 
     const { id: parkId, source: parkSource, latitude, longitude } = parkData;
 
-    // Use the RPC function to find trails for this park
+    // Use the trails_with_park view which includes geometry_geojson
+    // First get trail IDs from the RPC function, then fetch full data with GeoJSON
     const { data: trailsData, error: trailsError } = await supabase.rpc('find_trails_for_park', {
       p_park_id: parkId,
       p_park_source: parkSource,
@@ -54,6 +55,25 @@ export async function GET(request, { params }) {
       console.error('Error fetching trails for park:', trailsError);
       return NextResponse.json({ error: 'Failed to fetch trails' }, { status: 500 });
     }
+
+    // Get trail IDs to fetch with GeoJSON
+    const trailIds = (trailsData || []).map((t) => t.id);
+
+    // Fetch trails with GeoJSON geometry from the view
+    let trailsWithGeojson = [];
+    if (trailIds.length > 0 && includeGeometry) {
+      const { data: viewData, error: viewError } = await supabase
+        .from('trails_with_park')
+        .select('*')
+        .in('id', trailIds);
+
+      if (!viewError && viewData) {
+        trailsWithGeojson = viewData;
+      }
+    }
+
+    // Create a map for quick lookup
+    const geojsonMap = new Map(trailsWithGeojson.map((t) => [t.id, t.geometry_geojson]));
 
     // Apply filters
     let filteredTrails = trailsData || [];
@@ -86,12 +106,14 @@ export async function GET(request, { params }) {
       };
 
       // Include geometry if requested
-      if (includeGeometry && trail.geometry) {
-        try {
-          // Convert WKT to GeoJSON if needed
-          result.geometry = trail.geometry;
-        } catch {
-          result.geometry = null;
+      if (includeGeometry) {
+        const geojsonStr = geojsonMap.get(trail.id);
+        if (geojsonStr) {
+          try {
+            result.geojson = JSON.parse(geojsonStr);
+          } catch {
+            result.geojson = null;
+          }
         }
       }
 

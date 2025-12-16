@@ -1,22 +1,8 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
-
-/**
- * Creates a Supabase client for server-side operations
- */
-const createServerClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
-  return createClient(supabaseUrl, supabaseKey);
-};
 
 // Static list of U.S. states as fallback
 const US_STATES = [
@@ -84,7 +70,7 @@ const US_STATES = [
  */
 export async function GET(request) {
   try {
-    const supabase = createServerClient();
+    const supabase = createServiceClient();
     const { searchParams } = new URL(request.url);
 
     // Query parameters

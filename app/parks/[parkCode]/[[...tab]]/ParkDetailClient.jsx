@@ -46,7 +46,7 @@ function ParkTrailsSection({ park, hasCoordinates }) {
         setLoading(true);
         // Use park_code for NPS parks, otherwise use park id
         const identifier = park.park_code || park.id;
-        const response = await fetch(`/api/parks/${identifier}/trails`);
+        const response = await fetch(`/api/parks/${identifier}/trails?includeGeometry=true`);
         
         if (!response.ok) {
           throw new Error('Failed to fetch trails');

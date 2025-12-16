@@ -1,23 +1,16 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 import TrailDetailClient from './TrailDetailClient';
 
-/**
- * Get Supabase client (created lazily to avoid build-time errors)
- */
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY
-  );
-}
+// Force dynamic rendering to avoid build-time errors
+export const dynamic = 'force-dynamic';
 
 /**
  * Generate metadata for the trail page
  */
 export async function generateMetadata({ params }) {
   const { parkCode, trailSlug } = await params;
-  const supabase = getSupabase();
+  const supabase = createServiceClient();
   
   // Fetch trail data
   const { data: trail } = await supabase
@@ -79,7 +72,7 @@ export async function generateMetadata({ params }) {
  */
 export default async function TrailPage({ params }) {
   const { parkCode, trailSlug } = await params;
-  const supabase = getSupabase();
+  const supabase = createServiceClient();
 
   // Fetch trail with geometry
   const { data: trail, error: trailError } = await supabase

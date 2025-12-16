@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 
 // Static fallback data for US states
@@ -56,27 +56,13 @@ const US_STATES = [
 ];
 
 /**
- * Creates a Supabase client for server-side operations
- */
-const createServerClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!supabaseUrl || !supabaseKey) {
-    throw new Error('Missing Supabase environment variables');
-  }
-
-  return createClient(supabaseUrl, supabaseKey);
-};
-
-/**
  * GET /api/states/[slug]
  * Returns a state with its parks
  */
 export async function GET(request, { params }) {
   try {
-    const supabase = createServerClient();
-    const { slug } = params;
+    const { slug } = await params;
+    const supabase = createServiceClient();
 
     // First, get the state
     const { data: state, error: stateError } = await supabase
