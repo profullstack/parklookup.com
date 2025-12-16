@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/parks/[parkCode]/trails
@@ -28,7 +28,7 @@ export async function GET(request, { params }) {
     const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 100);
     const includeGeometry = searchParams.get('includeGeometry') === 'true';
 
-    const supabase = await createServerClient();
+    const supabase = createServiceClient();
 
     // First, find the park by park_code
     const { data: parkData, error: parkError } = await supabase

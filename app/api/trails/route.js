@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/trails
@@ -36,7 +36,7 @@ export async function GET(request) {
     const offset = parseInt(searchParams.get('offset') || '0', 10);
     const search = searchParams.get('search');
 
-    const supabase = await createServerClient();
+    const supabase = createServiceClient();
 
     // If searching near a point, use the RPC function
     if (near) {
