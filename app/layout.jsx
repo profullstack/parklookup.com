@@ -65,6 +65,13 @@ export default function RootLayout({ children }) {
           src="https://datafa.st/js/script.js"
           strategy="afterInteractive"
         />
+
+        {/* Ahrefs Analytics */}
+        <Script
+          src="https://analytics.ahrefs.com/analytics.js"
+          data-key="yCYcncFawMOkZgZd1aIz8A"
+          strategy="afterInteractive"
+        />
       </body>
     </html>
   );

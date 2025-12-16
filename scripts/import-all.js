@@ -7,6 +7,8 @@
  * 1. Import NPS parks
  * 2. Import Wikidata parks
  * 3. Link parks together
+ * 4. Link parks to states
+ * 5. Import trails from OpenStreetMap
  *
  * Usage:
  *   node scripts/import-all.js
@@ -61,6 +63,7 @@ const main = async () => {
   console.log('  2. Wikidata SPARQL endpoint');
   console.log('  3. Link parks together');
   console.log('  4. Link parks to states');
+  console.log('  5. OpenStreetMap trails (optional, use --with-trails)');
   console.log('='.repeat(60));
 
   const startTime = Date.now();
@@ -77,6 +80,16 @@ const main = async () => {
 
     // Step 4: Link parks to states
     await runScript(join(__dirname, 'link-parks-to-states.js'), 'Park-State Linking');
+
+    // Step 5: Import trails (optional, can be slow due to Overpass API rate limits)
+    const withTrails = process.argv.includes('--with-trails');
+    if (withTrails) {
+      await runScript(join(__dirname, 'import-trails.js'), 'Trail Import (OSM)');
+    } else {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log('⏭️  Skipping trail import (use --with-trails to include)');
+      console.log('='.repeat(60));
+    }
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);

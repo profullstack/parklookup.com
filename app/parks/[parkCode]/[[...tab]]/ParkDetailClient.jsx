@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import dynamic from 'next/dynamic';
@@ -13,8 +13,9 @@ import NearbyPlaces from '@/components/parks/NearbyPlaces';
 import NearbyParks from '@/components/parks/NearbyParks';
 import ParkReviews from '@/components/parks/ParkReviews';
 import UserPhotos from '@/components/parks/UserPhotos';
+import TrailList from '@/components/trails/TrailList';
 
-// Dynamically import the map component to avoid SSR issues with Leaflet
+// Dynamically import the map components to avoid SSR issues
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
   ssr: false,
   loading: () => (
@@ -22,11 +23,168 @@ const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
   ),
 });
 
+const TrailMap = dynamic(() => import('@/components/trails/TrailMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-64 md:h-96 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-lg" />
+  ),
+});
+
+/**
+ * Park Trails Section Component
+ * Displays trail map and list for a park
+ */
+function ParkTrailsSection({ park, hasCoordinates }) {
+  const [trails, setTrails] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchTrails = async () => {
+      try {
+        setLoading(true);
+        // Use park_code for NPS parks, otherwise use park id
+        const identifier = park.park_code || park.id;
+        const response = await fetch(`/api/parks/${identifier}/trails`);
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch trails');
+        }
+        
+        const data = await response.json();
+        setTrails(data.trails || []);
+      } catch (err) {
+        console.error('Error fetching trails:', err);
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchTrails();
+  }, [park.park_code, park.id]);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-64 md:h-96 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-lg" />
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-24 bg-gray-200 dark:bg-gray-700 animate-pulse rounded-lg" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <svg
+          className="w-12 h-12 mx-auto text-gray-400 mb-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+          />
+        </svg>
+        <p className="text-gray-600 dark:text-gray-400">
+          Unable to load trails: {error}
+        </p>
+      </div>
+    );
+  }
+
+  if (trails.length === 0) {
+    return (
+      <div className="text-center py-12 bg-gray-100 dark:bg-gray-800 rounded-lg">
+        <svg
+          className="w-12 h-12 mx-auto text-gray-400 mb-4"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+          />
+        </svg>
+        <p className="text-gray-600 dark:text-gray-400 mb-2">
+          No trails found for this park
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-500">
+          Trail data may not be available yet for this location
+        </p>
+      </div>
+    );
+  }
+
+  // Prepare GeoJSON for the map
+  const trailsGeoJSON = {
+    type: 'FeatureCollection',
+    features: trails
+      .filter((trail) => trail.geojson)
+      .map((trail) => ({
+        type: 'Feature',
+        properties: {
+          id: trail.id,
+          name: trail.name,
+          difficulty: trail.difficulty,
+          length_meters: trail.length_meters,
+          surface: trail.surface,
+        },
+        geometry: trail.geojson,
+      })),
+  };
+
+  const centerLat = hasCoordinates ? parseFloat(park.latitude) : 39.8283;
+  const centerLng = hasCoordinates ? parseFloat(park.longitude) : -98.5795;
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+          Trails in {park.full_name || park.name}
+        </h2>
+        <p className="text-gray-600 dark:text-gray-400 text-sm">
+          {trails.length} trail{trails.length !== 1 ? 's' : ''} found
+        </p>
+      </div>
+
+      {/* Trail Map */}
+      {trailsGeoJSON.features.length > 0 && (
+        <div className="rounded-lg overflow-hidden shadow-md">
+          <TrailMap
+            trails={trailsGeoJSON}
+            center={[centerLng, centerLat]}
+            zoom={hasCoordinates ? 11 : 4}
+          />
+        </div>
+      )}
+
+      {/* Trail List */}
+      <TrailList
+        trails={trails}
+        parkCode={park.park_code}
+        showFilters={trails.length > 3}
+      />
+    </div>
+  );
+}
+
 /**
  * Tab configuration
  */
 const TABS = [
   { id: 'overview', label: 'Overview' },
+  { id: 'trails', label: 'Trails' },
   { id: 'photos', label: 'Photos' },
   { id: 'map', label: 'Map' },
   { id: 'weather', label: 'Weather Events' },
@@ -361,6 +519,11 @@ export default function ParkDetailClient({
         </div>
       )}
 
+      {/* Trails Tab */}
+      {activeTab === 'trails' && (
+        <ParkTrailsSection park={park} hasCoordinates={hasCoordinates} />
+      )}
+
       {/* Photos Tab */}
       {activeTab === 'photos' && (
         <UserPhotos parkCode={park.park_code} />
@@ -503,8 +666,8 @@ export default function ParkDetailClient({
         </div>
       )}
 
-      {/* Image Gallery - shown on all tabs when there are images */}
-      {images.length > 0 && (
+      {/* Image Gallery - shown on all tabs except trails when there are images */}
+      {images.length > 0 && activeTab !== 'trails' && (
         <div className="mt-8">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Photos</h2>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
