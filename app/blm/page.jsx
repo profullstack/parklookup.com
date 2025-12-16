@@ -1,5 +1,10 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 import Link from 'next/link';
+
+/**
+ * Force dynamic rendering to avoid build-time Supabase client issues
+ */
+export const dynamic = 'force-dynamic';
 
 /**
  * US States with BLM land (western states primarily)
@@ -50,10 +55,7 @@ export const metadata = {
  * Fetch BLM land statistics
  */
 async function getBLMStats() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabase = createServiceClient();
 
   // Get total count
   const { count: totalCount } = await supabase
@@ -92,10 +94,7 @@ async function getBLMStats() {
  * Fetch featured BLM lands
  */
 async function getFeaturedBLMLands() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabase = createServiceClient();
 
   const { data } = await supabase
     .from('blm_lands')

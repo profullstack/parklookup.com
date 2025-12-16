@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/server';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import BLMCard from '@/components/blm/BLMCard';
@@ -63,10 +63,7 @@ export async function generateMetadata({ params }) {
  * Fetch BLM lands for a state
  */
 async function getStateBLMLands(stateCode) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabase = createServiceClient();
 
   const { data, error, count } = await supabase
     .from('blm_lands')
@@ -87,10 +84,7 @@ async function getStateBLMLands(stateCode) {
  * Fetch state statistics
  */
 async function getStateStats(stateCode) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabase = createServiceClient();
 
   // Get total area
   const { data: areaData } = await supabase
@@ -108,10 +102,7 @@ async function getStateStats(stateCode) {
  * Fetch BLM lands with geometry for map
  */
 async function getStateBLMLandsWithGeometry(stateCode) {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL,
-    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  const supabase = createServiceClient();
 
   // Get simplified geometry for map display
   const { data } = await supabase.rpc('get_state_blm_geojson', { p_state: stateCode });
