@@ -47,6 +47,9 @@ public/sw.js.map
 public/workbox-*.js
 public/workbox-*.js.map
 
+# Downloaded data files (large GeoJSON files)
+data/
+
 # Misc
 *.log
 *.tsbuildinfo

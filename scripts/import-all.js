@@ -9,6 +9,7 @@
  * 3. Link parks together
  * 4. Link parks to states
  * 5. Import trails from OpenStreetMap
+ * 6. Import BLM land boundaries
  *
  * Usage:
  *   node scripts/import-all.js
@@ -64,6 +65,7 @@ const main = async () => {
   console.log('  3. Link parks together');
   console.log('  4. Link parks to states');
   console.log('  5. OpenStreetMap trails (optional, use --with-trails)');
+  console.log('  6. BLM land boundaries (optional, use --with-blm)');
   console.log('='.repeat(60));
 
   const startTime = Date.now();
@@ -88,6 +90,17 @@ const main = async () => {
     } else {
       console.log(`\n${'='.repeat(60)}`);
       console.log('⏭️  Skipping trail import (use --with-trails to include)');
+      console.log('='.repeat(60));
+    }
+
+    // Step 6: Import BLM lands (optional, requires pre-downloaded GeoJSON file)
+    const withBLM = process.argv.includes('--with-blm');
+    if (withBLM) {
+      await runScript(join(__dirname, 'import-blm.js'), 'BLM Land Import');
+    } else {
+      console.log(`\n${'='.repeat(60)}`);
+      console.log('⏭️  Skipping BLM land import (use --with-blm to include)');
+      console.log('   Note: Requires pre-downloaded GeoJSON file at data/blm/blm.geojson');
       console.log('='.repeat(60));
     }
 

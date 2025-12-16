@@ -13,6 +13,14 @@ const DIFFICULTY_COLORS = {
 };
 
 /**
+ * BLM land styling colors
+ */
+const BLM_COLORS = {
+  fill: 'rgba(217, 119, 6, 0.2)', // amber-600 with transparency
+  stroke: 'rgba(217, 119, 6, 0.8)', // amber-600
+};
+
+/**
  * TrailMap component - displays trails on a MapLibre GL map
  *
  * @param {Object} props
@@ -22,6 +30,8 @@ const DIFFICULTY_COLORS = {
  * @param {Function} props.onTrailClick - Callback when a trail is clicked
  * @param {string} props.selectedTrailId - ID of currently selected trail
  * @param {string} props.className - Additional CSS classes
+ * @param {boolean} props.showBLMToggle - Whether to show BLM land layer toggle
+ * @param {string} props.parkCode - Park code for fetching nearby BLM lands
  */
 export default function TrailMap({
   trails = [],
@@ -30,11 +40,16 @@ export default function TrailMap({
   onTrailClick,
   selectedTrailId,
   className = '',
+  showBLMToggle = false,
+  parkCode = null,
 }) {
   const mapContainer = useRef(null);
   const map = useRef(null);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [maplibregl, setMaplibregl] = useState(null);
+  const [showBLMLands, setShowBLMLands] = useState(false);
+  const [blmLands, setBLMLands] = useState([]);
+  const [loadingBLM, setLoadingBLM] = useState(false);
 
   // Dynamically import maplibre-gl to avoid SSR issues
   useEffect(() => {
@@ -247,6 +262,148 @@ export default function TrailMap({
     });
   }, [selectedTrailId, mapLoaded]);
 
+  // Fetch BLM lands when toggle is enabled
+  useEffect(() => {
+    if (!showBLMLands || !parkCode || blmLands.length > 0) return;
+
+    const fetchBLMLands = async () => {
+      setLoadingBLM(true);
+      try {
+        const response = await fetch(`/api/parks/${parkCode}/blm?limit=50`);
+        if (response.ok) {
+          const data = await response.json();
+          setBLMLands(data.blmLands || []);
+        }
+      } catch (error) {
+        console.error('Error fetching BLM lands:', error);
+      } finally {
+        setLoadingBLM(false);
+      }
+    };
+
+    fetchBLMLands();
+  }, [showBLMLands, parkCode, blmLands.length]);
+
+  // Add/remove BLM land layer
+  useEffect(() => {
+    if (!map.current || !mapLoaded || !maplibregl) return;
+
+    // Remove existing BLM layers
+    if (map.current.getLayer('blm-lands-fill')) {
+      map.current.removeLayer('blm-lands-fill');
+    }
+    if (map.current.getLayer('blm-lands-outline')) {
+      map.current.removeLayer('blm-lands-outline');
+    }
+    if (map.current.getSource('blm-lands')) {
+      map.current.removeSource('blm-lands');
+    }
+
+    if (!showBLMLands || blmLands.length === 0) return;
+
+    // Convert BLM lands to GeoJSON
+    const features = blmLands
+      .map((land) => {
+        let geometry = null;
+        
+        // Handle different geometry formats
+        if (land.geojson) {
+          geometry = typeof land.geojson === 'string' ? JSON.parse(land.geojson) : land.geojson;
+        } else if (land.geometry) {
+          geometry = typeof land.geometry === 'string' ? JSON.parse(land.geometry) : land.geometry;
+        }
+
+        if (!geometry) return null;
+
+        return {
+          type: 'Feature',
+          properties: {
+            id: land.id,
+            name: land.unit_name || land.unitName || 'BLM Land',
+            state: land.state,
+            area_acres: land.area_acres || land.areaAcres,
+          },
+          geometry,
+        };
+      })
+      .filter(Boolean);
+
+    if (features.length === 0) return;
+
+    const geojson = {
+      type: 'FeatureCollection',
+      features,
+    };
+
+    // Add source
+    map.current.addSource('blm-lands', {
+      type: 'geojson',
+      data: geojson,
+    });
+
+    // Add fill layer (below trails)
+    map.current.addLayer(
+      {
+        id: 'blm-lands-fill',
+        type: 'fill',
+        source: 'blm-lands',
+        paint: {
+          'fill-color': BLM_COLORS.fill,
+          'fill-opacity': 0.6,
+        },
+      },
+      'trails-easy' // Insert below trail layers
+    );
+
+    // Add outline layer
+    map.current.addLayer(
+      {
+        id: 'blm-lands-outline',
+        type: 'line',
+        source: 'blm-lands',
+        paint: {
+          'line-color': BLM_COLORS.stroke,
+          'line-width': 2,
+        },
+      },
+      'trails-easy' // Insert below trail layers
+    );
+
+    // Add hover popup for BLM lands
+    const popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+    });
+
+    map.current.on('mouseenter', 'blm-lands-fill', (e) => {
+      map.current.getCanvas().style.cursor = 'pointer';
+      
+      if (e.features.length > 0) {
+        const feature = e.features[0];
+        const name = feature.properties.name;
+        const state = feature.properties.state;
+        const area = feature.properties.area_acres;
+        
+        let html = `<div class="p-2"><strong class="text-amber-700">${name}</strong>`;
+        if (state) html += `<br><span class="text-gray-600">${state}</span>`;
+        if (area) html += `<br><span class="text-gray-500 text-sm">${Math.round(area).toLocaleString()} acres</span>`;
+        html += `<br><span class="text-xs text-gray-400">Bureau of Land Management</span></div>`;
+        
+        popup.setLngLat(e.lngLat).setHTML(html).addTo(map.current);
+      }
+    });
+
+    map.current.on('mouseleave', 'blm-lands-fill', () => {
+      map.current.getCanvas().style.cursor = '';
+      popup.remove();
+    });
+  }, [mapLoaded, showBLMLands, blmLands, maplibregl]);
+
+  // Toggle BLM lands visibility
+  const handleBLMToggle = useCallback(() => {
+    setShowBLMLands((prev) => !prev);
+  }, []);
+
   return (
     <div className={`relative ${className}`}>
       <div ref={mapContainer} className="w-full h-full min-h-[400px] rounded-lg" />
@@ -279,7 +436,67 @@ export default function TrailMap({
             <span className="text-xs text-gray-600 dark:text-gray-400">Hard</span>
           </div>
         </div>
+
+        {/* BLM Land Legend (when visible) */}
+        {showBLMToggle && showBLMLands && (
+          <>
+            <div className="border-t border-gray-200 dark:border-gray-700 my-2" />
+            <div className="flex items-center gap-2">
+              <div
+                className="w-4 h-3 rounded border"
+                style={{
+                  backgroundColor: BLM_COLORS.fill,
+                  borderColor: BLM_COLORS.stroke,
+                }}
+              />
+              <span className="text-xs text-gray-600 dark:text-gray-400">BLM Land</span>
+            </div>
+          </>
+        )}
       </div>
+
+      {/* BLM Toggle Button */}
+      {showBLMToggle && (
+        <div className="absolute top-4 left-4 bg-white dark:bg-gray-800 rounded-lg shadow-lg">
+          <button
+            onClick={handleBLMToggle}
+            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+              showBLMLands
+                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+            disabled={loadingBLM}
+          >
+            {loadingBLM ? (
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-amber-600" />
+            ) : (
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                />
+              </svg>
+            )}
+            <span>BLM Land</span>
+            {showBLMLands && (
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path
+                  fillRule="evenodd"
+                  d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                  clipRule="evenodd"
+                />
+              </svg>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Loading overlay */}
       {!mapLoaded && (

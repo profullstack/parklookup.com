@@ -22,6 +22,8 @@
     "import:link": "node scripts/link-parks.js",
     "import:link-states": "node scripts/link-parks-to-states.js",
     "import:trails": "node scripts/import-trails.js",
+    "import:blm": "node scripts/import-blm.js",
+    "download:blm": "node scripts/download-blm-data.js",
     "import:all": "node scripts/import-all.js"
   },
   "engines": {

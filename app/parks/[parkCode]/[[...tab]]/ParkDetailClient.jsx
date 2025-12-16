@@ -14,6 +14,7 @@ import NearbyParks from '@/components/parks/NearbyParks';
 import ParkReviews from '@/components/parks/ParkReviews';
 import UserPhotos from '@/components/parks/UserPhotos';
 import TrailList from '@/components/trails/TrailList';
+import ParkBLMSection from '@/components/blm/ParkBLMSection';
 
 // Dynamically import the map components to avoid SSR issues
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -165,6 +166,8 @@ function ParkTrailsSection({ park, hasCoordinates }) {
             trails={trailsGeoJSON}
             center={[centerLng, centerLat]}
             zoom={hasCoordinates ? 11 : 4}
+            showBLMToggle={true}
+            parkCode={park.park_code || park.id}
           />
         </div>
       )}
@@ -185,6 +188,7 @@ function ParkTrailsSection({ park, hasCoordinates }) {
 const TABS = [
   { id: 'overview', label: 'Overview' },
   { id: 'trails', label: 'Trails' },
+  { id: 'blm', label: 'BLM Land' },
   { id: 'photos', label: 'Photos' },
   { id: 'map', label: 'Map' },
   { id: 'weather', label: 'Weather Events' },
@@ -522,6 +526,11 @@ export default function ParkDetailClient({
       {/* Trails Tab */}
       {activeTab === 'trails' && (
         <ParkTrailsSection park={park} hasCoordinates={hasCoordinates} />
+      )}
+
+      {/* BLM Land Tab */}
+      {activeTab === 'blm' && (
+        <ParkBLMSection park={park} hasCoordinates={hasCoordinates} />
       )}
 
       {/* Photos Tab */}
