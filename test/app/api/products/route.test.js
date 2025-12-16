@@ -17,8 +17,9 @@ const mockSupabaseClient = {
   in: vi.fn(() => mockSupabaseClient),
 };
 
-vi.mock('@supabase/supabase-js', () => ({
-  createClient: vi.fn(() => mockSupabaseClient),
+// Mock the createServiceClient from lib/supabase/server
+vi.mock('@/lib/supabase/server', () => ({
+  createServiceClient: vi.fn(() => mockSupabaseClient),
 }));
 
 describe('Products API Route', () => {
@@ -244,10 +245,12 @@ describe('Products API Route', () => {
       expect(data.error).toBe('Failed to fetch products');
     });
 
-    it('should return 500 when database configuration is missing', async () => {
-      vi.stubEnv('NEXT_PUBLIC_SUPABASE_URL', '');
-      vi.stubEnv('SUPABASE_SERVICE_ROLE_KEY', '');
-      vi.resetModules();
+    it('should return 500 when createServiceClient throws', async () => {
+      // Import the mock to make it throw
+      const { createServiceClient } = await import('@/lib/supabase/server');
+      createServiceClient.mockImplementationOnce(() => {
+        throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL environment variable');
+      });
 
       const { GET } = await import('@/app/api/products/route.js');
       const request = new Request('http://localhost:3000/api/products');
@@ -255,7 +258,7 @@ describe('Products API Route', () => {
       const data = await response.json();
 
       expect(response.status).toBe(500);
-      expect(data.error).toBe('Database configuration missing');
+      expect(data.error).toBe('Internal server error');
     });
 
     it('should order products by rating descending', async () => {
