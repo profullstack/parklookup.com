@@ -78,17 +78,48 @@ describe('Trail Comments API', () => {
         },
       ];
 
+      const mockProfiles = [
+        { id: 'user-1', display_name: 'User One', username: 'user1', avatar_url: null },
+        { id: 'user-2', display_name: 'User Two', username: 'user2', avatar_url: null },
+      ];
+
+      let callCount = 0;
       const mockSupabase = {
-        from: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({
-          data: { id: 'trail-123' },
-          error: null,
-        }),
-        order: vi.fn().mockResolvedValue({
-          data: mockComments,
-          error: null,
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'trails') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({
+                data: { id: 'trail-123' },
+                error: null,
+              }),
+            };
+          }
+          if (table === 'trail_comments') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              order: vi.fn().mockResolvedValue({
+                data: mockComments,
+                error: null,
+              }),
+            };
+          }
+          if (table === 'profiles') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              in: vi.fn().mockResolvedValue({
+                data: mockProfiles,
+                error: null,
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          };
         }),
       };
 
@@ -101,6 +132,8 @@ describe('Trail Comments API', () => {
       expect(response.status).toBe(200);
       expect(data.comments).toHaveLength(2);
       expect(data.comments[0].content).toBe('Great trail!');
+      expect(data.comments[0].profile).toBeDefined();
+      expect(data.comments[0].profile.display_name).toBe('User One');
     });
 
     it('should return 404 for non-existent trail', async () => {
@@ -124,16 +157,32 @@ describe('Trail Comments API', () => {
 
     it('should return empty array when no comments exist', async () => {
       const mockSupabase = {
-        from: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        eq: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({
-          data: { id: 'trail-123' },
-          error: null,
-        }),
-        order: vi.fn().mockResolvedValue({
-          data: [],
-          error: null,
+        from: vi.fn().mockImplementation((table) => {
+          if (table === 'trails') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({
+                data: { id: 'trail-123' },
+                error: null,
+              }),
+            };
+          }
+          if (table === 'trail_comments') {
+            return {
+              select: vi.fn().mockReturnThis(),
+              eq: vi.fn().mockReturnThis(),
+              order: vi.fn().mockResolvedValue({
+                data: [],
+                error: null,
+              }),
+            };
+          }
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          };
         }),
       };
 
