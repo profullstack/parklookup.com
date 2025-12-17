@@ -130,20 +130,26 @@ export function TrackingProvider({ children }) {
 
   const value = {
     // State
-    isTracking: tracking.isTracking,
+    isTracking: tracking.isRecording,
     isPaused: tracking.isPaused,
-    status: tracking.status,
-    trackId: tracking.trackId,
+    status: tracking.trackingState,
+    trackId: tracking.track?.id,
     points: tracking.points,
     stats: tracking.stats,
     error: tracking.error,
     currentPosition: tracking.currentPosition,
-    detectedActivity: tracking.detectedActivity,
+    detectedActivity: tracking.activity,
     activeTrackConfig,
     showTrackingPanel,
     canTrack,
     isPro,
     proLoading,
+    pendingPointsCount: tracking.pendingPointsCount,
+    isUploading: tracking.isUploading,
+
+    // Recovery state
+    hasRecoverableSession: tracking.hasRecoverableSession,
+    recoverableSessionInfo: tracking.recoverableSessionInfo,
 
     // Actions
     startNewTrack,
@@ -153,6 +159,11 @@ export function TrackingProvider({ children }) {
     discardCurrentTrack,
     toggleTrackingPanel,
     setShowTrackingPanel,
+
+    // Recovery actions
+    recoverSession: tracking.recoverSession,
+    dismissRecoverableSession: tracking.dismissRecoverableSession,
+    checkRecoverableSession: tracking.checkRecoverableSession,
   };
 
   return <TrackingContext.Provider value={value}>{children}</TrackingContext.Provider>;

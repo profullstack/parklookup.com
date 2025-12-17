@@ -43,9 +43,56 @@ const DEFAULT_OPTIONS = {
 
   // Tracking options
   minDistanceMeters: 5, // Minimum distance between points
-  maxPointsPerBatch: 50, // Points to batch before uploading
-  uploadIntervalMs: 30000, // Upload interval in milliseconds
+  maxPointsPerBatch: 30, // Points to batch before uploading (reduced for more frequent saves)
+  uploadIntervalMs: 15000, // Upload interval in milliseconds (reduced to 15 seconds)
   autoDetectActivity: true, // Auto-detect activity type
+  localBackupKey: 'parklookup_tracking_backup', // localStorage key for backup
+};
+
+/**
+ * Save tracking state to localStorage for crash recovery
+ */
+const saveLocalBackup = (key, data) => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.setItem(key, JSON.stringify({
+        ...data,
+        savedAt: new Date().toISOString(),
+      }));
+    }
+  } catch (err) {
+    console.warn('Failed to save local backup:', err);
+  }
+};
+
+/**
+ * Load tracking state from localStorage
+ */
+const loadLocalBackup = (key) => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      const data = localStorage.getItem(key);
+      if (data) {
+        return JSON.parse(data);
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to load local backup:', err);
+  }
+  return null;
+};
+
+/**
+ * Clear local backup
+ */
+const clearLocalBackup = (key) => {
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      localStorage.removeItem(key);
+    }
+  } catch (err) {
+    console.warn('Failed to clear local backup:', err);
+  }
 };
 
 /**
@@ -82,6 +129,8 @@ export const useTracking = (options = {}) => {
   const [activity, setActivity] = useState(null);
   const [error, setError] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasRecoverableSession, setHasRecoverableSession] = useState(false);
+  const [recoverableSessionInfo, setRecoverableSessionInfo] = useState(null);
 
   // Refs
   const activityDetectorRef = useRef(new ActivityDetector());
@@ -400,6 +449,9 @@ export const useTracking = (options = {}) => {
       await updateTrack(accessToken, track.id, { status: 'deleted' });
     }
 
+    // Clear local backup
+    clearLocalBackup(mergedOptions.localBackupKey);
+
     // Reset state
     setTrack(null);
     setPoints([]);
@@ -408,10 +460,168 @@ export const useTracking = (options = {}) => {
     setActivity(null);
     setError(null);
     setTrackingState(TRACKING_STATE.IDLE);
+    setHasRecoverableSession(false);
+    setRecoverableSessionInfo(null);
     sequenceNumRef.current = 0;
     lastPositionRef.current = null;
     activityDetectorRef.current.reset();
-  }, [track?.id, accessToken]);
+  }, [track?.id, accessToken, mergedOptions.localBackupKey]);
+
+  /**
+   * Check for recoverable session from local backup
+   */
+  const checkRecoverableSession = useCallback(() => {
+    const backup = loadLocalBackup(mergedOptions.localBackupKey);
+    if (backup && backup.trackId && backup.points?.length > 0) {
+      setHasRecoverableSession(true);
+      setRecoverableSessionInfo({
+        trackId: backup.trackId,
+        pointCount: backup.points.length,
+        savedAt: backup.savedAt,
+        stats: backup.stats,
+      });
+      return backup;
+    }
+    setHasRecoverableSession(false);
+    setRecoverableSessionInfo(null);
+    return null;
+  }, [mergedOptions.localBackupKey]);
+
+  /**
+   * Recover a session from local backup
+   * This uploads any pending points from the backup to the server
+   */
+  const recoverSession = useCallback(async () => {
+    if (!accessToken) {
+      return { error: { message: 'Access token required' } };
+    }
+
+    const backup = loadLocalBackup(mergedOptions.localBackupKey);
+    if (!backup || !backup.trackId) {
+      return { error: { message: 'No recoverable session found' } };
+    }
+
+    try {
+      // Upload any pending points from the backup
+      if (backup.pendingPoints?.length > 0) {
+        const result = await addTrackPoints(accessToken, backup.trackId, backup.pendingPoints);
+        if (result.error) {
+          console.error('Failed to recover pending points:', result.error);
+        }
+      }
+
+      // Clear the backup after successful recovery
+      clearLocalBackup(mergedOptions.localBackupKey);
+      setHasRecoverableSession(false);
+      setRecoverableSessionInfo(null);
+
+      return {
+        success: true,
+        trackId: backup.trackId,
+        recoveredPoints: backup.pendingPoints?.length || 0,
+      };
+    } catch (err) {
+      return { error: { message: err.message } };
+    }
+  }, [accessToken, mergedOptions.localBackupKey]);
+
+  /**
+   * Dismiss recoverable session without recovering
+   */
+  const dismissRecoverableSession = useCallback(() => {
+    clearLocalBackup(mergedOptions.localBackupKey);
+    setHasRecoverableSession(false);
+    setRecoverableSessionInfo(null);
+  }, [mergedOptions.localBackupKey]);
+
+  // Check for recoverable session on mount
+  useEffect(() => {
+    checkRecoverableSession();
+  }, [checkRecoverableSession]);
+
+  // Save local backup whenever points change (for crash recovery)
+  useEffect(() => {
+    if (track?.id && points.length > 0 && trackingState !== TRACKING_STATE.IDLE) {
+      saveLocalBackup(mergedOptions.localBackupKey, {
+        trackId: track.id,
+        points,
+        pendingPoints,
+        stats,
+        activity,
+        trackingState,
+        sequenceNum: sequenceNumRef.current,
+      });
+    }
+  }, [track?.id, points, pendingPoints, stats, activity, trackingState, mergedOptions.localBackupKey]);
+
+  // Clear local backup when tracking completes or is discarded
+  useEffect(() => {
+    if (trackingState === TRACKING_STATE.IDLE && !track?.id) {
+      clearLocalBackup(mergedOptions.localBackupKey);
+    }
+  }, [trackingState, track?.id, mergedOptions.localBackupKey]);
+
+  // Handle page visibility change - upload points when page becomes hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && trackingState === TRACKING_STATE.RECORDING) {
+        // Try to upload pending points when user switches away
+        uploadPoints();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      };
+    }
+  }, [trackingState, uploadPoints]);
+
+  // Handle beforeunload - try to save before page closes
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (trackingState === TRACKING_STATE.RECORDING || trackingState === TRACKING_STATE.PAUSED) {
+        // Save backup to localStorage
+        if (track?.id && points.length > 0) {
+          saveLocalBackup(mergedOptions.localBackupKey, {
+            trackId: track.id,
+            points,
+            pendingPoints,
+            stats,
+            activity,
+            trackingState,
+            sequenceNum: sequenceNumRef.current,
+          });
+        }
+
+        // Try to upload pending points using sendBeacon for reliability
+        if (pendingPoints.length > 0 && track?.id && accessToken) {
+          try {
+            const payload = JSON.stringify({ points: pendingPoints });
+            navigator.sendBeacon(
+              `/api/tracks/${track.id}/points`,
+              new Blob([payload], { type: 'application/json' })
+            );
+          } catch (err) {
+            console.warn('Failed to send beacon:', err);
+          }
+        }
+
+        // Show confirmation dialog
+        e.preventDefault();
+        e.returnValue = 'You have an active tracking session. Are you sure you want to leave?';
+        return e.returnValue;
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+      return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+      };
+    }
+  }, [trackingState, track?.id, points, pendingPoints, stats, activity, accessToken, mergedOptions.localBackupKey]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -448,6 +658,10 @@ export const useTracking = (options = {}) => {
     error,
     isUploading,
 
+    // Recovery state
+    hasRecoverableSession,
+    recoverableSessionInfo,
+
     // Geolocation state
     currentPosition: geo.position,
     geoError: geo.error,
@@ -462,6 +676,11 @@ export const useTracking = (options = {}) => {
     stopTracking,
     discardTracking,
     uploadPoints,
+
+    // Recovery actions
+    checkRecoverableSession,
+    recoverSession,
+    dismissRecoverableSession,
 
     // Geolocation actions
     getCurrentPosition: geo.getCurrentPosition,

@@ -41,6 +41,10 @@ function TracksPageContent() {
     pauseCurrentTrack,
     resumeCurrentTrack,
     discardCurrentTrack,
+    hasRecoverableSession,
+    recoverableSessionInfo,
+    recoverSession,
+    dismissRecoverableSession,
   } = useTrackingContext();
 
   // Get active tab from URL or default based on tracking state
@@ -50,6 +54,8 @@ function TracksPageContent() {
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [recovering, setRecovering] = useState(false);
+  const [recoveryResult, setRecoveryResult] = useState(null);
   const [filter, setFilter] = useState('all');
   const [activityFilter, setActivityFilter] = useState('all');
   const [sortBy, setSortBy] = useState('created_at');
@@ -137,6 +143,37 @@ function TracksPageContent() {
       setActiveTab('my-tracks');
     } catch (err) {
       console.error('Failed to discard tracking:', err);
+    }
+  };
+
+  // Handle recovering a session
+  const handleRecoverSession = async () => {
+    setRecovering(true);
+    setRecoveryResult(null);
+    try {
+      const result = await recoverSession();
+      if (result.error) {
+        setRecoveryResult({ success: false, message: result.error.message });
+      } else {
+        setRecoveryResult({
+          success: true,
+          message: `Recovered ${result.recoveredPoints} points from your previous session.`,
+        });
+        // Refresh tracks list
+        fetchTracks();
+      }
+    } catch (err) {
+      setRecoveryResult({ success: false, message: err.message });
+    } finally {
+      setRecovering(false);
+    }
+  };
+
+  // Handle dismissing recoverable session
+  const handleDismissRecovery = () => {
+    if (confirm('Are you sure? Any unsaved tracking data will be lost.')) {
+      dismissRecoverableSession();
+      setRecoveryResult(null);
     }
   };
 
@@ -389,6 +426,145 @@ function TracksPageContent() {
         {trackingError && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
             <p className="text-red-600 dark:text-red-400">{trackingError}</p>
+          </div>
+        )}
+
+        {/* Session Recovery Banner */}
+        {hasRecoverableSession && !isTracking && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-4 mb-6">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0">
+                <svg
+                  className="w-6 h-6 text-amber-600 dark:text-amber-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                  />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                  Recoverable Tracking Session Found
+                </h3>
+                <p className="mt-1 text-sm text-amber-700 dark:text-amber-300">
+                  {recoverableSessionInfo ? (
+                    <>
+                      Found {recoverableSessionInfo.pointCount} points from a previous session
+                      {recoverableSessionInfo.title && ` "${recoverableSessionInfo.title}"`}
+                      {recoverableSessionInfo.lastUpdated && (
+                        <> (last updated {new Date(recoverableSessionInfo.lastUpdated).toLocaleString()})</>
+                      )}
+                    </>
+                  ) : (
+                    'A previous tracking session was interrupted. Would you like to recover it?'
+                  )}
+                </p>
+                <div className="mt-3 flex gap-3">
+                  <button
+                    onClick={handleRecoverSession}
+                    disabled={recovering}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm rounded-lg font-medium transition-colors flex items-center gap-2"
+                  >
+                    {recovering ? (
+                      <>
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                        Recovering...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                          />
+                        </svg>
+                        Recover Session
+                      </>
+                    )}
+                  </button>
+                  <button
+                    onClick={handleDismissRecovery}
+                    disabled={recovering}
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-gray-700 dark:text-gray-300 text-sm rounded-lg font-medium transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Recovery Result */}
+        {recoveryResult && (
+          <div
+            className={`rounded-lg p-4 mb-6 ${
+              recoveryResult.success
+                ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
+                : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800'
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              {recoveryResult.success ? (
+                <svg
+                  className="w-5 h-5 text-green-600 dark:text-green-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              ) : (
+                <svg
+                  className="w-5 h-5 text-red-600 dark:text-red-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              )}
+              <p
+                className={
+                  recoveryResult.success
+                    ? 'text-green-600 dark:text-green-400'
+                    : 'text-red-600 dark:text-red-400'
+                }
+              >
+                {recoveryResult.message}
+              </p>
+              <button
+                onClick={() => setRecoveryResult(null)}
+                className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
 

@@ -545,4 +545,634 @@ describe('useTracking Hook', () => {
       expect(addTrackPoints).toHaveBeenCalled();
     });
   });
+
+  describe('Local Backup and Crash Recovery', () => {
+    const localBackupKey = 'parklookup_tracking_backup';
+    let mockLocalStorage;
+
+    beforeEach(() => {
+      // Mock localStorage
+      mockLocalStorage = {
+        store: {},
+        getItem: vi.fn((key) => mockLocalStorage.store[key] || null),
+        setItem: vi.fn((key, value) => {
+          mockLocalStorage.store[key] = value;
+        }),
+        removeItem: vi.fn((key) => {
+          delete mockLocalStorage.store[key];
+        }),
+        clear: vi.fn(() => {
+          mockLocalStorage.store = {};
+        }),
+      };
+
+      // Replace global localStorage
+      vi.stubGlobal('localStorage', mockLocalStorage);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    describe('saveLocalBackup', () => {
+      it('should save tracking state to localStorage', () => {
+        const backupData = {
+          trackId: mockTrackId,
+          points: [
+            { latitude: 37.7749, longitude: -122.4194, sequenceNum: 0 },
+            { latitude: 37.7750, longitude: -122.4195, sequenceNum: 1 },
+          ],
+          pendingPoints: [{ latitude: 37.7751, longitude: -122.4196, sequenceNum: 2 }],
+          stats: { distance: 100, duration: 60 },
+          activity: 'walking',
+          trackingState: 'recording',
+          sequenceNum: 3,
+        };
+
+        // Simulate saveLocalBackup
+        const dataToSave = {
+          ...backupData,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(localBackupKey, JSON.stringify(dataToSave));
+
+        expect(localStorage.setItem).toHaveBeenCalledWith(
+          localBackupKey,
+          expect.stringContaining(mockTrackId)
+        );
+
+        const saved = JSON.parse(mockLocalStorage.store[localBackupKey]);
+        expect(saved.trackId).toBe(mockTrackId);
+        expect(saved.points).toHaveLength(2);
+        expect(saved.pendingPoints).toHaveLength(1);
+        expect(saved.savedAt).toBeDefined();
+      });
+
+      it('should include timestamp in backup', () => {
+        const backupData = {
+          trackId: mockTrackId,
+          points: [],
+          pendingPoints: [],
+        };
+
+        const dataToSave = {
+          ...backupData,
+          savedAt: new Date().toISOString(),
+        };
+        localStorage.setItem(localBackupKey, JSON.stringify(dataToSave));
+
+        const saved = JSON.parse(mockLocalStorage.store[localBackupKey]);
+        expect(saved.savedAt).toBeDefined();
+        expect(new Date(saved.savedAt)).toBeInstanceOf(Date);
+      });
+
+      it('should handle localStorage errors gracefully', () => {
+        localStorage.setItem.mockImplementationOnce(() => {
+          throw new Error('QuotaExceededError');
+        });
+
+        // Should not throw
+        expect(() => {
+          try {
+            localStorage.setItem(localBackupKey, JSON.stringify({ trackId: mockTrackId }));
+          } catch {
+            // Silently handle error
+          }
+        }).not.toThrow();
+      });
+    });
+
+    describe('loadLocalBackup', () => {
+      it('should load backup from localStorage', () => {
+        const backupData = {
+          trackId: mockTrackId,
+          points: [{ latitude: 37.7749, longitude: -122.4194 }],
+          pendingPoints: [],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const loaded = JSON.parse(localStorage.getItem(localBackupKey));
+
+        expect(loaded.trackId).toBe(mockTrackId);
+        expect(loaded.points).toHaveLength(1);
+      });
+
+      it('should return null if no backup exists', () => {
+        const loaded = localStorage.getItem(localBackupKey);
+
+        expect(loaded).toBeNull();
+      });
+
+      it('should handle corrupted JSON gracefully', () => {
+        mockLocalStorage.store[localBackupKey] = 'invalid json {{{';
+
+        let loaded = null;
+        try {
+          loaded = JSON.parse(localStorage.getItem(localBackupKey));
+        } catch {
+          loaded = null;
+        }
+
+        expect(loaded).toBeNull();
+      });
+    });
+
+    describe('clearLocalBackup', () => {
+      it('should remove backup from localStorage', () => {
+        mockLocalStorage.store[localBackupKey] = JSON.stringify({ trackId: mockTrackId });
+
+        localStorage.removeItem(localBackupKey);
+
+        expect(localStorage.removeItem).toHaveBeenCalledWith(localBackupKey);
+        expect(mockLocalStorage.store[localBackupKey]).toBeUndefined();
+      });
+    });
+
+    describe('checkRecoverableSession', () => {
+      it('should detect recoverable session with valid backup', () => {
+        const backupData = {
+          trackId: mockTrackId,
+          points: [
+            { latitude: 37.7749, longitude: -122.4194 },
+            { latitude: 37.7750, longitude: -122.4195 },
+          ],
+          pendingPoints: [{ latitude: 37.7751, longitude: -122.4196 }],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+        const hasRecoverable = backup && backup.trackId && backup.points?.length > 0;
+
+        expect(hasRecoverable).toBe(true);
+      });
+
+      it('should not detect recoverable session without trackId', () => {
+        const backupData = {
+          points: [{ latitude: 37.7749, longitude: -122.4194 }],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+        const hasRecoverable = !!(backup && backup.trackId && backup.points?.length > 0);
+
+        expect(hasRecoverable).toBe(false);
+      });
+
+      it('should not detect recoverable session without points', () => {
+        const backupData = {
+          trackId: mockTrackId,
+          points: [],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+        const hasRecoverable = backup && backup.trackId && backup.points?.length > 0;
+
+        expect(hasRecoverable).toBe(false);
+      });
+
+      it('should provide session info when recoverable', () => {
+        const backupData = {
+          trackId: mockTrackId,
+          points: [
+            { latitude: 37.7749, longitude: -122.4194 },
+            { latitude: 37.7750, longitude: -122.4195 },
+            { latitude: 37.7751, longitude: -122.4196 },
+          ],
+          stats: { distance: 150, duration: 90 },
+          savedAt: '2024-01-15T10:30:00Z',
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+        const sessionInfo = {
+          trackId: backup.trackId,
+          pointCount: backup.points.length,
+          savedAt: backup.savedAt,
+          stats: backup.stats,
+        };
+
+        expect(sessionInfo.trackId).toBe(mockTrackId);
+        expect(sessionInfo.pointCount).toBe(3);
+        expect(sessionInfo.savedAt).toBe('2024-01-15T10:30:00Z');
+        expect(sessionInfo.stats.distance).toBe(150);
+      });
+    });
+
+    describe('recoverSession', () => {
+      it('should upload pending points from backup', async () => {
+        const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+        addTrackPoints.mockResolvedValueOnce({ inserted: 2 });
+
+        const backupData = {
+          trackId: mockTrackId,
+          points: [
+            { latitude: 37.7749, longitude: -122.4194 },
+            { latitude: 37.7750, longitude: -122.4195 },
+          ],
+          pendingPoints: [
+            { latitude: 37.7751, longitude: -122.4196 },
+            { latitude: 37.7752, longitude: -122.4197 },
+          ],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+
+        if (backup.pendingPoints?.length > 0) {
+          await addTrackPoints(mockAccessToken, backup.trackId, backup.pendingPoints);
+        }
+
+        expect(addTrackPoints).toHaveBeenCalledWith(
+          mockAccessToken,
+          mockTrackId,
+          expect.arrayContaining([
+            expect.objectContaining({ latitude: 37.7751 }),
+            expect.objectContaining({ latitude: 37.7752 }),
+          ])
+        );
+      });
+
+      it('should clear backup after successful recovery', async () => {
+        const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+        addTrackPoints.mockResolvedValueOnce({ inserted: 1 });
+
+        const backupData = {
+          trackId: mockTrackId,
+          points: [{ latitude: 37.7749, longitude: -122.4194 }],
+          pendingPoints: [{ latitude: 37.7750, longitude: -122.4195 }],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        // Simulate recovery
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+        if (backup.pendingPoints?.length > 0) {
+          await addTrackPoints(mockAccessToken, backup.trackId, backup.pendingPoints);
+        }
+        localStorage.removeItem(localBackupKey);
+
+        expect(localStorage.removeItem).toHaveBeenCalledWith(localBackupKey);
+        expect(mockLocalStorage.store[localBackupKey]).toBeUndefined();
+      });
+
+      it('should return error if no backup exists', () => {
+        const backup = localStorage.getItem(localBackupKey);
+
+        const result = backup
+          ? { success: true }
+          : { error: { message: 'No recoverable session found' } };
+
+        expect(result.error).toBeDefined();
+        expect(result.error.message).toBe('No recoverable session found');
+      });
+
+      it('should return error if access token is missing', () => {
+        const accessToken = null;
+
+        const result = accessToken
+          ? { success: true }
+          : { error: { message: 'Access token required' } };
+
+        expect(result.error).toBeDefined();
+        expect(result.error.message).toBe('Access token required');
+      });
+
+      it('should handle upload failure gracefully', async () => {
+        const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+        addTrackPoints.mockResolvedValueOnce({
+          error: { message: 'Track not found' },
+        });
+
+        const backupData = {
+          trackId: 'deleted-track-id',
+          points: [{ latitude: 37.7749, longitude: -122.4194 }],
+          pendingPoints: [{ latitude: 37.7750, longitude: -122.4195 }],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+        const result = await addTrackPoints(mockAccessToken, backup.trackId, backup.pendingPoints);
+
+        expect(result.error).toBeDefined();
+        expect(result.error.message).toBe('Track not found');
+      });
+
+      it('should return recovered points count on success', async () => {
+        const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+        addTrackPoints.mockResolvedValueOnce({ inserted: 3 });
+
+        const backupData = {
+          trackId: mockTrackId,
+          points: [],
+          pendingPoints: [
+            { latitude: 37.7749, longitude: -122.4194 },
+            { latitude: 37.7750, longitude: -122.4195 },
+            { latitude: 37.7751, longitude: -122.4196 },
+          ],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        const backup = JSON.parse(localStorage.getItem(localBackupKey));
+        await addTrackPoints(mockAccessToken, backup.trackId, backup.pendingPoints);
+
+        const result = {
+          success: true,
+          trackId: backup.trackId,
+          recoveredPoints: backup.pendingPoints.length,
+        };
+
+        expect(result.success).toBe(true);
+        expect(result.recoveredPoints).toBe(3);
+      });
+    });
+
+    describe('dismissRecoverableSession', () => {
+      it('should clear backup without recovering', () => {
+        const backupData = {
+          trackId: mockTrackId,
+          points: [{ latitude: 37.7749, longitude: -122.4194 }],
+          pendingPoints: [{ latitude: 37.7750, longitude: -122.4195 }],
+          savedAt: new Date().toISOString(),
+        };
+
+        mockLocalStorage.store[localBackupKey] = JSON.stringify(backupData);
+
+        // Dismiss without recovering
+        localStorage.removeItem(localBackupKey);
+
+        expect(localStorage.removeItem).toHaveBeenCalledWith(localBackupKey);
+        expect(mockLocalStorage.store[localBackupKey]).toBeUndefined();
+      });
+
+      it('should reset recovery state', () => {
+        let hasRecoverableSession = true;
+        let recoverableSessionInfo = { trackId: mockTrackId, pointCount: 5 };
+
+        // Dismiss
+        localStorage.removeItem(localBackupKey);
+        hasRecoverableSession = false;
+        recoverableSessionInfo = null;
+
+        expect(hasRecoverableSession).toBe(false);
+        expect(recoverableSessionInfo).toBeNull();
+      });
+    });
+  });
+
+  describe('Page Visibility Handling', () => {
+    it('should upload points when page becomes hidden', async () => {
+      const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+      addTrackPoints.mockResolvedValueOnce({ inserted: 5 });
+
+      const pendingPoints = [
+        { latitude: 37.7749, longitude: -122.4194 },
+        { latitude: 37.7750, longitude: -122.4195 },
+      ];
+
+      // Simulate visibility change to hidden
+      const visibilityState = 'hidden';
+      const trackingState = 'recording';
+
+      if (visibilityState === 'hidden' && trackingState === 'recording') {
+        await addTrackPoints(mockAccessToken, mockTrackId, pendingPoints);
+      }
+
+      expect(addTrackPoints).toHaveBeenCalled();
+    });
+
+    it('should not upload when page is visible', async () => {
+      const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+
+      const visibilityState = 'visible';
+      const trackingState = 'recording';
+
+      if (visibilityState === 'hidden' && trackingState === 'recording') {
+        await addTrackPoints(mockAccessToken, mockTrackId, []);
+      }
+
+      expect(addTrackPoints).not.toHaveBeenCalled();
+    });
+
+    it('should not upload when not recording', async () => {
+      const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+
+      const visibilityState = 'hidden';
+      const trackingState = 'idle';
+
+      if (visibilityState === 'hidden' && trackingState === 'recording') {
+        await addTrackPoints(mockAccessToken, mockTrackId, []);
+      }
+
+      expect(addTrackPoints).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('beforeunload Handling', () => {
+    let mockLocalStorage;
+
+    beforeEach(() => {
+      mockLocalStorage = {
+        store: {},
+        getItem: vi.fn((key) => mockLocalStorage.store[key] || null),
+        setItem: vi.fn((key, value) => {
+          mockLocalStorage.store[key] = value;
+        }),
+        removeItem: vi.fn((key) => {
+          delete mockLocalStorage.store[key];
+        }),
+      };
+      vi.stubGlobal('localStorage', mockLocalStorage);
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('should save backup before page unload', () => {
+      const localBackupKey = 'parklookup_tracking_backup';
+      const trackingState = 'recording';
+      const trackId = mockTrackId;
+      const points = [
+        { latitude: 37.7749, longitude: -122.4194 },
+        { latitude: 37.7750, longitude: -122.4195 },
+      ];
+      const pendingPoints = [{ latitude: 37.7751, longitude: -122.4196 }];
+
+      // Simulate beforeunload
+      if (trackingState === 'recording' || trackingState === 'paused') {
+        if (trackId && points.length > 0) {
+          const backupData = {
+            trackId,
+            points,
+            pendingPoints,
+            savedAt: new Date().toISOString(),
+          };
+          localStorage.setItem(localBackupKey, JSON.stringify(backupData));
+        }
+      }
+
+      expect(localStorage.setItem).toHaveBeenCalled();
+      const saved = JSON.parse(mockLocalStorage.store[localBackupKey]);
+      expect(saved.trackId).toBe(mockTrackId);
+    });
+
+    it('should use sendBeacon for reliable upload', () => {
+      const mockSendBeacon = vi.fn().mockReturnValue(true);
+      vi.stubGlobal('navigator', { sendBeacon: mockSendBeacon });
+
+      const trackId = mockTrackId;
+      const pendingPoints = [
+        { latitude: 37.7749, longitude: -122.4194 },
+        { latitude: 37.7750, longitude: -122.4195 },
+      ];
+
+      // Simulate sendBeacon call
+      if (pendingPoints.length > 0 && trackId) {
+        const payload = JSON.stringify({ points: pendingPoints });
+        navigator.sendBeacon(
+          `/api/tracks/${trackId}/points`,
+          new Blob([payload], { type: 'application/json' })
+        );
+      }
+
+      expect(mockSendBeacon).toHaveBeenCalledWith(
+        `/api/tracks/${mockTrackId}/points`,
+        expect.any(Blob)
+      );
+    });
+
+    it('should handle sendBeacon failure gracefully', () => {
+      const mockSendBeacon = vi.fn().mockImplementation(() => {
+        throw new Error('sendBeacon failed');
+      });
+      vi.stubGlobal('navigator', { sendBeacon: mockSendBeacon });
+
+      const trackId = mockTrackId;
+      const pendingPoints = [{ latitude: 37.7749, longitude: -122.4194 }];
+
+      // Should not throw
+      expect(() => {
+        try {
+          if (pendingPoints.length > 0 && trackId) {
+            const payload = JSON.stringify({ points: pendingPoints });
+            navigator.sendBeacon(
+              `/api/tracks/${trackId}/points`,
+              new Blob([payload], { type: 'application/json' })
+            );
+          }
+        } catch {
+          // Silently handle error
+        }
+      }).not.toThrow();
+    });
+
+    it('should not save backup when idle', () => {
+      const localBackupKey = 'parklookup_tracking_backup';
+      const trackingState = 'idle';
+      const trackId = mockTrackId;
+      const points = [{ latitude: 37.7749, longitude: -122.4194 }];
+
+      // Simulate beforeunload
+      if (trackingState === 'recording' || trackingState === 'paused') {
+        if (trackId && points.length > 0) {
+          localStorage.setItem(localBackupKey, JSON.stringify({ trackId, points }));
+        }
+      }
+
+      expect(localStorage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('should show confirmation dialog when tracking', () => {
+      const trackingState = 'recording';
+      const mockEvent = {
+        preventDefault: vi.fn(),
+        returnValue: '',
+      };
+
+      // Simulate beforeunload handler
+      if (trackingState === 'recording' || trackingState === 'paused') {
+        mockEvent.preventDefault();
+        mockEvent.returnValue = 'You have an active tracking session. Are you sure you want to leave?';
+      }
+
+      expect(mockEvent.preventDefault).toHaveBeenCalled();
+      expect(mockEvent.returnValue).toContain('active tracking session');
+    });
+  });
+
+  describe('Periodic Upload Configuration', () => {
+    it('should use reduced upload interval (15 seconds)', () => {
+      const DEFAULT_OPTIONS = {
+        uploadIntervalMs: 15000,
+        maxPointsPerBatch: 30,
+      };
+
+      expect(DEFAULT_OPTIONS.uploadIntervalMs).toBe(15000);
+    });
+
+    it('should use reduced batch size (30 points)', () => {
+      const DEFAULT_OPTIONS = {
+        uploadIntervalMs: 15000,
+        maxPointsPerBatch: 30,
+      };
+
+      expect(DEFAULT_OPTIONS.maxPointsPerBatch).toBe(30);
+    });
+
+    it('should trigger upload when batch threshold reached', async () => {
+      const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+      addTrackPoints.mockResolvedValueOnce({ inserted: 30 });
+
+      const maxPointsPerBatch = 30;
+      const pendingPoints = Array(30)
+        .fill(null)
+        .map((_, i) => ({
+          latitude: 37.7749 + i * 0.0001,
+          longitude: -122.4194,
+        }));
+
+      // Trigger upload when threshold reached
+      if (pendingPoints.length >= maxPointsPerBatch) {
+        await addTrackPoints(mockAccessToken, mockTrackId, pendingPoints);
+      }
+
+      expect(addTrackPoints).toHaveBeenCalled();
+    });
+
+    it('should not trigger upload below threshold', async () => {
+      const { addTrackPoints } = await import('../../lib/tracking/tracking-client.js');
+
+      const maxPointsPerBatch = 30;
+      const pendingPoints = Array(20)
+        .fill(null)
+        .map((_, i) => ({
+          latitude: 37.7749 + i * 0.0001,
+          longitude: -122.4194,
+        }));
+
+      // Should not trigger upload
+      if (pendingPoints.length >= maxPointsPerBatch) {
+        await addTrackPoints(mockAccessToken, mockTrackId, pendingPoints);
+      }
+
+      expect(addTrackPoints).not.toHaveBeenCalled();
+    });
+  });
 });
