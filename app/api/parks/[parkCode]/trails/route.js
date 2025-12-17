@@ -30,16 +30,23 @@ export async function GET(request, { params }) {
 
     const supabase = createServiceClient();
 
-    // First, find the park by park_code
-    const { data: parkData, error: parkError } = await supabase
+    // First, find the park by park_code or ID
+    const { data: parkResults, error: parkError } = await supabase
       .from('all_parks')
-      .select('id, source, latitude, longitude')
-      .eq('park_code', parkCode)
-      .single();
+      .select('id, source, latitude, longitude, park_code')
+      .or(`park_code.eq.${parkCode},id.eq.${parkCode}`)
+      .limit(1);
 
-    if (parkError || !parkData) {
+    if (parkError) {
+      console.error('Error fetching park:', parkError);
+      return NextResponse.json({ error: 'Failed to fetch park' }, { status: 500 });
+    }
+
+    if (!parkResults || parkResults.length === 0) {
       return NextResponse.json({ error: 'Park not found' }, { status: 404 });
     }
+
+    const parkData = parkResults[0];
 
     const { id: parkId, source: parkSource, latitude, longitude } = parkData;
 
