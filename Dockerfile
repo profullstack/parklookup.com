@@ -12,7 +12,8 @@ WORKDIR /app
 # Install dependencies stage
 FROM base AS deps
 COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile
+# Use node-linker=hoisted to create flat node_modules structure (like npm)
+RUN echo "node-linker=hoisted" > .npmrc && pnpm install --frozen-lockfile
 
 # Build stage
 FROM base AS builder
@@ -55,6 +56,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
 
 # Copy sharp native bindings for image optimization
+# With node-linker=hoisted, node_modules has flat structure like npm
 COPY --from=builder /app/node_modules/sharp ./node_modules/sharp
 COPY --from=builder /app/node_modules/@img ./node_modules/@img
 
