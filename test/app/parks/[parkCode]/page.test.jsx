@@ -45,6 +45,38 @@ vi.mock('@/hooks/useAuth', () => ({
   }),
 }));
 
+// Mock useProStatus hook
+vi.mock('@/hooks/useProStatus', () => ({
+  useProStatus: () => ({
+    isPro: false,
+    loading: false,
+  }),
+}));
+
+// Mock TrackingContext
+vi.mock('@/contexts/TrackingContext', () => ({
+  useTracking: () => ({
+    isTracking: false,
+    startTracking: vi.fn(),
+    currentTrack: null,
+  }),
+}));
+
+// Mock StartTrackingButton
+vi.mock('@/components/tracking/StartTrackingButton', () => ({
+  default: ({ parkCode, parkId, parkName, variant }) => (
+    <button
+      data-testid="start-tracking-button"
+      data-park-code={parkCode}
+      data-park-id={parkId}
+      data-park-name={parkName}
+      data-variant={variant}
+    >
+      Start Tracking
+    </button>
+  ),
+}));
+
 // Mock FavoriteButton
 vi.mock('@/components/parks/FavoriteButton', () => ({
   FavoriteButton: ({ parkId, parkCode }) => (

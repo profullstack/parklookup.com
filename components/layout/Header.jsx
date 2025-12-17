@@ -9,6 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/useAuth';
+import { useProStatus } from '@/hooks/useProStatus';
 import Button from '../ui/Button';
 
 /**
@@ -130,6 +131,7 @@ function UserDropdown({ user, onSignOut }) {
 
 export default function Header() {
   const { user, signOut, loading } = useAuth();
+  const { isPro } = useProStatus();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleSignOut = async () => {
@@ -178,6 +180,16 @@ export default function Header() {
                   <span>🧭</span>
                   My Trips
                 </Link>
+                {isPro && (
+                  <Link
+                    href="/tracks"
+                    className="text-gray-600 hover:text-green-600 font-medium transition-colors flex items-center gap-1"
+                  >
+                    <span>📍</span>
+                    My Tracks
+                    <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">PRO</span>
+                  </Link>
+                )}
                 <Link
                   href="/favorites"
                   className="text-gray-600 hover:text-green-600 font-medium transition-colors"
@@ -263,6 +275,17 @@ export default function Header() {
                     <span>🧭</span>
                     My Trips
                   </Link>
+                  {isPro && (
+                    <Link
+                      href="/tracks"
+                      className="text-gray-600 hover:text-green-600 font-medium flex items-center gap-1"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
+                      <span>📍</span>
+                      My Tracks
+                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">PRO</span>
+                    </Link>
+                  )}
                   <Link
                     href="/favorites"
                     className="text-gray-600 hover:text-green-600 font-medium"

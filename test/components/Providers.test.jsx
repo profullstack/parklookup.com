@@ -9,6 +9,12 @@ import { render, screen } from '@testing-library/react';
 // Mock the dependencies
 vi.mock('@/hooks/useAuth', () => ({
   AuthProvider: ({ children }) => <div data-testid="auth-provider">{children}</div>,
+  useAuth: () => ({
+    user: null,
+    loading: false,
+    accessToken: null,
+    isPro: false,
+  }),
 }));
 
 vi.mock('@/components/layout/Header', () => ({
@@ -21,6 +27,16 @@ vi.mock('@/components/ui/OfflineBanner', () => ({
 
 vi.mock('@/components/ui/InstallPrompt', () => ({
   InstallPrompt: () => <div data-testid="install-prompt">InstallPrompt</div>,
+}));
+
+// Mock TrackingProvider
+vi.mock('@/contexts/TrackingContext', () => ({
+  TrackingProvider: ({ children }) => <div data-testid="tracking-provider">{children}</div>,
+  useTracking: () => ({
+    isTracking: false,
+    startTracking: vi.fn(),
+    currentTrack: null,
+  }),
 }));
 
 // Import after mocks

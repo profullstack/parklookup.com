@@ -15,6 +15,7 @@ import ParkReviews from '@/components/parks/ParkReviews';
 import UserPhotos from '@/components/parks/UserPhotos';
 import TrailList from '@/components/trails/TrailList';
 import ParkBLMSection from '@/components/blm/ParkBLMSection';
+import StartTrackingButton from '@/components/tracking/StartTrackingButton';
 
 // Dynamically import the map components to avoid SSR issues
 const ParkMap = dynamic(() => import('@/components/parks/ParkMap'), {
@@ -340,14 +341,22 @@ export default function ParkDetailClient({
             )}
           </div>
 
-          {/* External Links */}
+          {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
+            {/* Start Tracking Button - for pro users */}
+            <StartTrackingButton
+              parkCode={park.park_code}
+              parkId={park.id}
+              parkName={park.full_name || park.name}
+              variant="primary"
+            />
+            
             {park.url && (
               <a
                 href={park.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
               >
                 <svg
                   className="w-5 h-5 mr-2"
