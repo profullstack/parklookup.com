@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 
 /**
+ * Check if a string is a valid UUID
+ * @param {string} str - String to check
+ * @returns {boolean} True if valid UUID
+ */
+const isValidUUID = (str) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
+/**
  * GET /api/parks/[parkCode]/blm
  *
  * Get BLM lands near a specific park
@@ -24,15 +34,21 @@ export async function GET(request, { params }) {
 
     const supabase = createServiceClient();
 
-    // First, find the park by park_code or ID
+    // First, find the park by park_code or ID (only check ID if it's a valid UUID)
     // Try all_parks view which includes NPS, Wikidata, and local parks
     let parkQuery = supabase
       .from('all_parks')
-      .select('id, park_code, full_name, latitude, longitude, source')
-      .or(`park_code.eq.${parkCode},id.eq.${parkCode}`)
-      .limit(1);
+      .select('id, park_code, full_name, latitude, longitude, source');
 
-    const { data: parkData, error: parkError } = await parkQuery;
+    if (isValidUUID(parkCode)) {
+      // If it's a UUID, search by both park_code and id
+      parkQuery = parkQuery.or(`park_code.eq.${parkCode},id.eq.${parkCode}`);
+    } else {
+      // If it's not a UUID, only search by park_code
+      parkQuery = parkQuery.eq('park_code', parkCode);
+    }
+
+    const { data: parkData, error: parkError } = await parkQuery.limit(1);
 
     if (parkError) {
       console.error('Error fetching park:', parkError);

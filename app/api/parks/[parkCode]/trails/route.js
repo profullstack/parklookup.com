@@ -2,6 +2,16 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/server';
 
 /**
+ * Check if a string is a valid UUID
+ * @param {string} str - String to check
+ * @returns {boolean} True if valid UUID
+ */
+const isValidUUID = (str) => {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(str);
+};
+
+/**
  * GET /api/parks/[parkCode]/trails
  *
  * Get all trails associated with a specific park
@@ -30,12 +40,20 @@ export async function GET(request, { params }) {
 
     const supabase = createServiceClient();
 
-    // First, find the park by park_code or ID
-    const { data: parkResults, error: parkError } = await supabase
+    // First, find the park by park_code or ID (only check ID if it's a valid UUID)
+    let parkQuery = supabase
       .from('all_parks')
-      .select('id, source, latitude, longitude, park_code')
-      .or(`park_code.eq.${parkCode},id.eq.${parkCode}`)
-      .limit(1);
+      .select('id, source, latitude, longitude, park_code');
+
+    if (isValidUUID(parkCode)) {
+      // If it's a UUID, search by both park_code and id
+      parkQuery = parkQuery.or(`park_code.eq.${parkCode},id.eq.${parkCode}`);
+    } else {
+      // If it's not a UUID, only search by park_code
+      parkQuery = parkQuery.eq('park_code', parkCode);
+    }
+
+    const { data: parkResults, error: parkError } = await parkQuery.limit(1);
 
     if (parkError) {
       console.error('Error fetching park:', parkError);
