@@ -386,6 +386,7 @@ export default function TrailPhotos({ trailId }) {
       // First, upload the file to get a URL
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('trailId', trailId); // Pass trailId to media API
 
       // Upload to media API
       const uploadRes = await fetch('/api/media', {

@@ -55,7 +55,7 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Trail not found' }, { status: 404 });
     }
 
-    // Get comments for this trail
+    // Get comments for this trail with user profile info
     const { data: comments, error } = await supabase
       .from('trail_comments')
       .select('*')
@@ -67,7 +67,28 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Failed to fetch comments' }, { status: 500 });
     }
 
-    return NextResponse.json({ comments: comments || [] });
+    // Fetch user profiles for all comments
+    const userIds = [...new Set((comments || []).map((c) => c.user_id))];
+    let profileMap = {};
+    
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, display_name, username, avatar_url')
+        .in('id', userIds);
+      
+      profiles?.forEach((p) => {
+        profileMap[p.id] = p;
+      });
+    }
+
+    // Attach profile info to each comment
+    const commentsWithProfiles = (comments || []).map((comment) => ({
+      ...comment,
+      profile: profileMap[comment.user_id] || null,
+    }));
+
+    return NextResponse.json({ comments: commentsWithProfiles });
   } catch (error) {
     console.error('Error in GET /api/trails/[id]/comments:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -126,7 +147,19 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Failed to create comment' }, { status: 500 });
     }
 
-    return NextResponse.json({ comment }, { status: 201 });
+    // Fetch the user's profile to include in response
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, display_name, username, avatar_url')
+      .eq('id', user.id)
+      .single();
+
+    return NextResponse.json({
+      comment: {
+        ...comment,
+        profile: profile || null,
+      }
+    }, { status: 201 });
   } catch (error) {
     console.error('Error in POST /api/trails/[id]/comments:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

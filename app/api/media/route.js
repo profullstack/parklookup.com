@@ -183,7 +183,7 @@ export async function GET(request) {
 
 /**
  * POST /api/media
- * Upload new media (photo or video) for national parks (parkCode) or local parks (localParkId)
+ * Upload new media (photo or video) for national parks (parkCode), local parks (localParkId), or trails (trailId)
  */
 export async function POST(request) {
   try {
@@ -196,6 +196,7 @@ export async function POST(request) {
     const file = formData.get('file');
     const parkCode = formData.get('parkCode');
     const localParkId = formData.get('localParkId');
+    const trailId = formData.get('trailId');
     const title = formData.get('title') || '';
     const description = formData.get('description') || '';
 
@@ -203,16 +204,19 @@ export async function POST(request) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    if (!parkCode && !localParkId) {
-      return NextResponse.json({ error: 'Park code or local park ID is required' }, { status: 400 });
+    // For trail uploads, we don't require parkCode or localParkId
+    // The trail media record will be created separately via /api/trails/[id]/media
+    if (!parkCode && !localParkId && !trailId) {
+      return NextResponse.json({ error: 'Park code, local park ID, or trail ID is required' }, { status: 400 });
     }
 
     const supabase = createServiceClient();
 
     let park = null;
     let localPark = null;
+    let trail = null;
 
-    // Verify park exists based on which identifier was provided
+    // Verify entity exists based on which identifier was provided
     if (parkCode) {
       // Verify park exists in all_parks view (supports NPS, state parks, etc.)
       const { data, error: parkError } = await supabase
@@ -237,6 +241,18 @@ export async function POST(request) {
         return NextResponse.json({ error: 'Local park not found' }, { status: 404 });
       }
       localPark = data;
+    } else if (trailId) {
+      // Verify trail exists
+      const { data, error: trailError } = await supabase
+        .from('trails')
+        .select('id, name, slug')
+        .eq('id', trailId)
+        .single();
+
+      if (trailError || !data) {
+        return NextResponse.json({ error: 'Trail not found' }, { status: 404 });
+      }
+      trail = data;
     }
 
     // Get file buffer and validate
@@ -354,6 +370,7 @@ export async function POST(request) {
             thumbnail_url: thumbnailUrl?.publicUrl,
             park: park,
             local_park: localPark,
+            trail: trail,
           },
         },
         { status: 201 }

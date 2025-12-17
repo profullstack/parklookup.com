@@ -50,11 +50,21 @@ function Comment({ comment, currentUserId, onDelete, onEdit }) {
     <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
       <div className="flex justify-between items-start mb-2">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
-            {comment.user_id?.slice(0, 2).toUpperCase() || 'U'}
-          </div>
+          {comment.profile?.avatar_url ? (
+            <img
+              src={comment.profile.avatar_url}
+              alt={comment.profile.display_name || comment.profile.username || 'User'}
+              className="w-8 h-8 rounded-full object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center text-white text-sm font-medium">
+              {(comment.profile?.display_name || comment.profile?.username || 'U').slice(0, 2).toUpperCase()}
+            </div>
+          )}
           <div>
-            <p className="text-sm font-medium text-gray-900 dark:text-white">Hiker</p>
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {comment.profile?.display_name || comment.profile?.username || 'Hiker'}
+            </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {new Date(comment.created_at).toLocaleDateString()}
             </p>
