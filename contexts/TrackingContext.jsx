@@ -21,17 +21,19 @@ export function TrackingProvider({ children }) {
   const [activeTrackConfig, setActiveTrackConfig] = useState(null);
   const [showTrackingPanel, setShowTrackingPanel] = useState(false);
 
-  // Debug logging for pro status
-  console.log('TrackingProvider render:', {
-    user: user?.id,
-    isPro,
-    proLoading,
-    profile: profile ? {
-      is_pro: profile.is_pro,
-      subscription_status: profile.subscription_status,
-      subscription_tier: profile.subscription_tier,
-    } : null,
-  });
+  // Debug logging for pro status (using console.warn to avoid production stripping)
+  if (typeof window !== 'undefined') {
+    console.warn('[TrackingProvider] render:', {
+      user: user?.id,
+      isPro,
+      proLoading,
+      profile: profile ? {
+        is_pro: profile.is_pro,
+        subscription_status: profile.subscription_status,
+        subscription_tier: profile.subscription_tier,
+      } : null,
+    });
+  }
 
   // Use the tracking hook
   const tracking = useTracking({

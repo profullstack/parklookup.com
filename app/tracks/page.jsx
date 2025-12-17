@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useProStatus } from '@/hooks/useProStatus';
 import { getTracks, deleteTrack } from '@/lib/tracking/tracking-client';
 import TrackCard from '@/components/tracking/TrackCard';
 import Link from 'next/link';
@@ -11,7 +12,8 @@ import Link from 'next/link';
  * Displays user's recorded tracks with filtering and sorting
  */
 export default function MyTracksPage() {
-  const { user, accessToken, isPro } = useAuth();
+  const { user, accessToken, loading: authLoading } = useAuth();
+  const { isPro, loading: proLoading } = useProStatus();
   const [tracks, setTracks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -96,7 +98,24 @@ export default function MyTracksPage() {
     }));
   };
 
-  // Not signed in
+  // Show loading state while checking auth and pro status
+  const isInitialLoading = authLoading || proLoading;
+
+  // Show loading spinner while checking auth/pro status
+  if (isInitialLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+            <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Not signed in (only check after auth loading is complete)
   if (!user) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
@@ -132,7 +151,7 @@ export default function MyTracksPage() {
   }
 
   // Not pro user
-  if (!isPro) {
+  if (user && !isPro) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
         <div className="max-w-4xl mx-auto px-4">
