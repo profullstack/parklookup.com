@@ -51,13 +51,20 @@ export async function generateMetadata({ params }) {
   const description = trail.description 
     || `${trail.name || 'Trail'} is a ${trail.difficulty || ''} ${lengthMiles ? `${lengthMiles} mile` : ''} trail in ${parkName}. ${trail.surface ? `Surface: ${trail.surface}.` : ''}`.trim();
 
+  // Canonical URL for the trail
+  const canonicalPath = `/parks/${parkCode}/trails/${trailSlug}`;
+
   return {
     title,
     description,
+    alternates: {
+      canonical: canonicalPath,
+    },
     openGraph: {
       title,
       description,
       type: 'website',
+      url: canonicalPath,
     },
     twitter: {
       card: 'summary',

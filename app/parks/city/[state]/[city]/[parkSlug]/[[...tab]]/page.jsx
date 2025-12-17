@@ -14,10 +14,17 @@ import { createClient } from '@/lib/supabase/server';
 import LocalParkDetailClient from '@/components/parks/LocalParkDetailClient';
 
 /**
+ * Valid tab names for city park detail pages
+ */
+const VALID_TABS = ['overview', 'map', 'photos', 'reviews'];
+const DEFAULT_TAB = 'overview';
+
+/**
  * Generate metadata for SEO
  */
 export async function generateMetadata({ params }) {
-  const { state, city, parkSlug } = await params;
+  const { state, city, parkSlug, tab } = await params;
+  const activeTab = tab?.[0] || DEFAULT_TAB;
 
   const supabase = createClient();
 
@@ -50,6 +57,12 @@ export async function generateMetadata({ params }) {
     park.description ||
     `Explore ${park.name}, a ${park.park_type} park in ${park.cities.name}, ${park.states.name}. Find photos, maps, weather, and visitor information.`;
 
+  // Canonical URL should point to the base park page (without tab) for overview,
+  // or include the tab for other tabs to avoid duplicate content
+  const canonicalPath = activeTab === DEFAULT_TAB
+    ? `/parks/city/${state}/${city}/${parkSlug}`
+    : `/parks/city/${state}/${city}/${parkSlug}/${activeTab}`;
+
   return {
     title,
     description,
@@ -57,7 +70,7 @@ export async function generateMetadata({ params }) {
       title,
       description,
       type: 'website',
-      url: `/parks/city/${state}/${city}/${parkSlug}`,
+      url: canonicalPath,
     },
     twitter: {
       card: 'summary_large_image',
@@ -65,7 +78,7 @@ export async function generateMetadata({ params }) {
       description,
     },
     alternates: {
-      canonical: `/parks/city/${state}/${city}/${parkSlug}`,
+      canonical: canonicalPath,
     },
   };
 }

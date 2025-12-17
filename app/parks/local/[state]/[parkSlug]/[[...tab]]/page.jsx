@@ -62,10 +62,17 @@ async function getLocalPark(stateSlug, parkSlug) {
 }
 
 /**
+ * Valid tab names for local park detail pages
+ */
+const VALID_TABS = ['overview', 'map', 'photos', 'reviews'];
+const DEFAULT_TAB = 'overview';
+
+/**
  * Generate metadata for the park page
  */
 export async function generateMetadata({ params }) {
-  const { state, parkSlug } = await params;
+  const { state, parkSlug, tab } = await params;
+  const activeTab = tab?.[0] || DEFAULT_TAB;
   const park = await getLocalPark(state, parkSlug);
 
   if (!park) {
@@ -74,16 +81,26 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  const parkType = park.park_type === 'county' ? 'County Park' : 
+  const parkType = park.park_type === 'county' ? 'County Park' :
                    park.park_type === 'city' ? 'City Park' : 'Local Park';
+
+  // Canonical URL should point to the base park page (without tab) for overview,
+  // or include the tab for other tabs to avoid duplicate content
+  const canonicalPath = activeTab === DEFAULT_TAB
+    ? `/parks/local/${state}/${parkSlug}`
+    : `/parks/local/${state}/${parkSlug}/${activeTab}`;
 
   return {
     title: `${park.name} | ${parkType} in ${park.state_name} | ParkLookup`,
     description: park.description || `Explore ${park.name}, a ${parkType.toLowerCase()} in ${park.state_name}. Find location, photos, and visitor information.`,
+    alternates: {
+      canonical: canonicalPath,
+    },
     openGraph: {
       title: `${park.name} | ${parkType}`,
       description: park.description || `Explore ${park.name} in ${park.state_name}`,
       images: park.park_photos?.[0]?.image_url ? [park.park_photos[0].image_url] : [],
+      url: canonicalPath,
     },
   };
 }

@@ -91,13 +91,21 @@ export async function generateMetadata({ params }) {
     photos: `View user-contributed photos and videos of ${park.full_name}`,
   };
 
+  // Canonical URL should point to the base park page (without tab) for overview,
+  // or include the tab for other tabs to avoid duplicate content
+  const canonicalPath = activeTab === DEFAULT_TAB ? `/parks/${parkCode}` : `/parks/${parkCode}/${activeTab}`;
+
   return {
     title: `${park.full_name}${tabTitles[activeTab] || ''} | ParkLookup`,
     description: tabDescriptions[activeTab] || park.description,
+    alternates: {
+      canonical: canonicalPath,
+    },
     openGraph: {
       title: `${park.full_name}${tabTitles[activeTab] || ''}`,
       description: tabDescriptions[activeTab] || park.description,
       type: 'website',
+      url: canonicalPath,
     },
   };
 }

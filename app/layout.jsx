@@ -1,16 +1,26 @@
 import Script from 'next/script';
 import './globals.css';
 import { Providers } from '@/components/Providers';
+import { SITE_URL } from '@/lib/seo/canonical';
 
 export const metadata = {
+  metadataBase: new URL(SITE_URL),
   title: 'ParkLookup - Discover State and National Parks',
   description:
     'Discover and explore U.S. National and State Parks. Search, save favorites, and plan your next adventure.',
   keywords: 'national parks, state parks, hiking, camping, outdoors, nature, travel',
+  alternates: {
+    canonical: '/',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
     title: 'ParkLookup',
+  },
+  openGraph: {
+    type: 'website',
+    siteName: 'ParkLookup',
+    url: SITE_URL,
   },
   other: {
     'mobile-web-app-capable': 'yes',

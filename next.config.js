@@ -90,6 +90,8 @@ const withPWA = withPWAInit({
 const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
+  // Normalize URLs by removing trailing slashes to prevent duplicate content
+  trailingSlash: false,
   images: {
     remotePatterns: [
       {
