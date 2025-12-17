@@ -127,23 +127,37 @@ function ParkTrailsSection({ park, hasCoordinates }) {
     );
   }
 
-  // Prepare GeoJSON for the map
-  const trailsGeoJSON = {
-    type: 'FeatureCollection',
-    features: trails
-      .filter((trail) => trail.geojson)
-      .map((trail) => ({
-        type: 'Feature',
-        properties: {
-          id: trail.id,
-          name: trail.name,
-          difficulty: trail.difficulty,
-          length_meters: trail.length_meters,
-          surface: trail.surface,
-        },
-        geometry: trail.geojson,
-      })),
-  };
+  // Filter trails that have valid geometry for the map
+  const trailsWithGeometry = trails.filter((trail) => {
+    if (!trail.geojson && !trail.geometry && !trail.geometry_geojson) return false;
+    
+    // Parse geometry to check for valid coordinates
+    let geom = trail.geojson || trail.geometry || trail.geometry_geojson;
+    if (typeof geom === 'string') {
+      try {
+        geom = JSON.parse(geom);
+      } catch {
+        return false;
+      }
+    }
+    
+    // Check if geometry has valid coordinates
+    if (!geom?.coordinates || !Array.isArray(geom.coordinates)) return false;
+    
+    // Check for at least one valid coordinate
+    const hasValidCoord = geom.coordinates.some((coord) =>
+      Array.isArray(coord) &&
+      coord.length >= 2 &&
+      typeof coord[0] === 'number' &&
+      typeof coord[1] === 'number' &&
+      !isNaN(coord[0]) &&
+      !isNaN(coord[1]) &&
+      isFinite(coord[0]) &&
+      isFinite(coord[1])
+    );
+    
+    return hasValidCoord;
+  });
 
   const centerLat = hasCoordinates ? parseFloat(park.latitude) : 39.8283;
   const centerLng = hasCoordinates ? parseFloat(park.longitude) : -98.5795;
@@ -159,12 +173,12 @@ function ParkTrailsSection({ park, hasCoordinates }) {
         </p>
       </div>
 
-      {/* Trail Map */}
-      {trailsGeoJSON.features.length > 0 && (
+      {/* Trail Map - pass array of trails, not GeoJSON */}
+      {trailsWithGeometry.length > 0 && (
         <div className="rounded-lg overflow-hidden shadow-md">
           <TrailMap
-            trails={trailsGeoJSON}
-            center={[centerLng, centerLat]}
+            trails={trailsWithGeometry}
+            center={{ lat: centerLat, lng: centerLng }}
             zoom={hasCoordinates ? 11 : 4}
             showBLMToggle={true}
             parkCode={park.park_code || park.id}

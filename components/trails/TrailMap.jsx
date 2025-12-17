@@ -150,8 +150,11 @@ export default function TrailMap({
       map.current.removeSource('trails');
     }
 
+    // Ensure trails is an array
+    const trailsArray = Array.isArray(trails) ? trails : [];
+    
     // Convert trails to GeoJSON FeatureCollection
-    const features = trails
+    const features = trailsArray
       .map((trail) => {
         let geometry = null;
 
@@ -173,12 +176,14 @@ export default function TrailMap({
           return null;
         }
 
-        if (!geometry || !geometry.coordinates) return null;
+        if (!geometry || !geometry.coordinates || !Array.isArray(geometry.coordinates)) return null;
 
-        // Validate that geometry has valid coordinates
-        const hasValidCoords = geometry.coordinates.some((coord) => isValidCoord(coord));
-        if (!hasValidCoords) {
-          console.warn('Trail has no valid coordinates:', trail.name || trail.id);
+        // Filter out invalid coordinates from the geometry
+        const validCoordinates = geometry.coordinates.filter((coord) => isValidCoord(coord));
+        
+        // Need at least 2 valid coordinates for a line
+        if (validCoordinates.length < 2) {
+          console.warn('Trail has insufficient valid coordinates:', trail.name || trail.id);
           return null;
         }
 
@@ -191,7 +196,10 @@ export default function TrailMap({
             length_meters: trail.length_meters,
             slug: trail.slug,
           },
-          geometry,
+          geometry: {
+            ...geometry,
+            coordinates: validCoordinates, // Use only valid coordinates
+          },
         };
       })
       .filter(Boolean);
