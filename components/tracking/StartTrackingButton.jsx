@@ -47,14 +47,14 @@ export default function StartTrackingButton({
   // Build the tracking URL with park/trail context
   const buildTrackingUrl = () => {
     const params = new URLSearchParams();
+    params.set('tab', 'tracking');
     if (parkCode) params.set('parkCode', parkCode);
     if (parkId) params.set('parkId', parkId);
     if (trailId) params.set('trailId', trailId);
     if (parkName) params.set('parkName', parkName);
     if (trailName) params.set('trailName', trailName);
     
-    const queryString = params.toString();
-    return `/tracks${queryString ? `?${queryString}` : ''}`;
+    return `/tracks?${params.toString()}`;
   };
 
   const handleClick = async () => {
