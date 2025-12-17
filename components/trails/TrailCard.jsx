@@ -121,11 +121,12 @@ const TrailTypeIcon = ({ type }) => {
  *
  * @param {Object} props
  * @param {Object} props.trail - Trail data object
- * @param {string} props.parkCode - Park code for building URLs
+ * @param {string} props.parkId - Park ID for building URLs (preferred)
+ * @param {string} props.parkCode - Park code (fallback, deprecated)
  * @param {boolean} props.compact - Use compact layout
  * @param {boolean} props.showPark - Show park name
  */
-export default function TrailCard({ trail, parkCode, compact = false, showPark = false }) {
+export default function TrailCard({ trail, parkId, parkCode, compact = false, showPark = false }) {
   const {
     id,
     name,
@@ -137,11 +138,15 @@ export default function TrailCard({ trail, parkCode, compact = false, showPark =
     trail_type,
     park_name,
     park_code,
+    park_id,
   } = trail;
 
   const colors = DIFFICULTY_COLORS[difficulty] || DIFFICULTY_COLORS.easy;
-  const trailUrl = parkCode
-    ? `/parks/${parkCode}/trails/${slug}`
+  
+  // Use park ID for URL (preferred), fall back to park_id from trail, then parkCode
+  const effectiveParkId = parkId || park_id;
+  const trailUrl = effectiveParkId
+    ? `/park/${effectiveParkId}/trails/${id}`
     : `/trails/${id}`;
 
   if (compact) {

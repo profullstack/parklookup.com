@@ -7,25 +7,29 @@ import TrailCard, { TrailCardSkeleton } from './TrailCard';
  * TrailList component - displays a filterable list of trails
  *
  * @param {Object} props
- * @param {string} props.parkCode - Park code for fetching trails
- * @param {string} props.parkId - Park ID for fetching trails
+ * @param {string} props.parkCode - Park code for fetching trails (deprecated, use parkId)
+ * @param {string} props.parkId - Park ID for fetching trails and building URLs
  * @param {string} props.parkSource - Park source (nps, wikidata, local)
  * @param {Array} props.initialTrails - Pre-loaded trails (optional)
  * @param {boolean} props.showFilters - Show filter controls
  * @param {boolean} props.compact - Use compact card layout
  * @param {number} props.limit - Maximum trails to show
+ * @param {Array} props.trails - Pre-loaded trails array (alternative to initialTrails)
  */
 export default function TrailList({
   parkCode,
   parkId,
   parkSource,
   initialTrails,
+  trails: trailsProp,
   showFilters = true,
   compact = false,
   limit = 50,
 }) {
-  const [trails, setTrails] = useState(initialTrails || []);
-  const [loading, setLoading] = useState(!initialTrails);
+  // Support both initialTrails and trails props
+  const providedTrails = trailsProp || initialTrails;
+  const [trails, setTrails] = useState(providedTrails || []);
+  const [loading, setLoading] = useState(!providedTrails);
   const [error, setError] = useState(null);
   const [summary, setSummary] = useState(null);
 
@@ -335,6 +339,7 @@ export default function TrailList({
             <TrailCard
               key={trail.id}
               trail={trail}
+              parkId={parkId}
               parkCode={parkCode}
               compact={compact}
             />

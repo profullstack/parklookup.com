@@ -189,6 +189,7 @@ function ParkTrailsSection({ park, hasCoordinates }) {
       {/* Trail List */}
       <TrailList
         trails={trails}
+        parkId={park.id}
         parkCode={park.park_code}
         showFilters={trails.length > 3}
       />
