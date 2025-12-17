@@ -1,12 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 
 // Storage key for auth token (must match useAuth.js)
 const AUTH_TOKEN_KEY = 'parklookup_auth_token';
+
+/**
+ * Supported file types - photos and videos
+ */
+const ACCEPTED_IMAGE_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+];
+const ACCEPTED_VIDEO_TYPES = [
+  'video/mp4',
+  'video/quicktime',
+  'video/x-msvideo',
+  'video/webm',
+  'video/x-matroska',
+  'video/3gpp',
+  'video/x-m4v',
+];
+const ACCEPTED_TYPES = [...ACCEPTED_IMAGE_TYPES, ...ACCEPTED_VIDEO_TYPES];
+const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_VIDEO_SIZE = 50 * 1024 * 1024; // 50MB
 
 /**
  * Get stored token from localStorage
@@ -34,261 +56,296 @@ const getAuthHeaders = () => {
 };
 
 /**
- * Media Upload Form Component
+ * Format video duration as MM:SS
  */
-function MediaUploadForm({ trailId, onUploadComplete, onCancel }) {
+const formatDuration = (seconds) => {
+  if (!seconds) return '';
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+};
+
+/**
+ * Media Card component - handles both photos and videos
+ */
+function MediaCard({ media, currentUserId, onDelete }) {
+  const isOwner = currentUserId === media.user_id;
+  const isVideo = media.media_type === 'video';
+
+  return (
+    <div className="relative group rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
+      {isVideo ? (
+        <div className="relative w-full h-48">
+          <video
+            src={media.url}
+            poster={media.thumbnail_url}
+            className="w-full h-full object-cover"
+            controls
+            preload="metadata"
+          />
+          {/* Video indicator overlay */}
+          <div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded flex items-center gap-1">
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M8 5v14l11-7z" />
+            </svg>
+            {media.duration && <span>{formatDuration(media.duration)}</span>}
+          </div>
+        </div>
+      ) : (
+        <img
+          src={media.url}
+          alt={media.caption || 'Trail photo'}
+          className="w-full h-48 object-cover"
+          loading="lazy"
+        />
+      )}
+      {media.caption && (
+        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+          <p className="text-white text-sm">{media.caption}</p>
+        </div>
+      )}
+      {isOwner && (
+        <button
+          onClick={() => onDelete(media.id)}
+          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1.5 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+          title={`Delete ${isVideo ? 'video' : 'photo'}`}
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M6 18L18 6M6 6l12 12"
+            />
+          </svg>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Upload Form component - supports photos and videos
+ */
+function UploadForm({ onUpload, isUploading }) {
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [caption, setCaption] = useState('');
-  const [uploading, setUploading] = useState(false);
   const [error, setError] = useState(null);
+  const [isVideo, setIsVideo] = useState(false);
+  const [videoDuration, setVideoDuration] = useState(null);
+  const fileInputRef = useRef(null);
 
-  const handleFileChange = (e) => {
+  const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-      // Create preview URL
-      const previewUrl = URL.createObjectURL(selectedFile);
-      setPreview(previewUrl);
+    if (!selectedFile) return;
+
+    // Validate file type
+    if (!ACCEPTED_TYPES.includes(selectedFile.type)) {
+      setError('Unsupported file type. Please upload a photo or video.');
+      return;
     }
+
+    // Check if it's a video
+    const fileIsVideo = ACCEPTED_VIDEO_TYPES.includes(selectedFile.type);
+    setIsVideo(fileIsVideo);
+
+    // Validate file size
+    const maxSize = fileIsVideo ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
+    if (selectedFile.size > maxSize) {
+      const sizeMB = Math.round(maxSize / 1024 / 1024);
+      setError(`File too large. Maximum size is ${sizeMB}MB.`);
+      return;
+    }
+
+    setFile(selectedFile);
+    setError(null);
+
+    // Create preview
+    if (ACCEPTED_IMAGE_TYPES.includes(selectedFile.type)) {
+      const reader = new FileReader();
+      reader.onload = (e) => setPreview(e.target.result);
+      reader.readAsDataURL(selectedFile);
+    } else {
+      // For videos, create a video element to get a frame and duration
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        setVideoDuration(video.duration);
+        video.currentTime = 1; // Seek to 1 second for thumbnail
+      };
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        setPreview(canvas.toDataURL('image/jpeg'));
+        URL.revokeObjectURL(video.src);
+      };
+      video.src = URL.createObjectURL(selectedFile);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      const event = { target: { files: [droppedFile] } };
+      handleFileSelect(event);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) {
-      setError('Please select a file to upload');
-      return;
+    if (!file) return;
+
+    await onUpload(file, caption, isVideo, videoDuration);
+    setFile(null);
+    setPreview(null);
+    setCaption('');
+    setIsVideo(false);
+    setVideoDuration(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
+  };
 
-    setUploading(true);
+  const clearFile = () => {
+    setFile(null);
+    setPreview(null);
     setError(null);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('caption', caption);
-      formData.append('trail_id', trailId);
-
-      const res = await fetch('/api/media', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: formData,
-      });
-
-      if (!res.ok) {
-        const errorData = await res.json();
-        throw new Error(errorData.error || 'Failed to upload');
-      }
-
-      const data = await res.json();
-      onUploadComplete(data.media);
-    } catch (err) {
-      console.error('Upload error:', err);
-      setError(err.message);
-    } finally {
-      setUploading(false);
+    setIsVideo(false);
+    setVideoDuration(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700 space-y-4">
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-          Select Photo or Video
-        </label>
-        <input
-          type="file"
-          accept="image/*,video/*"
-          onChange={handleFileChange}
-          className="w-full text-sm text-gray-500 dark:text-gray-400
-            file:mr-4 file:py-2 file:px-4
-            file:rounded-lg file:border-0
-            file:text-sm file:font-medium
-            file:bg-green-50 file:text-green-700
-            dark:file:bg-green-900/30 dark:file:text-green-400
-            hover:file:bg-green-100 dark:hover:file:bg-green-900/50"
-        />
-      </div>
-
-      {preview && (
-        <div className="relative aspect-video w-full max-w-md rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
-          {file?.type.startsWith('video/') ? (
-            <video src={preview} controls className="w-full h-full object-contain" />
-          ) : (
-            <Image
-              src={preview}
-              alt="Preview"
-              fill
-              className="object-contain"
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {!file ? (
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+          className="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-6 text-center cursor-pointer hover:border-green-500 dark:hover:border-green-400 transition-colors"
+        >
+          <svg
+            className="w-10 h-10 mx-auto text-gray-400 mb-3"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
             />
-          )}
+          </svg>
+          <p className="text-gray-600 dark:text-gray-400 mb-1">
+            Drag and drop or click to upload
+          </p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">
+            Photos: up to 10MB • Videos: up to 50MB
+          </p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={ACCEPTED_TYPES.join(',')}
+            onChange={handleFileSelect}
+            className="hidden"
+          />
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <div className="relative">
+            <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700">
+              <img
+                src={preview}
+                alt="Preview"
+                className="w-full h-full object-contain"
+              />
+              {isVideo && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/50 rounded-full p-3">
+                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                </div>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={clearFile}
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {file.name} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+            {isVideo && videoDuration && ` • ${formatDuration(videoDuration)}`}
+          </p>
+          <input
+            type="text"
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder="Add a caption (optional)"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-400"
+            maxLength={255}
+          />
+          <button
+            type="submit"
+            disabled={isUploading}
+            className="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isUploading
+              ? isVideo
+                ? 'Uploading video...'
+                : 'Uploading...'
+              : isVideo
+                ? 'Upload Video'
+                : 'Upload Photo'}
+          </button>
         </div>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Caption (optional)
-        </label>
-        <textarea
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          placeholder="Add a caption to your photo..."
-          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
-          rows={2}
-        />
-      </div>
-
       {error && (
-        <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+        </div>
       )}
-
-      <div className="flex gap-3">
-        <button
-          type="submit"
-          disabled={uploading || !file}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {uploading ? 'Uploading...' : 'Upload'}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="px-4 py-2 bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500"
-        >
-          Cancel
-        </button>
-      </div>
     </form>
   );
 }
 
 /**
- * Media Grid Component
- */
-function MediaGrid({ media, onMediaClick }) {
-  if (media.length === 0) {
-    return (
-      <div className="text-center py-12 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-        <svg
-          className="w-12 h-12 mx-auto text-gray-400 mb-4"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-          />
-        </svg>
-        <p className="text-gray-600 dark:text-gray-400">
-          No photos yet. Be the first to share your trail experience!
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-      {media.map((item) => (
-        <button
-          key={item.id}
-          onClick={() => onMediaClick(item)}
-          className="relative aspect-square rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-700 hover:opacity-90 transition-opacity"
-        >
-          {item.media_type === 'video' ? (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <video
-                src={item.url}
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-          ) : (
-            <Image
-              src={item.url}
-              alt={item.caption || 'Trail photo'}
-              fill
-              className="object-cover"
-            />
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/**
- * Media Modal Component
- */
-function MediaModal({ media, onClose }) {
-  if (!media) return null;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80" onClick={onClose}>
-      <div className="relative max-w-4xl max-h-[90vh] w-full mx-4" onClick={(e) => e.stopPropagation()}>
-        <button
-          onClick={onClose}
-          className="absolute -top-10 right-0 text-white hover:text-gray-300"
-        >
-          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        </button>
-        
-        <div className="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
-          {media.media_type === 'video' ? (
-            <video
-              src={media.url}
-              controls
-              autoPlay
-              className="w-full max-h-[70vh] object-contain"
-            />
-          ) : (
-            <div className="relative aspect-video">
-              <Image
-                src={media.url}
-                alt={media.caption || 'Trail photo'}
-                fill
-                className="object-contain"
-              />
-            </div>
-          )}
-          
-          {media.caption && (
-            <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-gray-700 dark:text-gray-300">{media.caption}</p>
-              <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                {new Date(media.created_at).toLocaleDateString()}
-              </p>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * Trail Photos Component
- * Displays user-contributed photos and videos for a trail with upload functionality
- *
- * @param {Object} props
- * @param {string} props.trailId - Trail ID for fetching and uploading media
+ * Trail Photos & Videos component
+ * Displays and allows uploading photos and videos for a trail
  */
 export default function TrailPhotos({ trailId }) {
-  const { user } = useAuth();
-  const [showUpload, setShowUpload] = useState(false);
+  const { user, accessToken } = useAuth();
   const [media, setMedia] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Fetch media for this trail
+  // Fetch media
   useEffect(() => {
     const fetchMedia = async () => {
       try {
@@ -310,18 +367,118 @@ export default function TrailPhotos({ trailId }) {
     }
   }, [trailId]);
 
-  const handleUploadComplete = (newMedia) => {
-    setMedia([newMedia, ...media]);
-    setShowUpload(false);
+  // Handle media upload
+  const handleUpload = async (file, caption, isVideo, duration) => {
+    if (!accessToken) {
+      alert('Please sign in to upload media');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(10);
+
+    try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress((prev) => Math.min(prev + 10, 90));
+      }, 500);
+
+      // First, upload the file to get a URL
+      const formData = new FormData();
+      formData.append('file', file);
+
+      // Upload to media API
+      const uploadRes = await fetch('/api/media', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: formData,
+      });
+
+      clearInterval(progressInterval);
+
+      if (!uploadRes.ok) {
+        throw new Error('Failed to upload file');
+      }
+
+      const uploadData = await uploadRes.json();
+      const mediaUrl = uploadData.media?.url || uploadData.url;
+      const thumbnailUrl = uploadData.media?.thumbnail_url || uploadData.thumbnail_url;
+
+      if (!mediaUrl) {
+        throw new Error('No URL returned from upload');
+      }
+
+      setUploadProgress(95);
+
+      // Then create the trail media record
+      const res = await fetch(`/api/trails/${trailId}/media`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({
+          url: mediaUrl,
+          thumbnail_url: thumbnailUrl || null,
+          media_type: isVideo ? 'video' : 'image',
+          caption: caption || null,
+          duration: isVideo ? Math.round(duration) : null,
+        }),
+      });
+
+      setUploadProgress(100);
+
+      if (res.ok) {
+        const data = await res.json();
+        setMedia([data.media, ...media]);
+        setShowUploadForm(false);
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || 'Failed to save media');
+      }
+    } catch (err) {
+      console.error('Error uploading media:', err);
+      alert(err.message || 'Failed to upload media');
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
   };
+
+  // Handle media delete
+  const handleDelete = async (mediaId) => {
+    const mediaItem = media.find((m) => m.id === mediaId);
+    const mediaType = mediaItem?.media_type === 'video' ? 'video' : 'photo';
+
+    if (!confirm(`Are you sure you want to delete this ${mediaType}?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/trails/${trailId}/media?mediaId=${mediaId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (res.ok) {
+        setMedia(media.filter((m) => m.id !== mediaId));
+      }
+    } catch (err) {
+      console.error('Error deleting media:', err);
+    }
+  };
+
+  // Count photos and videos
+  const photoCount = media.filter((m) => m.media_type !== 'video').length;
+  const videoCount = media.filter((m) => m.media_type === 'video').length;
 
   if (loading) {
     return (
       <div className="animate-pulse space-y-4">
-        <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
+        <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4" />
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="aspect-square bg-gray-200 dark:bg-gray-700 rounded-lg" />
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-48 bg-gray-200 dark:bg-gray-700 rounded-lg" />
           ))}
         </div>
       </div>
@@ -330,51 +487,103 @@ export default function TrailPhotos({ trailId }) {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with upload button */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-            Trail Photos & Videos
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            Photos and videos shared by hikers
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            Photos & Videos
+          </h3>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            {photoCount} photo{photoCount !== 1 ? 's' : ''}
+            {videoCount > 0 && ` • ${videoCount} video${videoCount !== 1 ? 's' : ''}`}
           </p>
         </div>
-        {user ? (
+        {user && !showUploadForm && (
           <button
-            onClick={() => setShowUpload(!showUpload)}
-            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+            onClick={() => setShowUploadForm(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 4v16m8-8H4"
+              />
             </svg>
-            Share Photo
+            Add Media
           </button>
-        ) : (
-          <Link
-            href="/signin"
-            className="inline-flex items-center px-4 py-2 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
-          >
-            Sign in to share
-          </Link>
         )}
       </div>
 
-      {/* Upload Form */}
-      {showUpload && (
-        <MediaUploadForm
-          trailId={trailId}
-          onUploadComplete={handleUploadComplete}
-          onCancel={() => setShowUpload(false)}
-        />
+      {/* Upload form */}
+      {showUploadForm && user && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="font-medium text-gray-900 dark:text-white">Upload Photo or Video</h4>
+            <button
+              onClick={() => setShowUploadForm(false)}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* Progress bar during upload */}
+          {isUploading && uploadProgress > 0 && (
+            <div className="mb-4">
+              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+                <span>Uploading...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div
+                  className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${uploadProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <UploadForm onUpload={handleUpload} isUploading={isUploading} />
+        </div>
       )}
 
-      {/* Media Grid */}
-      <MediaGrid media={media} onMediaClick={setSelectedMedia} />
+      {/* Sign in prompt */}
+      {!user && (
+        <div className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4 text-center">
+          <p className="text-gray-600 dark:text-gray-400 mb-2">
+            Sign in to share your trail photos and videos
+          </p>
+          <a href="/signin" className="text-green-600 hover:text-green-700 font-medium">
+            Sign In →
+          </a>
+        </div>
+      )}
 
-      {/* Media Modal */}
-      {selectedMedia && (
-        <MediaModal media={selectedMedia} onClose={() => setSelectedMedia(null)} />
+      {/* Media grid */}
+      {media.length > 0 ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {media.map((item) => (
+            <MediaCard
+              key={item.id}
+              media={item}
+              currentUserId={user?.id}
+              onDelete={handleDelete}
+            />
+          ))}
+        </div>
+      ) : (
+        <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+          No photos or videos yet. Be the first to share media from this trail!
+        </p>
       )}
     </div>
   );

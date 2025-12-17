@@ -161,7 +161,7 @@ function CommentForm({ onSubmit, isSubmitting }) {
         <textarea
           value={content}
           onChange={(e) => setContent(e.target.value)}
-          placeholder="Share your experience hiking this trail..."
+          placeholder="Share your experience on this trail..."
           className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white placeholder-gray-500"
           rows={4}
           required
@@ -196,9 +196,6 @@ function CommentForm({ onSubmit, isSubmitting }) {
 /**
  * Trail Reviews component
  * Displays reviews/comments for a trail with like functionality
- *
- * @param {Object} props
- * @param {string} props.trailId - Trail ID for fetching comments and likes
  */
 export default function TrailReviews({ trailId }) {
   const { user, loading: authLoading } = useAuth();
@@ -407,7 +404,7 @@ export default function TrailReviews({ trailId }) {
         </div>
       ) : (
         <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-          No reviews yet. Be the first to share your hiking experience!
+          No reviews yet. Be the first to share your experience!
         </p>
       )}
     </div>

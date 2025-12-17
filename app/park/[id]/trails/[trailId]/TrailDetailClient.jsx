@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useAnalytics } from '@/hooks/useAnalytics';
+import TrailReviews from '@/components/trails/TrailReviews';
+import TrailPhotos from '@/components/trails/TrailPhotos';
 
 // Dynamically import the map component to avoid SSR issues
 const TrailMap = dynamic(() => import('@/components/trails/TrailMap'), {
@@ -256,6 +258,22 @@ export default function TrailDetailClient({ trail, park, hasCoordinates }) {
           </Link>
         </div>
       )}
+
+      {/* Trail Photos */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+          Photos
+        </h2>
+        <TrailPhotos trailId={trail.id} />
+      </div>
+
+      {/* Trail Reviews */}
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-3">
+          Reviews & Ratings
+        </h2>
+        <TrailReviews trailId={trail.id} />
+      </div>
 
       {/* OSM Attribution */}
       {trail.source === 'osm' && (
