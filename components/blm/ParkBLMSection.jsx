@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import BLMList from './BLMList';
+import StartTrackingButton from '@/components/tracking/StartTrackingButton';
 
 // Dynamically import the map component to avoid SSR issues
 const BLMMap = dynamic(() => import('./BLMMap'), {
@@ -120,14 +121,23 @@ export default function ParkBLMSection({ park, hasCoordinates }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          BLM Land Near {park.full_name || park.name}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 text-sm">
-          {blmLands.length} BLM land{blmLands.length !== 1 ? 's' : ''} found within
-          50km
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            BLM Land Near {park.full_name || park.name}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            {blmLands.length} BLM land{blmLands.length !== 1 ? 's' : ''} found within
+            50km
+          </p>
+        </div>
+        <StartTrackingButton
+          parkCode={park.park_code}
+          parkId={park.id}
+          parkName={park.full_name || park.name}
+          variant="primary"
+          size="md"
+        />
       </div>
 
       {/* Info Banner */}

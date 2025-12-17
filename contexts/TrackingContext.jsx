@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useProStatus } from '@/hooks/useProStatus';
 import { useTracking } from '@/hooks/useTracking';
 
 /**
@@ -15,7 +16,8 @@ const TrackingContext = createContext(null);
  * Wraps the application to provide tracking functionality
  */
 export function TrackingProvider({ children }) {
-  const { user, accessToken, isPro } = useAuth();
+  const { user, accessToken } = useAuth();
+  const { isPro, loading: proLoading } = useProStatus();
   const [activeTrackConfig, setActiveTrackConfig] = useState(null);
   const [showTrackingPanel, setShowTrackingPanel] = useState(false);
 
@@ -102,7 +104,7 @@ export function TrackingProvider({ children }) {
   /**
    * Check if user can start tracking
    */
-  const canTrack = user && isPro;
+  const canTrack = user && isPro && !proLoading;
 
   const value = {
     // State
@@ -118,6 +120,8 @@ export function TrackingProvider({ children }) {
     activeTrackConfig,
     showTrackingPanel,
     canTrack,
+    isPro,
+    proLoading,
 
     // Actions
     startNewTrack,

@@ -165,13 +165,22 @@ function ParkTrailsSection({ park, hasCoordinates }) {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Trails in {park.full_name || park.name}
-        </h2>
-        <p className="text-gray-600 dark:text-gray-400 text-sm">
-          {trails.length} trail{trails.length !== 1 ? 's' : ''} found
-        </p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+            Trails in {park.full_name || park.name}
+          </h2>
+          <p className="text-gray-600 dark:text-gray-400 text-sm">
+            {trails.length} trail{trails.length !== 1 ? 's' : ''} found
+          </p>
+        </div>
+        <StartTrackingButton
+          parkCode={park.park_code}
+          parkId={park.id}
+          parkName={park.full_name || park.name}
+          variant="primary"
+          size="md"
+        />
       </div>
 
       {/* Trail Map - pass array of trails, not GeoJSON */}
