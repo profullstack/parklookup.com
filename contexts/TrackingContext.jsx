@@ -17,9 +17,21 @@ const TrackingContext = createContext(null);
  */
 export function TrackingProvider({ children }) {
   const { user, accessToken } = useAuth();
-  const { isPro, loading: proLoading } = useProStatus();
+  const { isPro, loading: proLoading, profile } = useProStatus();
   const [activeTrackConfig, setActiveTrackConfig] = useState(null);
   const [showTrackingPanel, setShowTrackingPanel] = useState(false);
+
+  // Debug logging for pro status
+  console.log('TrackingProvider render:', {
+    user: user?.id,
+    isPro,
+    proLoading,
+    profile: profile ? {
+      is_pro: profile.is_pro,
+      subscription_status: profile.subscription_status,
+      subscription_tier: profile.subscription_tier,
+    } : null,
+  });
 
   // Use the tracking hook
   const tracking = useTracking({
@@ -40,11 +52,19 @@ export function TrackingProvider({ children }) {
    */
   const startNewTrack = useCallback(
     async (config) => {
+      console.log('TrackingContext.startNewTrack called:', {
+        user: user?.id,
+        isPro,
+        proLoading,
+        config,
+      });
+
       if (!user) {
         throw new Error('You must be signed in to track');
       }
 
       if (!isPro) {
+        console.log('TrackingContext: isPro is false, throwing error');
         throw new Error('Trip tracking is a Pro feature');
       }
 

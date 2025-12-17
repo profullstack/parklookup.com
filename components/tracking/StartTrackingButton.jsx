@@ -58,19 +58,30 @@ export default function StartTrackingButton({
   };
 
   const handleClick = async () => {
+    console.log('StartTrackingButton handleClick:', {
+      isLoading,
+      authLoading,
+      proLoading,
+      user: user?.id,
+      isPro,
+    });
+
     // If still loading, don't do anything
     if (isLoading) {
+      console.log('StartTrackingButton: Still loading, returning');
       return;
     }
 
     // If not logged in, redirect to sign in
     if (!user) {
+      console.log('StartTrackingButton: No user, redirecting to signin');
       window.location.href = `/signin?redirect=${encodeURIComponent(buildTrackingUrl())}`;
       return;
     }
 
     // If not pro, show upgrade modal
     if (!isPro) {
+      console.log('StartTrackingButton: isPro is false, showing upgrade modal');
       setShowUpgradeModal(true);
       return;
     }
