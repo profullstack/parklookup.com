@@ -7,7 +7,7 @@ import ParkDetailClient from '@/app/parks/[parkCode]/[[...tab]]/ParkDetailClient
 /**
  * Valid tab names for park detail pages
  */
-const VALID_TABS = ['overview', 'map', 'weather', 'activities', 'reviews', 'info', 'photos'];
+const VALID_TABS = ['overview', 'trails', 'blm', 'map', 'weather', 'activities', 'reviews', 'info', 'photos'];
 const DEFAULT_TAB = 'overview';
 
 /**
@@ -73,6 +73,8 @@ export async function generateMetadata({ params }) {
 
   const tabTitles = {
     overview: '',
+    trails: ' - Hiking Trails',
+    blm: ' - BLM Land',
     map: ' - Map & Location',
     weather: ' - Weather Events',
     activities: ' - Activities & Nearby Places',
@@ -83,6 +85,8 @@ export async function generateMetadata({ params }) {
 
   const tabDescriptions = {
     overview: park.description || `Explore ${park.full_name} - ${park.designation || 'Park'} in ${park.states}`,
+    trails: `Discover hiking trails near ${park.full_name} in ${park.states}`,
+    blm: `Find BLM (Bureau of Land Management) land near ${park.full_name}`,
     map: `View the map and location of ${park.full_name} in ${park.states}`,
     weather: `Check current weather alerts and conditions for ${park.full_name}`,
     activities: `Discover activities and nearby places at ${park.full_name}`,
