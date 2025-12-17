@@ -47,6 +47,8 @@ const { SUPABASE_SERVICE_ROLE_KEY } = process.env;
 const DEFAULT_RADIUS_KM = 5;
 const DEFAULT_DELAY_MS = 3000;
 const BATCH_SIZE = 50;
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 5000;
 
 /**
  * Parse command line arguments
@@ -228,11 +230,11 @@ const fetchParks = async (supabase, options) => {
 };
 
 /**
- * Fetch trails for a single park
+ * Fetch trails for a single park with retry logic
  *
  * @param {Object} park - Park object with coordinates
  * @param {number} radiusKm - Search radius in kilometers
- * @returns {Promise<Array>} Array of normalized trail objects
+ * @returns {Promise<{trails: Array, success: boolean}>} Array of normalized trail objects and success status
  */
 const fetchTrailsForPark = async (park, radiusKm) => {
   const { latitude, longitude } = park;
@@ -240,22 +242,36 @@ const fetchTrailsForPark = async (park, radiusKm) => {
   // Calculate bounding box
   const bbox = calculateBbox(parseFloat(latitude), parseFloat(longitude), radiusKm);
 
-  try {
-    // Fetch trails from Overpass API
-    const elements = await fetchTrailsInBbox(bbox);
+  let lastError = null;
 
-    if (elements.length === 0) {
-      return [];
+  // Retry up to MAX_RETRIES times
+  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      // Fetch trails from Overpass API
+      const elements = await fetchTrailsInBbox(bbox);
+
+      if (elements.length === 0) {
+        return { trails: [], success: true };
+      }
+
+      // Transform OSM elements to normalized trail objects
+      const trails = transformOsmElements(elements, extractCoordinates);
+
+      return { trails, success: true };
+    } catch (error) {
+      lastError = error;
+      console.warn(`   ⚠️  Attempt ${attempt}/${MAX_RETRIES} failed: ${error.message}`);
+
+      if (attempt < MAX_RETRIES) {
+        console.log(`   ⏳ Retrying in ${RETRY_DELAY_MS / 1000}s...`);
+        await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+      }
     }
-
-    // Transform OSM elements to normalized trail objects
-    const trails = transformOsmElements(elements, extractCoordinates);
-
-    return trails;
-  } catch (error) {
-    console.warn(`⚠️  Failed to fetch trails for ${park.full_name}: ${error.message}`);
-    return [];
   }
+
+  // All retries failed
+  console.error(`   ❌ All ${MAX_RETRIES} attempts failed for ${park.full_name}. Skipping.`);
+  return { trails: [], success: false, error: lastError?.message };
 };
 
 /**
@@ -329,46 +345,35 @@ const main = async () => {
     const allTrails = [];
     let parksProcessed = 0;
     let parksWithTrails = 0;
+    let parksSkipped = 0;
 
     // Process each park
-    let consecutiveFailures = 0;
-    const MAX_CONSECUTIVE_FAILURES = 5;
-
     for (const park of parks) {
       parksProcessed++;
       const parkNum = options.skip + parksProcessed;
       console.log(`\n🔍 [${parkNum}] Processing: ${park.full_name}`);
 
-      try {
-        // Fetch trails for this park
-        const trails = await fetchTrailsForPark(park, options.radiusKm);
-        consecutiveFailures = 0; // Reset on success
+      // Fetch trails for this park (includes retry logic)
+      const result = await fetchTrailsForPark(park, options.radiusKm);
 
-        if (trails.length > 0) {
-          parksWithTrails++;
-          console.log(`   ✅ Found ${trails.length} trails`);
+      if (!result.success) {
+        // All retries failed, skip this park
+        parksSkipped++;
+      } else if (result.trails.length > 0) {
+        parksWithTrails++;
+        console.log(`   ✅ Found ${result.trails.length} trails`);
 
-          // Prepare trails for database with park association
-          const preparedTrails = trails.map((trail) =>
-            prepareForDatabase(trail, {
-              parkId: park.id,
-              parkSource: park.source,
-            })
-          );
+        // Prepare trails for database with park association
+        const preparedTrails = result.trails.map((trail) =>
+          prepareForDatabase(trail, {
+            parkId: park.id,
+            parkSource: park.source,
+          })
+        );
 
-          allTrails.push(...preparedTrails);
-        } else {
-          console.log(`   ⚪ No trails found`);
-        }
-      } catch (error) {
-        consecutiveFailures++;
-        console.error(`   ❌ Failed: ${error.message}`);
-
-        if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-          console.error(`\n🛑 Too many consecutive failures (${MAX_CONSECUTIVE_FAILURES}). Stopping.`);
-          console.error(`   Resume with: pnpm run import:trails -- --skip=${options.skip + parksProcessed}`);
-          break;
-        }
+        allTrails.push(...preparedTrails);
+      } else {
+        console.log(`   ⚪ No trails found`);
       }
 
       // Delay between parks to avoid overwhelming the Overpass API
@@ -408,6 +413,7 @@ const main = async () => {
           duration_ms: endTime - startTime,
           parks_processed: parksProcessed,
           parks_with_trails: parksWithTrails,
+          parks_skipped: parksSkipped,
           unique_trails: uniqueTrails.length,
           errors: results.errors,
         },
@@ -418,6 +424,7 @@ const main = async () => {
       console.log('📊 Import Summary:');
       console.log(`   - Parks processed: ${parksProcessed}`);
       console.log(`   - Parks with trails: ${parksWithTrails}`);
+      console.log(`   - Parks skipped (failed after ${MAX_RETRIES} retries): ${parksSkipped}`);
       console.log(`   - Total trails found: ${allTrails.length}`);
       console.log(`   - Unique trails: ${uniqueTrails.length}`);
       console.log(`   - Trails upserted: ${results.inserted}`);

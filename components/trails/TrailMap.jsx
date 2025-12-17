@@ -58,6 +58,20 @@ export default function TrailMap({
     });
   }, []);
 
+  /**
+   * Validate that a coordinate is a valid number
+   */
+  const isValidCoord = (coord) => {
+    return Array.isArray(coord) &&
+           coord.length >= 2 &&
+           typeof coord[0] === 'number' &&
+           typeof coord[1] === 'number' &&
+           !isNaN(coord[0]) &&
+           !isNaN(coord[1]) &&
+           isFinite(coord[0]) &&
+           isFinite(coord[1]);
+  };
+
   // Initialize map
   useEffect(() => {
     if (!maplibregl || !mapContainer.current || map.current) return;
@@ -65,25 +79,39 @@ export default function TrailMap({
     // Calculate center from trails if not provided
     let mapCenter = center;
     if (!mapCenter && trails.length > 0) {
-      const firstTrail = trails.find((t) => t.geometry || t.geometry_geojson);
+      const firstTrail = trails.find((t) => t.geometry || t.geometry_geojson || t.geojson);
       if (firstTrail) {
-        const geom =
-          typeof firstTrail.geometry === 'string'
-            ? JSON.parse(firstTrail.geometry)
-            : firstTrail.geometry ||
-              (firstTrail.geometry_geojson
-                ? JSON.parse(firstTrail.geometry_geojson)
-                : null);
+        let geom = null;
+        try {
+          if (firstTrail.geometry) {
+            geom = typeof firstTrail.geometry === 'string'
+              ? JSON.parse(firstTrail.geometry)
+              : firstTrail.geometry;
+          } else if (firstTrail.geometry_geojson) {
+            geom = typeof firstTrail.geometry_geojson === 'string'
+              ? JSON.parse(firstTrail.geometry_geojson)
+              : firstTrail.geometry_geojson;
+          } else if (firstTrail.geojson) {
+            geom = typeof firstTrail.geojson === 'string'
+              ? JSON.parse(firstTrail.geojson)
+              : firstTrail.geojson;
+          }
+        } catch (e) {
+          console.warn('Failed to parse trail geometry:', e);
+        }
 
         if (geom?.coordinates?.length > 0) {
-          const [lng, lat] = geom.coordinates[0];
-          mapCenter = { lat, lng };
+          const firstCoord = geom.coordinates[0];
+          if (isValidCoord(firstCoord)) {
+            const [lng, lat] = firstCoord;
+            mapCenter = { lat, lng };
+          }
         }
       }
     }
 
-    // Default center (US center)
-    if (!mapCenter) {
+    // Default center (US center) - validate before using
+    if (!mapCenter || isNaN(mapCenter.lat) || isNaN(mapCenter.lng)) {
       mapCenter = { lat: 39.8283, lng: -98.5795 };
     }
 
@@ -125,19 +153,34 @@ export default function TrailMap({
     // Convert trails to GeoJSON FeatureCollection
     const features = trails
       .map((trail) => {
-        let geometry;
+        let geometry = null;
 
-        if (trail.geometry) {
-          geometry =
-            typeof trail.geometry === 'string' ? JSON.parse(trail.geometry) : trail.geometry;
-        } else if (trail.geometry_geojson) {
-          geometry =
-            typeof trail.geometry_geojson === 'string'
-              ? JSON.parse(trail.geometry_geojson)
-              : trail.geometry_geojson;
+        try {
+          if (trail.geometry) {
+            geometry =
+              typeof trail.geometry === 'string' ? JSON.parse(trail.geometry) : trail.geometry;
+          } else if (trail.geometry_geojson) {
+            geometry =
+              typeof trail.geometry_geojson === 'string'
+                ? JSON.parse(trail.geometry_geojson)
+                : trail.geometry_geojson;
+          } else if (trail.geojson) {
+            geometry =
+              typeof trail.geojson === 'string' ? JSON.parse(trail.geojson) : trail.geojson;
+          }
+        } catch (e) {
+          console.warn('Failed to parse trail geometry:', e);
+          return null;
         }
 
-        if (!geometry) return null;
+        if (!geometry || !geometry.coordinates) return null;
+
+        // Validate that geometry has valid coordinates
+        const hasValidCoords = geometry.coordinates.some((coord) => isValidCoord(coord));
+        if (!hasValidCoords) {
+          console.warn('Trail has no valid coordinates:', trail.name || trail.id);
+          return null;
+        }
 
         return {
           type: 'Feature',
@@ -223,19 +266,31 @@ export default function TrailMap({
     // Fit bounds to show all trails
     if (features.length > 0) {
       const bounds = new maplibregl.LngLatBounds();
+      let hasValidBounds = false;
 
       features.forEach((feature) => {
-        if (feature.geometry.coordinates) {
+        if (feature.geometry?.coordinates) {
           feature.geometry.coordinates.forEach((coord) => {
-            bounds.extend(coord);
+            // Validate coordinate before extending bounds
+            if (isValidCoord(coord)) {
+              bounds.extend(coord);
+              hasValidBounds = true;
+            }
           });
         }
       });
 
-      map.current.fitBounds(bounds, {
-        padding: 50,
-        maxZoom: 14,
-      });
+      // Only fit bounds if we have valid coordinates
+      if (hasValidBounds && !bounds.isEmpty()) {
+        try {
+          map.current.fitBounds(bounds, {
+            padding: 50,
+            maxZoom: 14,
+          });
+        } catch (e) {
+          console.warn('Failed to fit bounds:', e);
+        }
+      }
     }
   }, [mapLoaded, trails, selectedTrailId, onTrailClick, maplibregl]);
 
