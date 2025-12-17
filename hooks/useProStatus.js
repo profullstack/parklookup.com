@@ -28,9 +28,11 @@ export function useProStatus() {
 
     try {
       setLoading(true);
-      const response = await fetch('/api/profile', {
+      // Add cache-busting to ensure fresh data
+      const response = await fetch(`/api/profile?_t=${Date.now()}`, {
         headers: {
           Authorization: `Bearer ${accessToken}`,
+          'Cache-Control': 'no-cache',
         },
       });
 

@@ -8,9 +8,7 @@
 'use client';
 
 import { useState } from 'react';
-import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { useProStatus } from '@/hooks/useProStatus';
 import { useTrackingContext } from '@/contexts/TrackingContext';
 import UpgradeModal from '@/components/ui/UpgradeModal';
 
@@ -36,12 +34,15 @@ export default function StartTrackingButton({
   size = 'md',
   className = '',
 }) {
-  const { user } = useAuth();
-  const { isPro, loading: proLoading } = useProStatus();
-  const { isTracking, startNewTrack, trackId } = useTrackingContext();
+  const { user, loading: authLoading } = useAuth();
+  // Use isPro from TrackingContext to ensure consistency
+  const { isTracking, startNewTrack, trackId, isPro, proLoading } = useTrackingContext();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState(null);
+
+  // Combined loading state - wait for both auth and pro status
+  const isLoading = authLoading || proLoading;
 
   // Build the tracking URL with park/trail context
   const buildTrackingUrl = () => {
@@ -57,6 +58,11 @@ export default function StartTrackingButton({
   };
 
   const handleClick = async () => {
+    // If still loading, don't do anything
+    if (isLoading) {
+      return;
+    }
+
     // If not logged in, redirect to sign in
     if (!user) {
       window.location.href = `/signin?redirect=${encodeURIComponent(buildTrackingUrl())}`;
@@ -121,8 +127,8 @@ export default function StartTrackingButton({
     ${className}
   `.trim();
 
-  // Show loading state
-  if (proLoading) {
+  // Show loading state - wait for both auth and pro status to load
+  if (isLoading) {
     return (
       <button className={buttonClasses} disabled>
         <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
