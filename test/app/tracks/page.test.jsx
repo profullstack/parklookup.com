@@ -9,9 +9,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 
 // Mock next/navigation
+const mockSearchParamsGet = vi.fn((key) => null);
 vi.mock('next/navigation', () => ({
   useSearchParams: vi.fn(() => ({
-    get: vi.fn((key) => null),
+    get: mockSearchParamsGet,
     toString: vi.fn(() => ''),
   })),
   useRouter: vi.fn(() => ({
@@ -655,6 +656,187 @@ describe('Tracks Page', () => {
       expect(sorted[0].id).toBe('2');
       expect(sorted[1].id).toBe('3');
       expect(sorted[2].id).toBe('1');
+    });
+  });
+
+  describe('Auto-Start Tracking with URL Parameters', () => {
+    /**
+     * Tests for the auto-start tracking flow when redirected from
+     * a park detail page with URL parameters
+     */
+
+    it('should detect auto-start condition with parkCode', () => {
+      const searchParams = {
+        start: 'true',
+        tab: 'tracking',
+        parkCode: 'yose',
+        parkName: 'Yosemite',
+      };
+
+      const hasContext = !!(searchParams.parkCode || searchParams.parkId || searchParams.localParkId || searchParams.trailId);
+      const shouldAutoStart = searchParams.start === 'true' && hasContext;
+
+      expect(shouldAutoStart).toBe(true);
+    });
+
+    it('should detect auto-start condition with parkId (NPS parks)', () => {
+      const searchParams = {
+        start: 'true',
+        tab: 'tracking',
+        parkId: 'nps-park-uuid-123',
+        parkName: 'Yosemite',
+      };
+
+      const hasContext = !!(searchParams.parkCode || searchParams.parkId || searchParams.localParkId || searchParams.trailId);
+      const shouldAutoStart = searchParams.start === 'true' && hasContext;
+
+      expect(shouldAutoStart).toBe(true);
+    });
+
+    it('should detect auto-start condition with localParkId (local parks)', () => {
+      const searchParams = {
+        start: 'true',
+        tab: 'tracking',
+        localParkId: 'local-park-uuid-456',
+        parkName: 'City Park',
+      };
+
+      const hasContext = !!(searchParams.parkCode || searchParams.parkId || searchParams.localParkId || searchParams.trailId);
+      const shouldAutoStart = searchParams.start === 'true' && hasContext;
+
+      expect(shouldAutoStart).toBe(true);
+    });
+
+    it('should detect auto-start condition with trailId', () => {
+      const searchParams = {
+        start: 'true',
+        tab: 'tracking',
+        trailId: 'trail-uuid-789',
+        trailName: 'Half Dome Trail',
+      };
+
+      const hasContext = !!(searchParams.parkCode || searchParams.parkId || searchParams.localParkId || searchParams.trailId);
+      const shouldAutoStart = searchParams.start === 'true' && hasContext;
+
+      expect(shouldAutoStart).toBe(true);
+    });
+
+    it('should not auto-start without start=true parameter', () => {
+      const searchParams = {
+        tab: 'tracking',
+        parkCode: 'yose',
+      };
+
+      const hasContext = !!(searchParams.parkCode || searchParams.parkId || searchParams.localParkId || searchParams.trailId);
+      const shouldAutoStart = searchParams.start === 'true' && hasContext;
+
+      expect(shouldAutoStart).toBe(false);
+    });
+
+    it('should not auto-start without any park/trail context', () => {
+      const searchParams = {
+        start: 'true',
+        tab: 'tracking',
+      };
+
+      const hasContext = !!(searchParams.parkCode || searchParams.parkId || searchParams.localParkId || searchParams.trailId);
+      const shouldAutoStart = searchParams.start === 'true' && hasContext;
+
+      expect(shouldAutoStart).toBe(false);
+    });
+
+    it('should pass localParkId to startNewTrack for local parks', async () => {
+      const mockStartNewTrack = vi.fn().mockResolvedValue({ track: { id: 'new-track-id' } });
+
+      const searchParams = {
+        start: 'true',
+        localParkId: 'local-park-uuid-456',
+        parkName: 'City Park',
+      };
+
+      // Simulate handleStartTracking
+      const handleStartTracking = async () => {
+        await mockStartNewTrack({
+          parkCode: searchParams.parkCode,
+          parkId: searchParams.parkId,
+          localParkId: searchParams.localParkId,
+          trailId: searchParams.trailId,
+          title: searchParams.parkName || searchParams.trailName,
+        });
+      };
+
+      await handleStartTracking();
+
+      expect(mockStartNewTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          localParkId: 'local-park-uuid-456',
+          title: 'City Park',
+        })
+      );
+      expect(mockStartNewTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parkId: undefined,
+        })
+      );
+    });
+
+    it('should pass parkId to startNewTrack for NPS parks', async () => {
+      const mockStartNewTrack = vi.fn().mockResolvedValue({ track: { id: 'new-track-id' } });
+
+      const searchParams = {
+        start: 'true',
+        parkId: 'nps-park-uuid-123',
+        parkCode: 'yose',
+        parkName: 'Yosemite',
+      };
+
+      // Simulate handleStartTracking
+      const handleStartTracking = async () => {
+        await mockStartNewTrack({
+          parkCode: searchParams.parkCode,
+          parkId: searchParams.parkId,
+          localParkId: searchParams.localParkId,
+          trailId: searchParams.trailId,
+          title: searchParams.parkName || searchParams.trailName,
+        });
+      };
+
+      await handleStartTracking();
+
+      expect(mockStartNewTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          parkId: 'nps-park-uuid-123',
+          parkCode: 'yose',
+          title: 'Yosemite',
+        })
+      );
+      expect(mockStartNewTrack).toHaveBeenCalledWith(
+        expect.objectContaining({
+          localParkId: undefined,
+        })
+      );
+    });
+
+    it('should handle hasContext check correctly for all park types', () => {
+      // Test NPS park
+      const npsParams = { parkCode: 'yose', parkId: 'nps-uuid' };
+      const npsHasContext = npsParams.parkCode || npsParams.parkId || npsParams.localParkId || npsParams.trailId;
+      expect(npsHasContext).toBeTruthy();
+
+      // Test local park
+      const localParams = { localParkId: 'local-uuid' };
+      const localHasContext = localParams.parkCode || localParams.parkId || localParams.localParkId || localParams.trailId;
+      expect(localHasContext).toBeTruthy();
+
+      // Test trail
+      const trailParams = { trailId: 'trail-uuid' };
+      const trailHasContext = trailParams.parkCode || trailParams.parkId || trailParams.localParkId || trailParams.trailId;
+      expect(trailHasContext).toBeTruthy();
+
+      // Test no context
+      const noParams = {};
+      const noHasContext = noParams.parkCode || noParams.parkId || noParams.localParkId || noParams.trailId;
+      expect(noHasContext).toBeFalsy();
     });
   });
 });

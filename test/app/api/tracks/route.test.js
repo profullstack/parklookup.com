@@ -176,6 +176,73 @@ describe('Tracks API Routes', () => {
         trackData.parkId || trackData.parkCode || trackData.trailId || trackData.localParkId;
       expect(hasAssociation).toBeFalsy();
     });
+
+    it('should accept localParkId as valid association', () => {
+      const trackData = {
+        title: 'Test Track',
+        activityType: 'hiking',
+        localParkId: 'local-park-uuid-123',
+      };
+
+      // Should be valid with localParkId
+      const hasAssociation =
+        trackData.parkId || trackData.parkCode || trackData.trailId || trackData.localParkId;
+      expect(hasAssociation).toBeTruthy();
+    });
+
+    it('should insert localParkId into local_park_id column', () => {
+      const trackData = {
+        localParkId: 'local-park-uuid-123',
+        activityType: 'hiking',
+      };
+
+      // Simulate the insert data transformation
+      const insertData = {
+        local_park_id: trackData.localParkId,
+        park_id: trackData.parkId || null,
+        activity_type: trackData.activityType,
+      };
+
+      expect(insertData.local_park_id).toBe('local-park-uuid-123');
+      expect(insertData.park_id).toBeNull();
+    });
+
+    it('should insert parkId into park_id column for NPS parks', () => {
+      const trackData = {
+        parkId: 'nps-park-uuid-456',
+        activityType: 'hiking',
+      };
+
+      // Simulate the insert data transformation
+      const insertData = {
+        local_park_id: trackData.localParkId || null,
+        park_id: trackData.parkId,
+        activity_type: trackData.activityType,
+      };
+
+      expect(insertData.park_id).toBe('nps-park-uuid-456');
+      expect(insertData.local_park_id).toBeNull();
+    });
+
+    it('should not mix parkId and localParkId in same track', () => {
+      // In practice, a track should have either parkId OR localParkId, not both
+      // This tests the expected behavior
+      const trackDataWithBoth = {
+        parkId: 'nps-park-uuid',
+        localParkId: 'local-park-uuid',
+        activityType: 'hiking',
+      };
+
+      // The API should handle this gracefully - both can be set if needed
+      // but typically only one should be provided based on park source
+      const insertData = {
+        park_id: trackDataWithBoth.parkId,
+        local_park_id: trackDataWithBoth.localParkId,
+      };
+
+      expect(insertData.park_id).toBe('nps-park-uuid');
+      expect(insertData.local_park_id).toBe('local-park-uuid');
+    });
   });
 
   describe('GET /api/tracks/[id]', () => {

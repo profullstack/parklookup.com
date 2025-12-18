@@ -16,7 +16,8 @@ import UpgradeModal from '@/components/ui/UpgradeModal';
  * Start Tracking Button
  * @param {Object} props
  * @param {string} [props.parkCode] - NPS park code
- * @param {string} [props.parkId] - Park ID (for local parks)
+ * @param {string} [props.parkId] - NPS Park ID (for nps_parks table)
+ * @param {string} [props.localParkId] - Local Park ID (for local_parks table)
  * @param {string} [props.trailId] - Trail ID
  * @param {string} [props.parkName] - Park name for display
  * @param {string} [props.trailName] - Trail name for display
@@ -27,6 +28,7 @@ import UpgradeModal from '@/components/ui/UpgradeModal';
 export default function StartTrackingButton({
   parkCode,
   parkId,
+  localParkId,
   trailId,
   parkName,
   trailName,
@@ -48,6 +50,7 @@ export default function StartTrackingButton({
     params.set('tab', 'tracking');
     if (parkCode) params.set('parkCode', parkCode);
     if (parkId) params.set('parkId', parkId);
+    if (localParkId) params.set('localParkId', localParkId);
     if (trailId) params.set('trailId', trailId);
     if (parkName) params.set('parkName', parkName);
     if (trailName) params.set('trailName', trailName);

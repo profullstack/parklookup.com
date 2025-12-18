@@ -133,7 +133,8 @@ export default function ParkBLMSection({ park, hasCoordinates }) {
         </div>
         <StartTrackingButton
           parkCode={park.park_code}
-          parkId={park.id}
+          parkId={park.source === 'local' ? null : park.id}
+          localParkId={park.source === 'local' ? park.id : null}
           parkName={park.full_name || park.name}
           variant="primary"
           size="md"

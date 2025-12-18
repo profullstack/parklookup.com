@@ -67,6 +67,7 @@ function TracksPageContent() {
   // Get URL params for starting a new track
   const parkCode = searchParams.get('parkCode');
   const parkId = searchParams.get('parkId');
+  const localParkId = searchParams.get('localParkId');
   const trailId = searchParams.get('trailId');
   const parkName = searchParams.get('parkName');
   const trailName = searchParams.get('trailName');
@@ -84,6 +85,7 @@ function TracksPageContent() {
         title: trailName || parkName || 'New Track',
         parkCode,
         parkId,
+        localParkId,
         trailId,
       });
       setActiveTab('tracking');
@@ -93,7 +95,7 @@ function TracksPageContent() {
     } finally {
       setStartingTrack(false);
     }
-  }, [user, isPro, isTracking, startingTrack, startNewTrack, trailName, parkName, parkCode, parkId, trailId]);
+  }, [user, isPro, isTracking, startingTrack, startNewTrack, trailName, parkName, parkCode, parkId, localParkId, trailId]);
 
   // Update active tab when tracking state changes
   useEffect(() => {
@@ -105,7 +107,7 @@ function TracksPageContent() {
   // Auto-start tracking if URL params indicate it
   useEffect(() => {
     const shouldAutoStart = autoStart && isPro && user && !isTracking && !startingTrack;
-    const hasContext = parkCode || parkId || trailId;
+    const hasContext = parkCode || parkId || localParkId || trailId;
 
     console.log('Auto-start check:', {
       autoStart,
@@ -118,10 +120,10 @@ function TracksPageContent() {
     });
 
     if (shouldAutoStart && hasContext) {
-      console.log('Auto-starting tracking with context:', { parkCode, parkId, trailId, parkName, trailName });
+      console.log('Auto-starting tracking with context:', { parkCode, parkId, localParkId, trailId, parkName, trailName });
       handleStartTracking();
     }
-  }, [autoStart, isPro, user, isTracking, startingTrack, parkCode, parkId, trailId, parkName, trailName, handleStartTracking]);
+  }, [autoStart, isPro, user, isTracking, startingTrack, parkCode, parkId, localParkId, trailId, parkName, trailName, handleStartTracking]);
 
   // Handle tab change
   const handleTabChange = (tabId) => {
@@ -704,12 +706,12 @@ function TracksPageContent() {
                   {parkName || trailName ? `Track at ${trailName || parkName}` : 'Start a New Track'}
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-6 max-w-md mx-auto">
-                  {parkCode || parkId || trailId
+                  {parkCode || parkId || localParkId || trailId
                     ? 'Click the button below to start recording your activity with GPS tracking.'
                     : 'Go to a park or trail page and click "Start Tracking" to begin recording your activity.'}
                 </p>
 
-                {(parkCode || parkId || trailId) ? (
+                {(parkCode || parkId || localParkId || trailId) ? (
                   <button
                     onClick={handleStartTracking}
                     disabled={startingTrack}

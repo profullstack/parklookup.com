@@ -294,7 +294,8 @@ export default function TrailDetailClient({ trail, park, lengthMiles, elevationF
           trailId={trail.id}
           trailName={trail.name || `Trail ${trail.source_id}`}
           parkCode={park.park_code}
-          parkId={park.id}
+          parkId={park.source === 'local' ? null : park.id}
+          localParkId={park.source === 'local' ? park.id : null}
           parkName={park.full_name || park.name}
           variant="primary"
         />
