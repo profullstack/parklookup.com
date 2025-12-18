@@ -42,37 +42,16 @@ export default async function TrackDetailPage({ params }) {
   const { id } = await params;
   const supabase = createServiceClient();
 
-  // Fetch track with related data
-  const { data: track, error } = await supabase
+  // First, fetch just the track without joins to verify it exists
+  const { data: baseTrack, error: baseError } = await supabase
     .from('user_tracks')
-    .select(`
-      *,
-      profiles:user_id (
-        id,
-        display_name,
-        avatar_url,
-        username
-      ),
-      nps_parks:park_id (
-        id,
-        park_code,
-        full_name
-      ),
-      local_parks:local_park_id (
-        id,
-        name,
-        slug
-      ),
-      trails:trail_id (
-        id,
-        name,
-        slug
-      )
-    `)
+    .select('*')
     .eq('id', id)
     .single();
 
-  if (error || !track) {
+  // If base track doesn't exist, show not found
+  if (baseError || !baseTrack) {
+    console.error('Track not found:', baseError);
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
         <div className="max-w-4xl mx-auto px-4">
@@ -101,6 +80,62 @@ export default async function TrackDetailPage({ params }) {
       </div>
     );
   }
+
+  // Fetch related data separately (profiles, parks, trails)
+  // This way if any join fails, we still have the base track
+  let profiles = null;
+  let nps_parks = null;
+  let local_parks = null;
+  let trails = null;
+
+  // Fetch user profile
+  if (baseTrack.user_id) {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id, display_name, avatar_url, username')
+      .eq('id', baseTrack.user_id)
+      .single();
+    profiles = data;
+  }
+
+  // Fetch NPS park if referenced
+  if (baseTrack.park_id) {
+    const { data } = await supabase
+      .from('nps_parks')
+      .select('id, park_code, full_name')
+      .eq('id', baseTrack.park_id)
+      .single();
+    nps_parks = data;
+  }
+
+  // Fetch local park if referenced
+  if (baseTrack.local_park_id) {
+    const { data } = await supabase
+      .from('local_parks')
+      .select('id, name, slug')
+      .eq('id', baseTrack.local_park_id)
+      .single();
+    local_parks = data;
+  }
+
+  // Fetch trail if referenced
+  if (baseTrack.trail_id) {
+    const { data } = await supabase
+      .from('trails')
+      .select('id, name, slug')
+      .eq('id', baseTrack.trail_id)
+      .single();
+    trails = data;
+  }
+
+  // Combine base track with related data
+  const track = {
+    ...baseTrack,
+    profiles,
+    nps_parks,
+    local_parks,
+    trails,
+  };
 
   // Fetch track points
   const { data: points } = await supabase
