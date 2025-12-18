@@ -458,7 +458,7 @@ describe('Track Comments API', () => {
         }),
       };
 
-      // Insert query
+      // Insert query - properly chain insert -> select -> single
       const insertQuery = {
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockReturnValue({
@@ -468,6 +468,10 @@ describe('Track Comments API', () => {
             }),
           }),
         }),
+      };
+
+      // Count query for getting updated comments count - needs select().eq() chain
+      const countQuery = {
         select: vi.fn().mockReturnValue({
           eq: vi.fn().mockResolvedValue({
             count: 1,
@@ -485,10 +489,8 @@ describe('Track Comments API', () => {
           if (callCount === 1) {
             return insertQuery;
           }
-          // Count query
-          return {
-            select: vi.fn().mockResolvedValue({ count: 1 }),
-          };
+          // Count query (second call)
+          return countQuery;
         }
         return {};
       });
