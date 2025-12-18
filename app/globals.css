@@ -190,3 +190,63 @@
     display: none !important;
   }
 }
+
+/* Leaflet map tile fixes */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #f3f4f6;
+}
+
+.leaflet-tile-pane {
+  z-index: 200 !important;
+}
+
+.leaflet-tile {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.leaflet-tile-container {
+  visibility: visible !important;
+}
+
+.leaflet-layer {
+  visibility: visible !important;
+}
+
+/* Ensure map controls are visible */
+.leaflet-control-container {
+  z-index: 800;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 1000;
+}
+
+/* Fix for dark mode */
+.dark .leaflet-container {
+  background: #1f2937;
+}
+
+/* Ensure popups are visible */
+.leaflet-popup-content-wrapper {
+  background: white;
+  color: #333;
+  border-radius: 8px;
+  box-shadow: 0 3px 14px rgba(0, 0, 0, 0.2);
+}
+
+.dark .leaflet-popup-content-wrapper {
+  background: #374151;
+  color: #f3f4f6;
+}
+
+.leaflet-popup-tip {
+  background: white;
+}
+
+.dark .leaflet-popup-tip {
+  background: #374151;
+}

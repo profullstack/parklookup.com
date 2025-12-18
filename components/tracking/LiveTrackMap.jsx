@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
 import { getActivityColor, getActivityIcon } from '@/lib/tracking/activity-detection';
 import { formatDistance, formatDuration, formatSpeed } from '@/lib/tracking/track-stats';
 
@@ -379,6 +378,45 @@ export default function LiveTrackMap({
           </div>
         </div>
       )}
+
+      {/* Leaflet CSS fix for tile layer visibility */}
+      <style jsx global>{`
+        .leaflet-container {
+          width: 100%;
+          height: 100%;
+          z-index: 0;
+        }
+        .leaflet-tile-pane {
+          z-index: 200;
+        }
+        .leaflet-overlay-pane {
+          z-index: 400;
+        }
+        .leaflet-shadow-pane {
+          z-index: 500;
+        }
+        .leaflet-marker-pane {
+          z-index: 600;
+        }
+        .leaflet-tooltip-pane {
+          z-index: 650;
+        }
+        .leaflet-popup-pane {
+          z-index: 700;
+        }
+        .leaflet-map-pane canvas {
+          z-index: 100;
+        }
+        .leaflet-map-pane svg {
+          z-index: 200;
+        }
+        .leaflet-tile {
+          visibility: visible !important;
+        }
+        .leaflet-tile-container {
+          visibility: visible !important;
+        }
+      `}</style>
     </div>
   );
 }
