@@ -67,17 +67,28 @@ describe('FavoritesPage', () => {
         isAuthenticated: true,
       });
 
-      // Mock favorites API response
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ favorites: [] }),
+      // Mock both API calls (favorites and liked tracks)
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ favorites: [] }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
       });
 
       render(<FavoritesPage />);
 
       // Wait for component to settle
       await waitFor(() => {
-        expect(screen.getByText('My Favorite Parks')).toBeInTheDocument();
+        expect(screen.getByText('My Favorites')).toBeInTheDocument();
       });
 
       // Should NOT redirect
@@ -109,10 +120,21 @@ describe('FavoritesPage', () => {
         isAuthenticated: true,
       });
 
-      // Mock favorites API response
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ favorites: [] }),
+      // Mock both API calls
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ favorites: [] }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
       });
 
       render(<FavoritesPage />);
@@ -131,10 +153,21 @@ describe('FavoritesPage', () => {
         isAuthenticated: true,
       });
 
-      // Mock favorites API response
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ favorites: [] }),
+      // Mock both API calls
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ favorites: [] }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
       });
 
       render(<FavoritesPage />);
@@ -161,9 +194,21 @@ describe('FavoritesPage', () => {
         isAuthenticated: true,
       });
 
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ favorites: [] }),
+      // Mock both API calls
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ favorites: [] }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
       });
 
       render(<FavoritesPage />);
@@ -181,28 +226,282 @@ describe('FavoritesPage', () => {
         isAuthenticated: true,
       });
 
-      global.fetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          favorites: [
-            {
-              id: 'fav-1',
-              park_id: 'park-1',
-              park: { id: 'park-1', full_name: 'Yellowstone', park_code: 'yell' },
-            },
-            {
-              id: 'fav-2',
-              park_id: 'park-2',
-              park: { id: 'park-2', full_name: 'Yosemite', park_code: 'yose' },
-            },
-          ],
-        }),
+      // Mock both API calls
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              favorites: [
+                {
+                  id: 'fav-1',
+                  park_id: 'park-1',
+                  park: { id: 'park-1', full_name: 'Yellowstone', park_code: 'yell' },
+                },
+                {
+                  id: 'fav-2',
+                  park_id: 'park-2',
+                  park: { id: 'park-2', full_name: 'Yosemite', park_code: 'yose' },
+                },
+              ],
+            }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
       });
 
       render(<FavoritesPage />);
 
       await waitFor(() => {
         expect(screen.getByText('You have 2 favorite parks')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Tabs Navigation', () => {
+    it('should display Parks and Liked Tracks tabs when user has favorites', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: 'user-123', email: 'test@example.com' },
+        session: { access_token: 'valid-token' },
+        loading: false,
+        isAuthenticated: true,
+      });
+
+      // Mock both API calls - favorites with data and liked tracks
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              favorites: [
+                {
+                  id: 'fav-1',
+                  park_id: 'park-1',
+                  park: { id: 'park-1', full_name: 'Yellowstone', park_code: 'yell' },
+                },
+              ],
+            }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        // Tabs are buttons, not role="tab"
+        expect(screen.getByText(/Parks \(/i)).toBeInTheDocument();
+        expect(screen.getByText(/Liked Tracks \(/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should show Parks tab content by default', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: 'user-123', email: 'test@example.com' },
+        session: { access_token: 'valid-token' },
+        loading: false,
+        isAuthenticated: true,
+      });
+
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              favorites: [
+                {
+                  id: 'fav-1',
+                  park_id: 'park-1',
+                  park: { id: 'park-1', full_name: 'Yellowstone', park_code: 'yell' },
+                },
+              ],
+            }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        // Parks tab should be active and show content
+        expect(screen.getByText('You have 1 favorite park')).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Liked Tracks Tab', () => {
+    it('should fetch liked tracks on page load', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: 'user-123', email: 'test@example.com' },
+        session: { access_token: 'valid-token' },
+        loading: false,
+        isAuthenticated: true,
+      });
+
+      global.fetch.mockImplementation((url, options) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              favorites: [
+                {
+                  id: 'fav-1',
+                  park_id: 'park-1',
+                  park: { id: 'park-1', full_name: 'Yellowstone', park_code: 'yell' },
+                },
+              ],
+            }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        // Both API calls should be made on page load
+        expect(global.fetch).toHaveBeenCalledWith(
+          '/api/favorites/tracks',
+          expect.objectContaining({
+            headers: expect.objectContaining({
+              Authorization: 'Bearer valid-token',
+            }),
+          })
+        );
+      });
+    });
+
+    it('should display liked tracks when available and tab is clicked', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: 'user-123', email: 'test@example.com' },
+        session: { access_token: 'valid-token' },
+        loading: false,
+        isAuthenticated: true,
+      });
+
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              favorites: [
+                {
+                  id: 'fav-1',
+                  park_id: 'park-1',
+                  park: { id: 'park-1', full_name: 'Yellowstone', park_code: 'yell' },
+                },
+              ],
+            }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              tracks: [
+                {
+                  track_id: 'track-1',
+                  title: 'Morning Hike at Yosemite',
+                  user_display_name: 'John Doe',
+                  user_username: 'johndoe',
+                  activity_type: 'hiking',
+                  distance_meters: 5000,
+                  duration_seconds: 3600,
+                  park_name: 'Yosemite National Park',
+                  likes_count: 10,
+                  comments_count: 5,
+                },
+              ],
+            }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Liked Tracks \(/i)).toBeInTheDocument();
+      });
+
+      // Click on Liked Tracks tab
+      const likedTracksTab = screen.getByText(/Liked Tracks \(/i);
+      likedTracksTab.click();
+
+      await waitFor(() => {
+        expect(screen.getByText('Morning Hike at Yosemite')).toBeInTheDocument();
+      });
+    });
+
+    it('should show empty state when no liked tracks and tab is clicked', async () => {
+      mockUseAuth.mockReturnValue({
+        user: { id: 'user-123', email: 'test@example.com' },
+        session: { access_token: 'valid-token' },
+        loading: false,
+        isAuthenticated: true,
+      });
+
+      global.fetch.mockImplementation((url) => {
+        if (url === '/api/favorites') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({
+              favorites: [
+                {
+                  id: 'fav-1',
+                  park_id: 'park-1',
+                  park: { id: 'park-1', full_name: 'Yellowstone', park_code: 'yell' },
+                },
+              ],
+            }),
+          });
+        }
+        if (url === '/api/favorites/tracks') {
+          return Promise.resolve({
+            ok: true,
+            json: async () => ({ tracks: [] }),
+          });
+        }
+        return Promise.reject(new Error('Unknown URL'));
+      });
+
+      render(<FavoritesPage />);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Liked Tracks \(/i)).toBeInTheDocument();
+      });
+
+      // Click on Liked Tracks tab
+      const likedTracksTab = screen.getByText(/Liked Tracks \(/i);
+      likedTracksTab.click();
+
+      await waitFor(() => {
+        expect(screen.getByText(/No liked tracks yet/i)).toBeInTheDocument();
       });
     });
   });

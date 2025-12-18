@@ -214,6 +214,22 @@ export default function TripPlannerPromo() {
                   </svg>
                   <span>Unlimited trips</span>
                 </li>
+                <li className="flex items-center gap-2 text-gray-400">
+                  <svg
+                    className="w-5 h-5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                  <span>Live tracking</span>
+                </li>
               </ul>
               <Link
                 href="/signup"
@@ -288,6 +304,22 @@ export default function TripPlannerPromo() {
                     />
                   </svg>
                   <span>Export trips to PDF</span>
+                </li>
+                <li className="flex items-center gap-2">
+                  <svg
+                    className="w-5 h-5 text-white"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                  <span>Live tracking for hiking, biking & driving</span>
                 </li>
                 <li className="flex items-center gap-2">
                   <svg

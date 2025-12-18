@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAnalytics } from '@/hooks/useAnalytics';
 import TrailReviews from '@/components/trails/TrailReviews';
 import TrailPhotos from '@/components/trails/TrailPhotos';
+import StartTrackingButton from '@/components/tracking/StartTrackingButton';
 
 // Dynamically import the map component to avoid SSR issues
 const TrailMap = dynamic(() => import('@/components/trails/TrailMap'), {
@@ -155,6 +156,21 @@ export default function TrailDetailClient({ trail, park, hasCoordinates }) {
             </p>
           </div>
         )}
+      </div>
+
+      {/* Start Tracking Button */}
+      <div className="mb-6">
+        <StartTrackingButton
+          trailId={trail.id}
+          trailName={trail.name}
+          parkCode={park.park_code}
+          parkId={park.source === 'nps' ? park.id : null}
+          localParkId={park.source === 'local' ? park.id : null}
+          parkName={park.full_name}
+          variant="primary"
+          size="lg"
+          className="w-full sm:w-auto"
+        />
       </div>
 
       {/* Trail Map */}

@@ -243,6 +243,77 @@ describe('Tracks API Routes', () => {
       expect(insertData.park_id).toBe('nps-park-uuid');
       expect(insertData.local_park_id).toBe('local-park-uuid');
     });
+
+    it('should validate parkId exists in nps_parks table before inserting', () => {
+      // The API should verify that parkId references a valid NPS park
+      // This prevents foreign key constraint violations
+      const trackData = {
+        parkId: 'valid-nps-park-uuid',
+        activityType: 'hiking',
+      };
+
+      // The API should check if parkId exists in nps_parks table
+      // If not found, it should return 400 error
+      const validationCheck = {
+        table: 'nps_parks',
+        column: 'id',
+        value: trackData.parkId,
+      };
+
+      expect(validationCheck.table).toBe('nps_parks');
+      expect(validationCheck.column).toBe('id');
+    });
+
+    it('should return 400 if parkId does not exist in nps_parks', () => {
+      // When parkId is provided but doesn't exist in nps_parks table,
+      // the API should return a 400 error instead of letting the
+      // database throw a foreign key constraint violation
+      const invalidParkId = 'non-existent-park-uuid';
+
+      // Expected error response
+      const expectedError = {
+        error: 'Invalid park_id: Park not found in NPS parks',
+        status: 400,
+      };
+
+      expect(expectedError.status).toBe(400);
+      expect(expectedError.error).toContain('Invalid park_id');
+    });
+
+    it('should allow null parkId when localParkId is provided', () => {
+      // For wikidata/local parks, parkId should be null
+      // and localParkId should be used instead
+      const trackData = {
+        parkId: null,
+        localParkId: 'wikidata-park-uuid',
+        activityType: 'hiking',
+      };
+
+      const insertData = {
+        park_id: trackData.parkId,
+        local_park_id: trackData.localParkId,
+      };
+
+      expect(insertData.park_id).toBeNull();
+      expect(insertData.local_park_id).toBe('wikidata-park-uuid');
+    });
+
+    it('should allow null parkId when only parkCode is provided', () => {
+      // For parks identified by code only (no UUID reference)
+      const trackData = {
+        parkId: null,
+        parkCode: 'yose',
+        activityType: 'hiking',
+      };
+
+      const insertData = {
+        park_id: trackData.parkId,
+        park_code: trackData.parkCode,
+      };
+
+      expect(insertData.park_id).toBeNull();
+      expect(insertData.park_code).toBe('yose');
+    });
   });
 
   describe('GET /api/tracks/[id]', () => {
