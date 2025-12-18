@@ -494,36 +494,44 @@ export default function TrackDetailClient({ track, points, media }) {
                 </p>
               ) : (
                 <div className="space-y-4">
-                  {comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-3">
-                      <div className="flex-shrink-0">
-                        {comment.profiles?.avatar_url ? (
-                          <img
-                            src={comment.profiles.avatar_url}
-                            alt={comment.profiles.display_name}
-                            className="w-8 h-8 rounded-full object-cover"
-                          />
-                        ) : (
-                          <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                            <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">
-                              {comment.profiles?.display_name?.charAt(0).toUpperCase() || '?'}
+                  {comments.map((comment) => {
+                    // Support both API formats: camelCase (user) and snake_case (profiles)
+                    const userProfile = comment.user || comment.profiles;
+                    const displayName = userProfile?.displayName || userProfile?.display_name;
+                    const avatarUrl = userProfile?.avatarUrl || userProfile?.avatar_url;
+                    const createdAt = comment.createdAt || comment.created_at;
+                    
+                    return (
+                      <div key={comment.id} className="flex gap-3">
+                        <div className="flex-shrink-0">
+                          {avatarUrl ? (
+                            <img
+                              src={avatarUrl}
+                              alt={displayName || 'User'}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                              <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+                                {displayName?.charAt(0).toUpperCase() || '?'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-gray-900 dark:text-white">
+                              {displayName || 'Anonymous'}
+                            </span>
+                            <span className="text-sm text-gray-500 dark:text-gray-400">
+                              {createdAt ? new Date(createdAt).toLocaleDateString() : ''}
                             </span>
                           </div>
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900 dark:text-white">
-                            {comment.profiles?.display_name || 'Anonymous'}
-                          </span>
-                          <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {new Date(comment.created_at).toLocaleDateString()}
-                          </span>
+                          <p className="text-gray-700 dark:text-gray-300 mt-1">{comment.content}</p>
                         </div>
-                        <p className="text-gray-700 dark:text-gray-300 mt-1">{comment.content}</p>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

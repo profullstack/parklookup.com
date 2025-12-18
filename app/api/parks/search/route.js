@@ -10,6 +10,75 @@ export const dynamic = 'force-dynamic';
 import { createServerClient } from '@/lib/supabase/client';
 
 /**
+ * Helper function to normalize Wikimedia URLs
+ * Converts http:// to https:// and Special:FilePath URLs to direct image URLs
+ */
+const normalizeWikimediaUrl = (url) => {
+  if (!url || typeof url !== 'string') {
+    return null;
+  }
+  
+  let normalized = url.trim();
+  
+  // Convert http to https
+  if (normalized.startsWith('http://')) {
+    normalized = normalized.replace('http://', 'https://');
+  }
+  
+  // Convert Special:FilePath URLs to direct upload URLs
+  if (normalized.includes('commons.wikimedia.org/wiki/Special:FilePath/')) {
+    const filename = normalized.split('Special:FilePath/')[1];
+    if (filename) {
+      normalized = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(decodeURIComponent(filename))}?width=800`;
+    }
+  }
+  
+  return normalized;
+};
+
+/**
+ * Helper function to normalize park image URLs
+ */
+const normalizeParkImages = (park) => {
+  const normalized = { ...park };
+  
+  // Normalize wikidata_image URL
+  if (normalized.wikidata_image) {
+    normalized.wikidata_image = normalizeWikimediaUrl(normalized.wikidata_image);
+  }
+  
+  // Normalize images array URLs (for wikidata parks that have images constructed from wikidata_image)
+  if (Array.isArray(normalized.images) && normalized.images.length > 0) {
+    normalized.images = normalized.images.map(img => {
+      if (img?.url && img.url.includes('wikimedia.org')) {
+        return { ...img, url: normalizeWikimediaUrl(img.url) };
+      }
+      return img;
+    });
+  }
+  
+  return normalized;
+};
+
+/**
+ * Helper function to check if a park has a valid image
+ */
+const hasValidImage = (park) => {
+  // Check NPS images array - must have at least one image with a valid URL
+  if (Array.isArray(park.images) && park.images.length > 0) {
+    const firstImage = park.images[0];
+    if (firstImage?.url && typeof firstImage.url === 'string' && firstImage.url.trim().length > 0) {
+      return true;
+    }
+  }
+  // Check wikidata_image - must be a non-empty string
+  if (park.wikidata_image && typeof park.wikidata_image === 'string' && park.wikidata_image.trim().length > 0) {
+    return true;
+  }
+  return false;
+};
+
+/**
  * GET handler for searching parks
  */
 export async function GET(request) {
@@ -60,88 +129,53 @@ export async function GET(request) {
       query = query.ilike('states', `%${state}%`);
     }
 
-    // If filtering for images, we need to fetch more and filter server-side
-    // because JSONB array emptiness can't be easily checked in PostgREST
-    // We need to fetch a LOT more because most local parks don't have images
-    // and they come first alphabetically
-    const fetchLimit = hasImages ? Math.max(limit * 50, 500) : limit;
+    // For hasImages queries (popular parks), use a raw SQL query to:
+    // 1. Filter for NPS parks with images
+    // 2. Join with park_likes and park_comments to get counts
+    // 3. Sort by popularity (likes + comments)
+    if (hasImages) {
+      // Use raw SQL for complex query with aggregations
+      const { data: popularParks, error: rpcError } = await supabase.rpc('get_popular_parks_with_images', {
+        p_limit: limit,
+        p_offset: offset,
+      });
+
+      if (rpcError) {
+        console.error('RPC error:', rpcError);
+        // Fallback to simple query if RPC doesn't exist
+        query = query
+          .eq('source', 'nps')
+          .not('images', 'is', null)
+          .not('images', 'eq', '[]')
+          .filter('images->0->url', 'neq', null);
+      } else if (popularParks) {
+        // RPC succeeded, use the results
+        const normalizedParks = popularParks.map(normalizeParkImages);
+        return NextResponse.json({
+          parks: normalizedParks,
+          total: normalizedParks.length,
+          query: q,
+          state,
+          hasImages,
+          pagination: {
+            page,
+            limit,
+            total: normalizedParks.length,
+            totalPages: 1,
+            hasMore: false,
+          },
+        });
+      }
+    }
 
     const { data: parks, error, count } = await query
       .order('full_name')
-      .range(offset, offset + fetchLimit - 1);
+      .range(offset, offset + limit - 1);
 
     if (error) {
       console.error('Database error:', error);
       return NextResponse.json({ error: 'Failed to search parks' }, { status: 500 });
     }
-
-    // Helper function to normalize Wikimedia URLs
-    // Converts http:// to https:// and Special:FilePath URLs to direct image URLs
-    const normalizeWikimediaUrl = (url) => {
-      if (!url || typeof url !== 'string') {
-        return null;
-      }
-      
-      let normalized = url.trim();
-      
-      // Convert http to https
-      if (normalized.startsWith('http://')) {
-        normalized = normalized.replace('http://', 'https://');
-      }
-      
-      // Convert Special:FilePath URLs to direct upload URLs
-      // http://commons.wikimedia.org/wiki/Special:FilePath/Image.jpg
-      // -> https://upload.wikimedia.org/wikipedia/commons/thumb/X/XX/Image.jpg/800px-Image.jpg
-      // For simplicity, we'll use the direct commons URL format
-      if (normalized.includes('commons.wikimedia.org/wiki/Special:FilePath/')) {
-        const filename = normalized.split('Special:FilePath/')[1];
-        if (filename) {
-          // Use the Wikimedia Commons API to get a direct URL
-          // Format: https://commons.wikimedia.org/wiki/Special:FilePath/FILENAME?width=800
-          normalized = `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(decodeURIComponent(filename))}?width=800`;
-        }
-      }
-      
-      return normalized;
-    };
-
-    // Helper function to check if a park has a valid image
-    const hasValidImage = (park) => {
-      // Check NPS images array - must have at least one image with a valid URL
-      if (Array.isArray(park.images) && park.images.length > 0) {
-        const firstImage = park.images[0];
-        if (firstImage?.url && typeof firstImage.url === 'string' && firstImage.url.trim().length > 0) {
-          return true;
-        }
-      }
-      // Check wikidata_image - must be a non-empty string
-      if (park.wikidata_image && typeof park.wikidata_image === 'string' && park.wikidata_image.trim().length > 0) {
-        return true;
-      }
-      return false;
-    };
-
-    // Helper function to normalize park image URLs
-    const normalizeParkImages = (park) => {
-      const normalized = { ...park };
-      
-      // Normalize wikidata_image URL
-      if (normalized.wikidata_image) {
-        normalized.wikidata_image = normalizeWikimediaUrl(normalized.wikidata_image);
-      }
-      
-      // Normalize images array URLs (for wikidata parks that have images constructed from wikidata_image)
-      if (Array.isArray(normalized.images) && normalized.images.length > 0) {
-        normalized.images = normalized.images.map(img => {
-          if (img?.url && img.url.includes('wikimedia.org')) {
-            return { ...img, url: normalizeWikimediaUrl(img.url) };
-          }
-          return img;
-        });
-      }
-      
-      return normalized;
-    };
 
     // Normalize image URLs and filter parks if hasImages is requested
     let filteredParks = (parks || []).map(normalizeParkImages);

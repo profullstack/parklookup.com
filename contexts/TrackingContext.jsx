@@ -17,9 +17,21 @@ const TrackingContext = createContext(null);
  */
 export function TrackingProvider({ children }) {
   const { user, accessToken } = useAuth();
-  const { isPro, loading: proLoading, profile } = useProStatus();
+  const { isPro, loading: proLoading, profile, refetch: refetchProStatus } = useProStatus();
   const [activeTrackConfig, setActiveTrackConfig] = useState(null);
   const [showTrackingPanel, setShowTrackingPanel] = useState(false);
+
+  // Use refs to track current values for async operations
+  const proLoadingRef = useRef(proLoading);
+  const isProRef = useRef(isPro);
+  const profileRef = useRef(profile);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    proLoadingRef.current = proLoading;
+    isProRef.current = isPro;
+    profileRef.current = profile;
+  }, [proLoading, isPro, profile]);
 
   // Debug logging for pro status (using console.warn to avoid production stripping)
   if (typeof window !== 'undefined') {
@@ -56,12 +68,12 @@ export function TrackingProvider({ children }) {
     async (config) => {
       console.log('TrackingContext.startNewTrack called:', {
         user: user?.id,
-        isPro,
-        proLoading,
-        profile: profile ? {
-          is_pro: profile.is_pro,
-          subscription_status: profile.subscription_status,
-          subscription_tier: profile.subscription_tier,
+        isPro: isProRef.current,
+        proLoading: proLoadingRef.current,
+        profile: profileRef.current ? {
+          is_pro: profileRef.current.is_pro,
+          subscription_status: profileRef.current.subscription_status,
+          subscription_tier: profileRef.current.subscription_tier,
         } : null,
         config,
       });
@@ -70,14 +82,33 @@ export function TrackingProvider({ children }) {
         throw new Error('You must be signed in to track');
       }
 
-      // Wait for pro status to load before checking
-      if (proLoading) {
+      // If pro status is still loading, wait for it with a timeout using refs
+      if (proLoadingRef.current) {
         console.log('TrackingContext: Pro status still loading, waiting...');
-        throw new Error('Loading subscription status, please try again');
+        // Try to refetch pro status first
+        if (refetchProStatus) {
+          try {
+            await refetchProStatus();
+          } catch (err) {
+            console.warn('TrackingContext: Failed to refetch pro status:', err);
+          }
+        }
+        
+        // Wait up to 5 seconds for pro status to load (checking ref)
+        let attempts = 0;
+        const maxAttempts = 50; // 50 * 100ms = 5 seconds
+        while (proLoadingRef.current && attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+          attempts++;
+        }
+        console.log('TrackingContext: Done waiting for pro status, proLoading:', proLoadingRef.current, 'isPro:', isProRef.current);
       }
 
-      if (!isPro) {
-        console.log('TrackingContext: isPro is false, throwing error. Profile:', profile);
+      // Check pro status using refs for current values
+      const currentProfile = profileRef.current;
+      const isUserPro = isProRef.current || currentProfile?.is_pro || currentProfile?.subscription_status === 'active';
+      if (!isUserPro) {
+        console.log('TrackingContext: User is not pro, throwing error. Profile:', currentProfile);
         throw new Error('Trip tracking is a Pro feature');
       }
 
@@ -92,7 +123,7 @@ export function TrackingProvider({ children }) {
       // The useTracking hook will automatically start when enabled
       return tracking.startTracking(config);
     },
-    [user, isPro, proLoading, profile, tracking]
+    [user, refetchProStatus, tracking]
   );
 
   /**

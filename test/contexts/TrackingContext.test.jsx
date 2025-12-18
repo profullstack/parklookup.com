@@ -126,6 +126,193 @@ describe('TrackingContext', () => {
     });
   });
 
+  describe('Pro Status Loading with Refs', () => {
+    it('should wait for pro status to load when proLoading is true', async () => {
+      // Simulate the ref-based waiting logic
+      let proLoadingRef = { current: true };
+      let isProRef = { current: false };
+      let profileRef = { current: null };
+      let waitAttempts = 0;
+
+      // Simulate pro status loading completing after 3 attempts
+      const simulateProStatusLoad = () => {
+        setTimeout(() => {
+          proLoadingRef.current = false;
+          isProRef.current = true;
+          profileRef.current = { is_pro: true, subscription_status: 'active' };
+        }, 250);
+      };
+
+      const startNewTrack = async (config) => {
+        const user = { id: 'user-123' };
+        if (!user) {
+          throw new Error('You must be signed in to track');
+        }
+
+        // Wait for pro status to load using refs
+        if (proLoadingRef.current) {
+          let attempts = 0;
+          const maxAttempts = 50;
+          while (proLoadingRef.current && attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            attempts++;
+            waitAttempts = attempts;
+          }
+        }
+
+        const currentProfile = profileRef.current;
+        const isUserPro =
+          isProRef.current || currentProfile?.is_pro || currentProfile?.subscription_status === 'active';
+        if (!isUserPro) {
+          throw new Error('Trip tracking is a Pro feature');
+        }
+
+        return { track: { id: 'track-123' } };
+      };
+
+      simulateProStatusLoad();
+      const result = await startNewTrack({ parkCode: 'yose' });
+
+      expect(result.track.id).toBe('track-123');
+      expect(waitAttempts).toBeGreaterThan(0);
+      expect(waitAttempts).toBeLessThan(10); // Should complete quickly
+    });
+
+    it('should check profile.is_pro as fallback for isPro', async () => {
+      const isProRef = { current: false };
+      const profileRef = { current: { is_pro: true, subscription_status: 'active' } };
+
+      const startNewTrack = async () => {
+        const user = { id: 'user-123' };
+        if (!user) {
+          throw new Error('You must be signed in to track');
+        }
+
+        const currentProfile = profileRef.current;
+        const isUserPro =
+          isProRef.current || currentProfile?.is_pro || currentProfile?.subscription_status === 'active';
+        if (!isUserPro) {
+          throw new Error('Trip tracking is a Pro feature');
+        }
+
+        return { track: { id: 'track-123' } };
+      };
+
+      const result = await startNewTrack();
+      expect(result.track.id).toBe('track-123');
+    });
+
+    it('should check profile.subscription_status as fallback', async () => {
+      const isProRef = { current: false };
+      const profileRef = { current: { is_pro: false, subscription_status: 'active' } };
+
+      const startNewTrack = async () => {
+        const user = { id: 'user-123' };
+        if (!user) {
+          throw new Error('You must be signed in to track');
+        }
+
+        const currentProfile = profileRef.current;
+        const isUserPro =
+          isProRef.current || currentProfile?.is_pro || currentProfile?.subscription_status === 'active';
+        if (!isUserPro) {
+          throw new Error('Trip tracking is a Pro feature');
+        }
+
+        return { track: { id: 'track-123' } };
+      };
+
+      const result = await startNewTrack();
+      expect(result.track.id).toBe('track-123');
+    });
+
+    it('should call refetchProStatus when proLoading is true', async () => {
+      const refetchProStatus = vi.fn().mockResolvedValue(undefined);
+      let proLoadingRef = { current: true };
+      let isProRef = { current: false };
+      let profileRef = { current: null };
+
+      // Simulate refetch completing the load
+      refetchProStatus.mockImplementation(async () => {
+        proLoadingRef.current = false;
+        isProRef.current = true;
+        profileRef.current = { is_pro: true };
+      });
+
+      const startNewTrack = async () => {
+        const user = { id: 'user-123' };
+        if (!user) {
+          throw new Error('You must be signed in to track');
+        }
+
+        if (proLoadingRef.current) {
+          if (refetchProStatus) {
+            try {
+              await refetchProStatus();
+            } catch (err) {
+              console.warn('Failed to refetch pro status:', err);
+            }
+          }
+
+          let attempts = 0;
+          const maxAttempts = 50;
+          while (proLoadingRef.current && attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            attempts++;
+          }
+        }
+
+        const currentProfile = profileRef.current;
+        const isUserPro =
+          isProRef.current || currentProfile?.is_pro || currentProfile?.subscription_status === 'active';
+        if (!isUserPro) {
+          throw new Error('Trip tracking is a Pro feature');
+        }
+
+        return { track: { id: 'track-123' } };
+      };
+
+      const result = await startNewTrack();
+
+      expect(refetchProStatus).toHaveBeenCalled();
+      expect(result.track.id).toBe('track-123');
+    });
+
+    it('should timeout and fail if pro status never loads and user is not pro', async () => {
+      const proLoadingRef = { current: true };
+      const isProRef = { current: false };
+      const profileRef = { current: null };
+
+      const startNewTrack = async () => {
+        const user = { id: 'user-123' };
+        if (!user) {
+          throw new Error('You must be signed in to track');
+        }
+
+        if (proLoadingRef.current) {
+          // Use very short timeout for test
+          let attempts = 0;
+          const maxAttempts = 3;
+          while (proLoadingRef.current && attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            attempts++;
+          }
+        }
+
+        const currentProfile = profileRef.current;
+        const isUserPro =
+          isProRef.current || currentProfile?.is_pro || currentProfile?.subscription_status === 'active';
+        if (!isUserPro) {
+          throw new Error('Trip tracking is a Pro feature');
+        }
+
+        return { track: { id: 'track-123' } };
+      };
+
+      await expect(startNewTrack()).rejects.toThrow('Trip tracking is a Pro feature');
+    });
+  });
+
   describe('startNewTrack validation', () => {
     it('should require user to be signed in', async () => {
       const user = null;
