@@ -6,7 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { createServerClient } from '@/lib/supabase/client';
+import { createServerClient, createAuthenticatedClient } from '@/lib/supabase/client';
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
@@ -291,7 +291,12 @@ export async function PATCH(request, { params }) {
       const canFinalize = ['recording', 'paused'].includes(existingTrack.status);
       if (status === 'completed' && canFinalize) {
         // Finalize the track - calculate stats
-        const { data: finalizedTrack, error: finalizeError } = await supabase.rpc('finalize_track', {
+        // Use authenticated client for RPC call since finalize_track uses auth.uid()
+        const authHeader = request.headers.get('authorization');
+        const token = authHeader?.substring(7);
+        const authClient = createAuthenticatedClient(token);
+
+        const { data: finalizedTrack, error: finalizeError } = await authClient.rpc('finalize_track', {
           p_track_id: id,
         });
 

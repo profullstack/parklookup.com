@@ -187,8 +187,8 @@ export default function TrackDetailClient({ track, points, media }) {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Map Section */}
-      <div className="h-[50vh] relative">
+      {/* Map Section - z-0 to ensure header dropdown (z-50) appears above */}
+      <div className="h-[50vh] relative z-0">
         <LiveTrackMap
           points={points}
           geometry={track.geometry}

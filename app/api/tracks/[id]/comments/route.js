@@ -85,7 +85,7 @@ export async function GET(request, { params }) {
         parent_id,
         created_at,
         updated_at,
-        profiles!track_comments_user_id_fkey (
+        profiles!track_comments_user_id_profiles_fkey (
           id,
           display_name,
           avatar_url,
@@ -118,7 +118,7 @@ export async function GET(request, { params }) {
           parent_id,
           created_at,
           updated_at,
-          profiles!track_comments_user_id_fkey (
+          profiles!track_comments_user_id_profiles_fkey (
             id,
             display_name,
             avatar_url,
@@ -275,7 +275,7 @@ export async function POST(request, { params }) {
         content,
         parent_id,
         created_at,
-        profiles!track_comments_user_id_fkey (
+        profiles!track_comments_user_id_profiles_fkey (
           id,
           display_name,
           avatar_url,
