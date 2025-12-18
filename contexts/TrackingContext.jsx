@@ -58,6 +58,11 @@ export function TrackingProvider({ children }) {
         user: user?.id,
         isPro,
         proLoading,
+        profile: profile ? {
+          is_pro: profile.is_pro,
+          subscription_status: profile.subscription_status,
+          subscription_tier: profile.subscription_tier,
+        } : null,
         config,
       });
 
@@ -65,8 +70,14 @@ export function TrackingProvider({ children }) {
         throw new Error('You must be signed in to track');
       }
 
+      // Wait for pro status to load before checking
+      if (proLoading) {
+        console.log('TrackingContext: Pro status still loading, waiting...');
+        throw new Error('Loading subscription status, please try again');
+      }
+
       if (!isPro) {
-        console.log('TrackingContext: isPro is false, throwing error');
+        console.log('TrackingContext: isPro is false, throwing error. Profile:', profile);
         throw new Error('Trip tracking is a Pro feature');
       }
 
@@ -81,7 +92,7 @@ export function TrackingProvider({ children }) {
       // The useTracking hook will automatically start when enabled
       return tracking.startTracking(config);
     },
-    [user, isPro, tracking]
+    [user, isPro, proLoading, profile, tracking]
   );
 
   /**
