@@ -314,6 +314,23 @@ export async function POST(request) {
       );
     }
 
+    // Validate parkId exists in nps_parks table if provided
+    let validatedParkId = null;
+    if (parkId) {
+      const { data: npsPark, error: npsError } = await supabase
+        .from('nps_parks')
+        .select('id')
+        .eq('id', parkId)
+        .single();
+
+      if (npsError || !npsPark) {
+        console.warn(`Invalid parkId ${parkId} - not found in nps_parks table. Using parkCode instead.`);
+        // Don't use the invalid parkId, fall back to parkCode only
+      } else {
+        validatedParkId = parkId;
+      }
+    }
+
     // Create the track
     const { data: track, error } = await supabase
       .from('user_tracks')
@@ -322,7 +339,7 @@ export async function POST(request) {
         title: title || null,
         description: description || null,
         activity_type: activityType,
-        park_id: parkId || null,
+        park_id: validatedParkId,
         park_code: parkCode || null,
         trail_id: trailId || null,
         local_park_id: localParkId || null,
