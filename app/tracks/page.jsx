@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useProStatus } from '@/hooks/useProStatus';
@@ -63,6 +63,9 @@ function TracksPageContent() {
   const [pagination, setPagination] = useState({ total: 0, limit: 20, offset: 0 });
   const [startingTrack, setStartingTrack] = useState(false);
   const [startError, setStartError] = useState(null);
+  
+  // Ref to track if auto-start has been attempted (prevents infinite loops)
+  const autoStartAttemptedRef = useRef(false);
 
   // Get URL params for starting a new track
   const parkCode = searchParams.get('parkCode');
@@ -105,7 +108,11 @@ function TracksPageContent() {
   }, [isTracking, activeTab]);
 
   // Auto-start tracking if URL params indicate it
+  // Uses a ref to prevent infinite loops - only attempts once per page load
   useEffect(() => {
+    // Skip if already attempted or not ready
+    if (autoStartAttemptedRef.current) return;
+    
     const shouldAutoStart = autoStart && isPro && user && !isTracking && !startingTrack;
     const hasContext = parkCode || parkId || localParkId || trailId;
 
@@ -117,9 +124,12 @@ function TracksPageContent() {
       startingTrack,
       hasContext,
       shouldAutoStart,
+      alreadyAttempted: autoStartAttemptedRef.current,
     });
 
     if (shouldAutoStart && hasContext) {
+      // Mark as attempted BEFORE calling to prevent re-entry
+      autoStartAttemptedRef.current = true;
       console.log('Auto-starting tracking with context:', { parkCode, parkId, localParkId, trailId, parkName, trailName });
       handleStartTracking();
     }
