@@ -72,35 +72,9 @@ function TracksPageContent() {
   const trailName = searchParams.get('trailName');
   const autoStart = searchParams.get('start') === 'true';
 
-  // Update active tab when tracking state changes
-  useEffect(() => {
-    if (isTracking && activeTab !== 'tracking') {
-      setActiveTab('tracking');
-    }
-  }, [isTracking]);
-
-  // Auto-start tracking if URL params indicate it
-  useEffect(() => {
-    const shouldAutoStart = autoStart && isPro && user && !isTracking && !startingTrack;
-    const hasContext = parkCode || parkId || trailId;
-
-    if (shouldAutoStart && hasContext) {
-      handleStartTracking();
-    }
-  }, [autoStart, isPro, user, isTracking, parkCode, parkId, trailId]);
-
-  // Handle tab change
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    // Update URL without full page reload
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('tab', tabId);
-    router.push(`/tracks?${params.toString()}`, { scroll: false });
-  };
-
-  // Handle starting a new track
-  const handleStartTracking = async () => {
-    if (!user || !isPro || isTracking) return;
+  // Handle starting a new track - defined before useEffect that uses it
+  const handleStartTracking = useCallback(async () => {
+    if (!user || !isPro || isTracking || startingTrack) return;
 
     setStartingTrack(true);
     setStartError(null);
@@ -119,6 +93,43 @@ function TracksPageContent() {
     } finally {
       setStartingTrack(false);
     }
+  }, [user, isPro, isTracking, startingTrack, startNewTrack, trailName, parkName, parkCode, parkId, trailId]);
+
+  // Update active tab when tracking state changes
+  useEffect(() => {
+    if (isTracking && activeTab !== 'tracking') {
+      setActiveTab('tracking');
+    }
+  }, [isTracking, activeTab]);
+
+  // Auto-start tracking if URL params indicate it
+  useEffect(() => {
+    const shouldAutoStart = autoStart && isPro && user && !isTracking && !startingTrack;
+    const hasContext = parkCode || parkId || trailId;
+
+    console.log('Auto-start check:', {
+      autoStart,
+      isPro,
+      user: user?.id,
+      isTracking,
+      startingTrack,
+      hasContext,
+      shouldAutoStart,
+    });
+
+    if (shouldAutoStart && hasContext) {
+      console.log('Auto-starting tracking with context:', { parkCode, parkId, trailId, parkName, trailName });
+      handleStartTracking();
+    }
+  }, [autoStart, isPro, user, isTracking, startingTrack, parkCode, parkId, trailId, parkName, trailName, handleStartTracking]);
+
+  // Handle tab change
+  const handleTabChange = (tabId) => {
+    setActiveTab(tabId);
+    // Update URL without full page reload
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tab', tabId);
+    router.push(`/tracks?${params.toString()}`, { scroll: false });
   };
 
   // Handle stopping the track

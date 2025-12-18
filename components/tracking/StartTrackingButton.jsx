@@ -36,10 +36,8 @@ export default function StartTrackingButton({
 }) {
   const { user, loading: authLoading } = useAuth();
   // Use isPro from TrackingContext to ensure consistency
-  const { isTracking, startNewTrack, trackId, isPro, proLoading } = useTrackingContext();
+  const { isTracking, isPro, proLoading } = useTrackingContext();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [error, setError] = useState(null);
 
   // Combined loading state - wait for both auth and pro status
   const isLoading = authLoading || proLoading;
@@ -72,10 +70,11 @@ export default function StartTrackingButton({
       return;
     }
 
-    // If not logged in, redirect to sign in
+    // If not logged in, redirect to sign in with auto-start after login
     if (!user) {
       console.log('StartTrackingButton: No user, redirecting to signin');
-      window.location.href = `/signin?redirect=${encodeURIComponent(buildTrackingUrl())}`;
+      const trackingUrl = buildTrackingUrl() + '&start=true';
+      window.location.href = `/signin?redirect=${encodeURIComponent(trackingUrl)}`;
       return;
     }
 
@@ -86,31 +85,18 @@ export default function StartTrackingButton({
       return;
     }
 
-    // If already tracking, go to tracks page
+    // If already tracking, go to tracks page with tracking tab
     if (isTracking) {
-      window.location.href = '/tracks';
+      window.location.href = '/tracks?tab=tracking';
       return;
     }
 
-    // Start tracking with park/trail context
-    setStarting(true);
-    setError(null);
-
-    try {
-      await startNewTrack({
-        title: trailName || parkName || 'New Track',
-        parkCode,
-        parkId,
-        trailId,
-      });
-      
-      // Navigate to tracks page
-      window.location.href = '/tracks';
-    } catch (err) {
-      console.error('Failed to start tracking:', err);
-      setError(err.message);
-      setStarting(false);
-    }
+    // Redirect to tracks page with auto-start parameter
+    // The tracks page will handle starting the track with the provided context
+    // This ensures the tracking context is properly initialized on the tracks page
+    console.log('StartTrackingButton: Redirecting to tracks page with auto-start');
+    const trackingUrl = buildTrackingUrl() + '&start=true';
+    window.location.href = trackingUrl;
   };
 
   // Variant styles
@@ -152,16 +138,10 @@ export default function StartTrackingButton({
     <>
       <button
         onClick={handleClick}
-        disabled={starting}
         className={buttonClasses}
         title={isTracking ? 'Continue tracking' : 'Start tracking your activity'}
       >
-        {starting ? (
-          <>
-            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-            Starting...
-          </>
-        ) : isTracking ? (
+        {isTracking ? (
           <>
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -182,10 +162,6 @@ export default function StartTrackingButton({
           </>
         )}
       </button>
-
-      {error && (
-        <p className="text-red-500 text-sm mt-2">{error}</p>
-      )}
 
       {/* Upgrade Modal for non-pro users */}
       <UpgradeModal
