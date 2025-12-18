@@ -18,6 +18,7 @@ const createChainableMock = (finalResult) => {
     single: vi.fn(() => Promise.resolve(finalResult)),
     textSearch: vi.fn(() => chainable),
     not: vi.fn(() => chainable),
+    filter: vi.fn(() => chainable),
   };
   return chainable;
 };
@@ -787,6 +788,7 @@ describe('Parks Search API', () => {
       };
       mockSupabaseClient = {
         from: vi.fn(() => createChainableMock(parksWithMixedImages)),
+        rpc: vi.fn(() => Promise.resolve({ data: null, error: { message: 'RPC not available' } })),
       };
 
       const { GET } = await import('@/app/api/parks/search/route.js');
@@ -825,6 +827,7 @@ describe('Parks Search API', () => {
       };
       mockSupabaseClient = {
         from: vi.fn(() => createChainableMock(parksWithWikidataImage)),
+        rpc: vi.fn(() => Promise.resolve({ data: null, error: { message: 'RPC not available' } })),
       };
 
       const { GET } = await import('@/app/api/parks/search/route.js');
@@ -864,6 +867,7 @@ describe('Parks Search API', () => {
       };
       mockSupabaseClient = {
         from: vi.fn(() => createChainableMock(parksWithEmptyImages)),
+        rpc: vi.fn(() => Promise.resolve({ data: null, error: { message: 'RPC not available' } })),
       };
 
       const { GET } = await import('@/app/api/parks/search/route.js');
