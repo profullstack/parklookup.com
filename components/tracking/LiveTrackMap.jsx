@@ -5,6 +5,9 @@ import dynamic from 'next/dynamic';
 import { getActivityColor, getActivityIcon } from '@/lib/tracking/activity-detection';
 import { formatDistance, formatDuration, formatSpeed } from '@/lib/tracking/track-stats';
 
+// Import Leaflet CSS
+import 'leaflet/dist/leaflet.css';
+
 // Dynamically import Leaflet components to avoid SSR issues
 const MapContainer = dynamic(() => import('react-leaflet').then((mod) => mod.MapContainer), {
   ssr: false,
@@ -31,9 +34,11 @@ const Popup = dynamic(() => import('react-leaflet').then((mod) => mod.Popup), {
   ssr: false,
 });
 
-const useMap = dynamic(() => import('react-leaflet').then((mod) => mod.useMap), {
-  ssr: false,
-});
+// Dynamically import the MapBoundsUpdater component that uses useMap hook
+const MapBoundsUpdaterComponent = dynamic(
+  () => import('./MapBoundsUpdater').then((mod) => mod.default),
+  { ssr: false }
+);
 
 /**
  * Map placeholder while loading
@@ -47,31 +52,6 @@ function MapPlaceholder() {
       </div>
     </div>
   );
-}
-
-/**
- * Component to auto-fit map bounds to track
- */
-function MapBoundsUpdater({ points, followUser, currentPosition }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-
-    if (followUser && currentPosition) {
-      // Center on current position when following
-      map.setView([currentPosition.latitude, currentPosition.longitude], map.getZoom());
-    } else if (points.length > 1) {
-      // Fit bounds to all points
-      const bounds = points.map((p) => [p.latitude, p.longitude]);
-      map.fitBounds(bounds, { padding: [50, 50] });
-    } else if (points.length === 1) {
-      // Center on single point
-      map.setView([points[0].latitude, points[0].longitude], 15);
-    }
-  }, [map, points, followUser, currentPosition]);
-
-  return null;
 }
 
 /**
@@ -292,7 +272,7 @@ export default function LiveTrackMap({
 
           {/* Map bounds updater */}
           {mapReady && (
-            <MapBoundsUpdater
+            <MapBoundsUpdaterComponent
               points={points}
               followUser={followUser && isLive}
               currentPosition={currentPosition}

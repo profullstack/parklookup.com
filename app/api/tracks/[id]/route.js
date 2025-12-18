@@ -288,7 +288,8 @@ export async function PATCH(request, { params }) {
       }
 
       // Handle status transitions
-      if (status === 'completed' && existingTrack.status === 'recording') {
+      const canFinalize = ['recording', 'paused'].includes(existingTrack.status);
+      if (status === 'completed' && canFinalize) {
         // Finalize the track - calculate stats
         const { data: finalizedTrack, error: finalizeError } = await supabase.rpc('finalize_track', {
           p_track_id: id,
