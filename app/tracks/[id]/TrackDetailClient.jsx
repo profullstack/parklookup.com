@@ -2,9 +2,22 @@
 
 import { useState, useCallback, useMemo } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/hooks/useAuth';
-import LiveTrackMap from '@/components/tracking/LiveTrackMap';
 import { getActivityIcon, getActivityColor } from '@/lib/tracking/activity-detection';
+
+// Dynamically import LiveTrackMap to avoid SSR issues with Leaflet
+const LiveTrackMap = dynamic(() => import('@/components/tracking/LiveTrackMap'), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
+        <p className="text-gray-500 dark:text-gray-400 text-sm">Loading map...</p>
+      </div>
+    </div>
+  ),
+});
 import { formatDistance, formatDuration, formatSpeed, formatElevation } from '@/lib/tracking/track-stats';
 import {
   likeTrack,

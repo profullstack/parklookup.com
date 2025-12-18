@@ -1,57 +1,30 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
+import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, useMap } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import { getActivityColor, getActivityIcon } from '@/lib/tracking/activity-detection';
 import { formatDistance, formatDuration, formatSpeed } from '@/lib/tracking/track-stats';
 
-// Import Leaflet CSS
-import 'leaflet/dist/leaflet.css';
-
-// Dynamically import Leaflet components to avoid SSR issues
-const MapContainer = dynamic(() => import('react-leaflet').then((mod) => mod.MapContainer), {
-  ssr: false,
-  loading: () => <MapPlaceholder />,
-});
-
-const TileLayer = dynamic(() => import('react-leaflet').then((mod) => mod.TileLayer), {
-  ssr: false,
-});
-
-const Polyline = dynamic(() => import('react-leaflet').then((mod) => mod.Polyline), {
-  ssr: false,
-});
-
-const CircleMarker = dynamic(() => import('react-leaflet').then((mod) => mod.CircleMarker), {
-  ssr: false,
-});
-
-const Marker = dynamic(() => import('react-leaflet').then((mod) => mod.Marker), {
-  ssr: false,
-});
-
-const Popup = dynamic(() => import('react-leaflet').then((mod) => mod.Popup), {
-  ssr: false,
-});
-
-// Dynamically import the MapBoundsUpdater component that uses useMap hook
-const MapBoundsUpdaterComponent = dynamic(
-  () => import('./MapBoundsUpdater').then((mod) => mod.default),
-  { ssr: false }
-);
-
 /**
- * Map placeholder while loading
+ * Component to handle map bounds updates
  */
-function MapPlaceholder() {
-  return (
-    <div className="w-full h-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600 mx-auto mb-2"></div>
-        <p className="text-gray-500 dark:text-gray-400 text-sm">Loading map...</p>
-      </div>
-    </div>
-  );
+function MapBoundsUpdater({ points, followUser, currentPosition }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (followUser && currentPosition) {
+      map.setView([currentPosition.latitude, currentPosition.longitude], map.getZoom(), {
+        animate: true,
+      });
+    } else if (points.length > 0) {
+      const bounds = L.latLngBounds(points.map((p) => [p.latitude, p.longitude]));
+      map.fitBounds(bounds, { padding: [50, 50] });
+    }
+  }, [map, points, followUser, currentPosition]);
+
+  return null;
 }
 
 /**
@@ -125,12 +98,14 @@ export default function LiveTrackMap({
         <MapContainer
           center={center}
           zoom={15}
-          className="w-full h-full"
+          scrollWheelZoom={true}
+          className="w-full h-full z-0"
           ref={mapRef}
           whenReady={() => setMapReady(true)}
+          style={{ height: '100%', width: '100%' }}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
@@ -224,10 +199,10 @@ export default function LiveTrackMap({
           )}
 
           {/* Accuracy circle (for live tracking) */}
-          {isLive && currentPosition?.accuracy && (
+          {isLive && currentPosition?.accuracy && currentPosition.accuracy < 100 && (
             <CircleMarker
               center={[currentPosition.latitude, currentPosition.longitude]}
-              radius={currentPosition.accuracy}
+              radius={Math.min(currentPosition.accuracy / 10, 30)}
               pathOptions={{
                 color: '#3b82f6',
                 fillColor: '#3b82f6',
@@ -272,7 +247,7 @@ export default function LiveTrackMap({
 
           {/* Map bounds updater */}
           {mapReady && (
-            <MapBoundsUpdaterComponent
+            <MapBoundsUpdater
               points={points}
               followUser={followUser && isLive}
               currentPosition={currentPosition}
@@ -283,7 +258,7 @@ export default function LiveTrackMap({
 
       {/* Stats Overlay */}
       {showStats && stats && (
-        <div className="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
+        <div className="absolute bottom-4 left-4 right-4 bg-white/90 dark:bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 shadow-lg z-[1000]">
           <div className="flex items-center justify-between gap-4">
             {/* Activity Icon */}
             <div className="flex items-center gap-2">
@@ -352,7 +327,7 @@ export default function LiveTrackMap({
 
       {/* Empty state */}
       {coordinates.length === 0 && !isLive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 dark:bg-gray-800/80">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 dark:bg-gray-800/80 z-[1000]">
           <div className="text-center">
             <svg
               className="w-12 h-12 mx-auto text-gray-400 mb-2"
@@ -374,7 +349,7 @@ export default function LiveTrackMap({
 
       {/* Waiting for GPS (live tracking) */}
       {isLive && coordinates.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 dark:bg-gray-800/80">
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100/80 dark:bg-gray-800/80 z-[1000]">
           <div className="text-center">
             <div className="animate-pulse">
               <svg
