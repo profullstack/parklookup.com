@@ -19,6 +19,7 @@ function ResetPasswordContent() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [tokenError, setTokenError] = useState(false);
+  const [isChecking, setIsChecking] = useState(true);
 
   // Get the access token from URL hash or query params
   // Supabase sends the token in the URL fragment
@@ -29,7 +30,9 @@ function ResetPasswordContent() {
 
     // Parse the access token from URL
     // Supabase sends it as a hash fragment: #access_token=xxx&type=recovery
-    if (typeof window !== 'undefined') {
+    const checkForToken = () => {
+      if (typeof window === 'undefined') return;
+
       const hash = window.location.hash;
       if (hash) {
         const params = new URLSearchParams(hash.substring(1));
@@ -38,21 +41,29 @@ function ResetPasswordContent() {
 
         if (token && type === 'recovery') {
           setAccessToken(token);
-        } else if (hash && !token) {
-          setTokenError(true);
-        }
-      } else {
-        // Check query params as fallback
-        const token = searchParams.get('access_token');
-        const type = searchParams.get('type');
-
-        if (token && type === 'recovery') {
-          setAccessToken(token);
-        } else {
-          setTokenError(true);
+          setIsChecking(false);
+          return;
         }
       }
-    }
+
+      // Check query params as fallback
+      const token = searchParams.get('access_token');
+      const type = searchParams.get('type');
+
+      if (token && type === 'recovery') {
+        setAccessToken(token);
+        setIsChecking(false);
+        return;
+      }
+
+      // No valid token found
+      setTokenError(true);
+      setIsChecking(false);
+    };
+
+    // Small delay to allow hash to be set by AuthRedirectHandler
+    const timer = setTimeout(checkForToken, 100);
+    return () => clearTimeout(timer);
   }, [trackPageView, searchParams]);
 
   const handleSubmit = async (e) => {
@@ -99,6 +110,62 @@ function ResetPasswordContent() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking for token
+  if (isChecking) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 px-4 py-12">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-8">
+            <Link href="/" className="inline-flex items-center">
+              <svg
+                className="w-10 h-10 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z"
+                />
+              </svg>
+              <span className="ml-2 text-2xl font-bold text-gray-900 dark:text-white">
+                ParkLookup
+              </span>
+            </Link>
+          </div>
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 text-center">
+            <div className="flex items-center justify-center">
+              <svg
+                className="animate-spin h-8 w-8 text-green-600"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+            </div>
+            <p className="mt-4 text-gray-600 dark:text-gray-400">
+              Verifying reset link...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Show error if no valid token
   if (tokenError) {
