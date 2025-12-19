@@ -39,6 +39,11 @@ vi.mock('@/contexts/TrackingContext', () => ({
   }),
 }));
 
+// Mock AuthRedirectHandler (uses Next.js router which isn't available in tests)
+vi.mock('@/components/auth/AuthRedirectHandler', () => ({
+  default: () => null,
+}));
+
 // Import after mocks
 import { Providers } from '@/components/Providers';
 

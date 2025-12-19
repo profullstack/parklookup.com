@@ -5,6 +5,7 @@ import { TrackingProvider } from '@/contexts/TrackingContext';
 import Header from '@/components/layout/Header';
 import { OfflineBanner } from '@/components/ui/OfflineBanner';
 import { InstallPrompt } from '@/components/ui/InstallPrompt';
+import AuthRedirectHandler from '@/components/auth/AuthRedirectHandler';
 
 /**
  * Client-side providers wrapper component
@@ -14,6 +15,9 @@ export function Providers({ children }) {
   return (
     <AuthProvider>
       <TrackingProvider>
+        {/* Handle auth redirects (password recovery, email confirmation, etc.) */}
+        <AuthRedirectHandler />
+        
         <div className="relative flex min-h-screen flex-col">
           <Header />
           <main className="flex-1">{children}</main>
