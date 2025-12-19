@@ -41,27 +41,26 @@ enable_signup = true
 enable_signup = true
 double_confirm_changes = true
 enable_confirmations = true
-sender_name = "ParkLookup"
 
 [auth.email.template.confirmation]
 subject = "Welcome to ParkLookup - Confirm Your Email"
-content_path = "./templates/confirm.html"
+content_path = "./supabase/templates/confirm.html"
 
 [auth.email.template.recovery]
 subject = "Reset Your ParkLookup Password"
-content_path = "./templates/recovery.html"
+content_path = "./supabase/templates/recovery.html"
 
 [auth.email.template.magic_link]
 subject = "Sign In to ParkLookup"
-content_path = "./templates/magic_link.html"
+content_path = "./supabase/templates/magic_link.html"
 
 [auth.email.template.email_change]
 subject = "Confirm Your New Email - ParkLookup"
-content_path = "./templates/email_change.html"
+content_path = "./supabase/templates/email_change.html"
 
 [auth.email.template.invite]
 subject = "You're Invited to ParkLookup"
-content_path = "./templates/invite.html"
+content_path = "./supabase/templates/invite.html"
 
 [auth.sms]
 enable_signup = false
