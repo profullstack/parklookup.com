@@ -575,12 +575,31 @@ export default function TrackDetailClient({ track, points, media }) {
                     const userProfile = comment.user || comment.profiles;
                     const displayName = userProfile?.displayName || userProfile?.display_name;
                     const avatarUrl = userProfile?.avatarUrl || userProfile?.avatar_url;
+                    const username = userProfile?.username || userProfile?.id;
+                    const userId = userProfile?.id || comment.user_id;
                     const createdAt = comment.createdAt || comment.created_at;
+                    const userProfileUrl = username ? `/users/${username}` : userId ? `/users/${userId}` : null;
                     
                     return (
                       <div key={comment.id} className="flex gap-3">
                         <div className="flex-shrink-0">
-                          {avatarUrl ? (
+                          {userProfileUrl ? (
+                            <Link href={userProfileUrl} className="block">
+                              {avatarUrl ? (
+                                <img
+                                  src={avatarUrl}
+                                  alt={displayName || 'User'}
+                                  className="w-8 h-8 rounded-full object-cover hover:opacity-80 transition-opacity"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                                  <span className="text-gray-500 dark:text-gray-400 text-sm font-medium">
+                                    {displayName?.charAt(0).toUpperCase() || '?'}
+                                  </span>
+                                </div>
+                              )}
+                            </Link>
+                          ) : avatarUrl ? (
                             <img
                               src={avatarUrl}
                               alt={displayName || 'User'}
@@ -596,9 +615,18 @@ export default function TrackDetailClient({ track, points, media }) {
                         </div>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-gray-900 dark:text-white">
-                              {displayName || 'Anonymous'}
-                            </span>
+                            {userProfileUrl ? (
+                              <Link
+                                href={userProfileUrl}
+                                className="font-medium text-gray-900 dark:text-white hover:text-green-600 dark:hover:text-green-400 transition-colors"
+                              >
+                                {displayName || 'Anonymous'}
+                              </Link>
+                            ) : (
+                              <span className="font-medium text-gray-900 dark:text-white">
+                                {displayName || 'Anonymous'}
+                              </span>
+                            )}
                             <span className="text-sm text-gray-500 dark:text-gray-400">
                               {createdAt ? new Date(createdAt).toLocaleDateString() : ''}
                             </span>

@@ -506,7 +506,195 @@ describe('TrackDetailClient', () => {
       
       await waitFor(() => {
         expect(screen.queryByRole('button', { name: /delete/i })).not.toBeInTheDocument();
+        });
+      });
+    });
+  
+    describe('Comment User Profile Links', () => {
+      it('should render comment username as a link to user profile', async () => {
+        mockGetTrackComments.mockResolvedValue({
+          comments: [
+            {
+              id: 'comment-1',
+              content: 'Great hike!',
+              created_at: '2024-01-15T10:00:00Z',
+              profiles: {
+                id: 'commenter-123',
+                display_name: 'John Commenter',
+                username: 'johncommenter',
+                avatar_url: null
+              },
+            },
+          ],
+        });
+        
+        const track = createMockTrack({ comments_count: 1 });
+        
+        render(<TrackDetailClient track={track} points={mockPoints} media={mockMedia} />);
+        
+        // Click comments button to show comments
+        const commentsButton = screen.getAllByRole('button').find(btn => btn.textContent.includes('1'));
+        
+        await act(async () => {
+          fireEvent.click(commentsButton);
+        });
+  
+        await waitFor(() => {
+          // Find the link with the username
+          const usernameLink = screen.getByRole('link', { name: 'John Commenter' });
+          expect(usernameLink).toBeInTheDocument();
+          expect(usernameLink).toHaveAttribute('href', '/users/johncommenter');
+        });
+      });
+  
+      it('should render comment avatar as a link to user profile', async () => {
+        mockGetTrackComments.mockResolvedValue({
+          comments: [
+            {
+              id: 'comment-1',
+              content: 'Nice trail!',
+              created_at: '2024-01-15T10:00:00Z',
+              profiles: {
+                id: 'commenter-456',
+                display_name: 'Jane Hiker',
+                username: 'janehiker',
+                avatar_url: 'https://example.com/avatar.jpg'
+              },
+            },
+          ],
+        });
+        
+        const track = createMockTrack({ comments_count: 1 });
+        
+        render(<TrackDetailClient track={track} points={mockPoints} media={mockMedia} />);
+        
+        // Click comments button to show comments
+        const commentsButton = screen.getAllByRole('button').find(btn => btn.textContent.includes('1'));
+        
+        await act(async () => {
+          fireEvent.click(commentsButton);
+        });
+  
+        await waitFor(() => {
+          // Find the avatar image
+          const avatarImg = screen.getByAltText('Jane Hiker');
+          expect(avatarImg).toBeInTheDocument();
+          
+          // The avatar should be wrapped in a link
+          const avatarLink = avatarImg.closest('a');
+          expect(avatarLink).toHaveAttribute('href', '/users/janehiker');
+        });
+      });
+  
+      it('should use user id as fallback when username is not available', async () => {
+        mockGetTrackComments.mockResolvedValue({
+          comments: [
+            {
+              id: 'comment-1',
+              content: 'Beautiful views!',
+              created_at: '2024-01-15T10:00:00Z',
+              profiles: {
+                id: 'user-789',
+                display_name: 'Anonymous User',
+                username: null,  // No username
+                avatar_url: null
+              },
+            },
+          ],
+        });
+        
+        const track = createMockTrack({ comments_count: 1 });
+        
+        render(<TrackDetailClient track={track} points={mockPoints} media={mockMedia} />);
+        
+        // Click comments button to show comments
+        const commentsButton = screen.getAllByRole('button').find(btn => btn.textContent.includes('1'));
+        
+        await act(async () => {
+          fireEvent.click(commentsButton);
+        });
+  
+        await waitFor(() => {
+          // Find the link with the display name
+          const usernameLink = screen.getByRole('link', { name: 'Anonymous User' });
+          expect(usernameLink).toBeInTheDocument();
+          // Should use user id as fallback
+          expect(usernameLink).toHaveAttribute('href', '/users/user-789');
+        });
+      });
+  
+      it('should handle camelCase API format for user profile', async () => {
+        mockGetTrackComments.mockResolvedValue({
+          comments: [
+            {
+              id: 'comment-1',
+              content: 'Loved it!',
+              createdAt: '2024-01-15T10:00:00Z',  // camelCase
+              user: {  // camelCase format
+                id: 'user-abc',
+                displayName: 'Camel User',
+                username: 'cameluser',
+                avatarUrl: null
+              },
+            },
+          ],
+        });
+        
+        const track = createMockTrack({ comments_count: 1 });
+        
+        render(<TrackDetailClient track={track} points={mockPoints} media={mockMedia} />);
+        
+        // Click comments button to show comments
+        const commentsButton = screen.getAllByRole('button').find(btn => btn.textContent.includes('1'));
+        
+        await act(async () => {
+          fireEvent.click(commentsButton);
+        });
+  
+        await waitFor(() => {
+          // Find the link with the display name
+          const usernameLink = screen.getByRole('link', { name: 'Camel User' });
+          expect(usernameLink).toBeInTheDocument();
+          expect(usernameLink).toHaveAttribute('href', '/users/cameluser');
+        });
+      });
+  
+      it('should display avatar placeholder with first letter when no avatar URL', async () => {
+        mockGetTrackComments.mockResolvedValue({
+          comments: [
+            {
+              id: 'comment-1',
+              content: 'Great experience!',
+              created_at: '2024-01-15T10:00:00Z',
+              profiles: {
+                id: 'user-xyz',
+                display_name: 'Mike Trails',
+                username: 'miketrails',
+                avatar_url: null
+              },
+            },
+          ],
+        });
+        
+        const track = createMockTrack({ comments_count: 1 });
+        
+        render(<TrackDetailClient track={track} points={mockPoints} media={mockMedia} />);
+        
+        // Click comments button to show comments
+        const commentsButton = screen.getAllByRole('button').find(btn => btn.textContent.includes('1'));
+        
+        await act(async () => {
+          fireEvent.click(commentsButton);
+        });
+  
+        await waitFor(() => {
+          // Should show first letter of display name
+          expect(screen.getByText('M')).toBeInTheDocument();
+          
+          // The placeholder should be wrapped in a link
+          const placeholderLink = screen.getByText('M').closest('a');
+          expect(placeholderLink).toHaveAttribute('href', '/users/miketrails');
+        });
       });
     });
   });
-});
