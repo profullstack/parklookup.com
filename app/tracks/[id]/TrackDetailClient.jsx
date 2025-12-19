@@ -38,7 +38,8 @@ export default function TrackDetailClient({ track, points, media }) {
   const { user, accessToken } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(track.likes_count || 0);
-  const [isShared, setIsShared] = useState(track.is_public);
+  // Track is shared if is_public is true AND status is 'shared'
+  const [isShared, setIsShared] = useState(track.is_public && track.status === 'shared');
   const [comments, setComments] = useState([]);
   const [commentsCount, setCommentsCount] = useState(track.comments_count || 0);
   const [showComments, setShowComments] = useState(false);
@@ -47,6 +48,11 @@ export default function TrackDetailClient({ track, points, media }) {
   const [selectedMedia, setSelectedMedia] = useState(null);
 
   const isOwner = user?.id === track.user_id;
+
+  // Sync isShared state with track prop when it changes (e.g., after page refresh)
+  useEffect(() => {
+    setIsShared(track.is_public && track.status === 'shared');
+  }, [track.is_public, track.status]);
 
   // Fetch initial like status when component mounts or user changes
   useEffect(() => {
@@ -116,15 +122,31 @@ export default function TrackDetailClient({ track, points, media }) {
     if (!accessToken || !isOwner) return;
 
     setIsLoading(true);
+    const previousState = isShared;
+    
     try {
       if (isShared) {
-        await unshareTrack(accessToken, track.id);
+        // Optimistically update UI
         setIsShared(false);
+        const result = await unshareTrack(accessToken, track.id);
+        if (result.error) {
+          // Revert on error
+          setIsShared(previousState);
+          console.error('Failed to unshare track:', result.error);
+        }
       } else {
-        await shareTrack(accessToken, track.id);
+        // Optimistically update UI
         setIsShared(true);
+        const result = await shareTrack(accessToken, track.id);
+        if (result.error) {
+          // Revert on error
+          setIsShared(previousState);
+          console.error('Failed to share track:', result.error);
+        }
       }
     } catch (error) {
+      // Revert on exception
+      setIsShared(previousState);
       console.error('Failed to update share status:', error);
     } finally {
       setIsLoading(false);
