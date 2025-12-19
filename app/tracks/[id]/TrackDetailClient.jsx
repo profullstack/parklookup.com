@@ -84,24 +84,6 @@ export default function TrackDetailClient({ track, points, media }) {
   const isOwner = user?.id === track.user_id;
   const isPublic = track.is_public;
 
-  // Access control: private tracks are only visible to their owner
-  // Wait for auth to load before checking access for private tracks
-  if (!isPublic && !authLoading && !isOwner) {
-    return <TrackNotFoundClient />;
-  }
-
-  // Show loading state while auth is loading for private tracks
-  if (!isPublic && authLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
   // Sync isShared state with track prop when it changes (e.g., after page refresh)
   useEffect(() => {
     setIsShared(track.is_public && track.status === 'shared');
@@ -292,6 +274,26 @@ export default function TrackDetailClient({ track, points, media }) {
   }, [track.title, track.activity_type]);
 
   const trackColor = getActivityColor(track.activity_type);
+
+  // Access control: private tracks are only visible to their owner
+  // This check must come AFTER all hooks to comply with React's rules of hooks
+  
+  // Show loading state while auth is loading for private tracks
+  if (!isPublic && authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Wait for auth to load before checking access for private tracks
+  if (!isPublic && !authLoading && !isOwner) {
+    return <TrackNotFoundClient />;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
