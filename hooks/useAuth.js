@@ -189,6 +189,55 @@ export function AuthProvider({ children }) {
   };
 
   /**
+   * Request password reset email
+   * @param {string} email - User's email address
+   */
+  const forgotPassword = async (email) => {
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: { message: data.error } };
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: { message: error.message } };
+    }
+  };
+
+  /**
+   * Reset password with access token from email link
+   * @param {string} password - New password
+   * @param {string} accessToken - Access token from reset email link
+   */
+  const resetPassword = async (password, accessToken) => {
+    try {
+      const response = await fetch('/api/auth/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password, accessToken }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        return { data: null, error: { message: data.error } };
+      }
+
+      return { data, error: null };
+    } catch (error) {
+      return { data: null, error: { message: error.message } };
+    }
+  };
+
+  /**
    * Refresh session from server
    */
   const refreshSession = async () => {
@@ -215,6 +264,8 @@ export function AuthProvider({ children }) {
     signIn,
     signUp,
     signOut,
+    forgotPassword,
+    resetPassword,
     refreshSession,
     isAuthenticated: !!user,
     // Convenience getter for access token
