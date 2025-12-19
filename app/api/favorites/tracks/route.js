@@ -75,10 +75,19 @@ export async function GET(request) {
       return NextResponse.json({ error: 'Failed to fetch liked tracks' }, { status: 500 });
     }
 
-    // Filter out tracks that are no longer public or have been deleted
-    const validTracks = (likedTracks || []).filter(
-      (like) => like.user_tracks && like.user_tracks.is_public && like.user_tracks.status === 'shared'
-    );
+    // Filter out tracks that are:
+    // 1. Deleted
+    // 2. Not accessible (not public/shared AND not owned by the user)
+    const validTracks = (likedTracks || []).filter((like) => {
+      if (!like.user_tracks) return false;
+      if (like.user_tracks.status === 'deleted') return false;
+      
+      // User can see their own tracks regardless of public status
+      if (like.user_tracks.user_id === user.id) return true;
+      
+      // For other users' tracks, must be public and shared
+      return like.user_tracks.is_public && like.user_tracks.status === 'shared';
+    });
 
     // Get unique user IDs and park codes for additional data
     const userIds = [...new Set(validTracks.map((t) => t.user_tracks.user_id))];

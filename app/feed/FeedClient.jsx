@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { getFeed, toggleMediaLike } from '@/lib/media/media-client';
+import { toggleTrackLike } from '@/lib/tracking/tracking-client';
 
 /**
  * Format relative time
@@ -32,7 +33,232 @@ const formatRelativeTime = (dateString) => {
 };
 
 /**
- * Feed Item Component
+ * Format distance for display
+ */
+const formatDistance = (meters) => {
+  if (!meters) return 'N/A';
+  if (meters < 1000) {
+    return `${Math.round(meters)} m`;
+  }
+  const km = meters / 1000;
+  const miles = km * 0.621371;
+  return `${miles.toFixed(1)} mi`;
+};
+
+/**
+ * Format duration for display
+ */
+const formatDuration = (seconds) => {
+  if (!seconds) return 'N/A';
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+};
+
+/**
+ * Activity type icons
+ */
+const activityIcons = {
+  walking: '🚶',
+  hiking: '🥾',
+  biking: '🚴',
+  driving: '🚗',
+};
+
+/**
+ * Track Feed Item Component
+ */
+function TrackFeedItem({ item, onLikeToggle, currentUserId, accessToken }) {
+  const [isLiked, setIsLiked] = useState(item.user_has_liked || false);
+  const [likesCount, setLikesCount] = useState(item.likes_count || 0);
+  const [isLiking, setIsLiking] = useState(false);
+
+  const trackId = item.track_id;
+
+  const handleLikeClick = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!currentUserId || isLiking) return;
+
+    setIsLiking(true);
+    const previousLiked = isLiked;
+    const previousCount = likesCount;
+
+    // Optimistic update
+    setIsLiked(!isLiked);
+    setLikesCount(isLiked ? likesCount - 1 : likesCount + 1);
+
+    const result = await onLikeToggle(trackId, isLiked);
+
+    if (result.error) {
+      // Revert on error
+      setIsLiked(previousLiked);
+      setLikesCount(previousCount);
+    }
+
+    setIsLiking(false);
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 p-4">
+        <Link href={`/users/${item.user_username || item.user_id}`}>
+          {item.user_avatar_url ? (
+            <Image
+              src={item.user_avatar_url}
+              alt={item.user_display_name || 'User'}
+              width={40}
+              height={40}
+              className="rounded-full"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+              <svg className="w-5 h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+              </svg>
+            </div>
+          )}
+        </Link>
+        <div className="flex-1 min-w-0">
+          <Link
+            href={`/users/${item.user_username || item.user_id}`}
+            className="font-medium text-gray-900 dark:text-white hover:underline"
+          >
+            {item.user_display_name || 'Anonymous'}
+          </Link>
+          <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+            <span>{formatRelativeTime(item.created_at)}</span>
+            {item.park_name && (
+              <>
+                <span>•</span>
+                <Link
+                  href={item.park_code ? `/parks/${item.park_code}` : '#'}
+                  className="hover:text-green-600 truncate"
+                >
+                  {item.park_name}
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+        {/* Track badge */}
+        <div className="flex items-center gap-1 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-medium">
+          <span>{activityIcons[item.activity_type] || '📍'}</span>
+          <span className="capitalize">{item.activity_type || 'Track'}</span>
+        </div>
+      </div>
+
+      {/* Track Preview */}
+      <Link href={`/tracks/${trackId}`} className="block">
+        <div className="relative bg-gradient-to-br from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20 p-6">
+          {/* Track Stats */}
+          <div className="flex items-center justify-around text-center">
+            <div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatDistance(item.distance_meters)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Distance</p>
+            </div>
+            <div className="h-12 w-px bg-gray-200 dark:bg-gray-700" />
+            <div>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                {formatDuration(item.duration_seconds)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Duration</p>
+            </div>
+            {item.elevation_gain_m > 0 && (
+              <>
+                <div className="h-12 w-px bg-gray-200 dark:bg-gray-700" />
+                <div>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                    {Math.round(item.elevation_gain_m)}m
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Elevation</p>
+                </div>
+              </>
+            )}
+          </div>
+          
+          {/* View Track Link */}
+          <div className="mt-4 text-center">
+            <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+              View Track →
+            </span>
+          </div>
+        </div>
+      </Link>
+
+      {/* Actions */}
+      <div className="p-4">
+        <div className="flex items-center gap-4 mb-2">
+          {/* Like button */}
+          <button
+            onClick={handleLikeClick}
+            disabled={!currentUserId || isLiking}
+            className={`flex items-center gap-1 transition-colors ${
+              isLiked ? 'text-red-500' : 'text-gray-600 dark:text-gray-400 hover:text-red-500'
+            } ${!currentUserId ? 'cursor-default' : ''}`}
+          >
+            <svg
+              className="w-6 h-6"
+              fill={isLiked ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"
+              />
+            </svg>
+            <span className="font-medium">{likesCount}</span>
+          </button>
+
+          {/* Comments */}
+          <Link
+            href={`/tracks/${trackId}`}
+            className="flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-green-500"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
+              />
+            </svg>
+            <span className="font-medium">{item.comments_count || 0}</span>
+          </Link>
+        </div>
+
+        {/* Title/Description */}
+        {(item.title || item.description) && (
+          <div className="text-sm">
+            {item.title && (
+              <span className="font-medium text-gray-900 dark:text-white mr-2">
+                {item.title}
+              </span>
+            )}
+            {item.description && (
+              <span className="text-gray-600 dark:text-gray-400 line-clamp-2">
+                {item.description}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Media Feed Item Component
  */
 function FeedItem({ item, onLikeToggle, currentUserId }) {
   const [isLiked, setIsLiked] = useState(item.user_has_liked || false);
@@ -222,12 +448,12 @@ function FeedItem({ item, onLikeToggle, currentUserId }) {
 export default function FeedClient() {
   const { user, accessToken, loading: authLoading } = useAuth();
   const [feedType, setFeedType] = useState('following');
-  const [media, setMedia] = useState([]);
+  const [feedItems, setFeedItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(true);
   const [offset, setOffset] = useState(0);
-  const limit = 10;
+  const limit = 20;
 
   useEffect(() => {
     if (!authLoading) {
@@ -240,7 +466,7 @@ export default function FeedClient() {
     setLoading(true);
     setError(null);
 
-    const { media: newMedia, feed_type, error: fetchError } = await getFeed(accessToken, {
+    const { items: newItems, media: newMedia, feed_type, error: fetchError } = await getFeed(accessToken, {
       type: feedType,
       limit,
       offset: currentOffset,
@@ -252,10 +478,13 @@ export default function FeedClient() {
       return;
     }
 
+    // Use items if available (discover feed), otherwise use media (following feed)
+    const itemsToUse = newItems?.length > 0 ? newItems : newMedia || [];
+
     if (loadMore) {
-      setMedia((prev) => [...prev, ...newMedia]);
+      setFeedItems((prev) => [...prev, ...itemsToUse]);
     } else {
-      setMedia(newMedia);
+      setFeedItems(itemsToUse);
     }
 
     // If user requested following but got discover, they have no follows
@@ -263,17 +492,25 @@ export default function FeedClient() {
       setFeedType('discover');
     }
 
-    setHasMore(newMedia.length === limit);
-    setOffset(currentOffset + newMedia.length);
+    setHasMore(itemsToUse.length === limit);
+    setOffset(currentOffset + itemsToUse.length);
     setLoading(false);
   };
 
-  const handleLikeToggle = async (mediaId, currentlyLiked) => {
+  const handleMediaLikeToggle = async (mediaId, currentlyLiked) => {
     if (!accessToken) {
       return { error: { message: 'Please sign in to like photos' } };
     }
 
     return toggleMediaLike(accessToken, mediaId, currentlyLiked);
+  };
+
+  const handleTrackLikeToggle = async (trackId, currentlyLiked) => {
+    if (!accessToken) {
+      return { error: { message: 'Please sign in to like tracks' } };
+    }
+
+    return toggleTrackLike(accessToken, trackId, currentlyLiked);
   };
 
   const handleLoadMore = () => {
@@ -341,7 +578,7 @@ export default function FeedClient() {
         )}
 
         {/* Loading */}
-        {loading && media.length === 0 && (
+        {loading && feedItems.length === 0 && (
           <div className="space-y-6">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-white dark:bg-gray-800 rounded-lg shadow-sm overflow-hidden animate-pulse">
@@ -363,7 +600,7 @@ export default function FeedClient() {
         )}
 
         {/* Empty State */}
-        {!loading && media.length === 0 && (
+        {!loading && feedItems.length === 0 && (
           <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg">
             <svg className="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -371,10 +608,10 @@ export default function FeedClient() {
             {feedType === 'following' ? (
               <>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  No photos yet
+                  No content yet
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Follow other users to see their photos here, or explore the discover feed.
+                  Follow other users to see their photos and tracks here, or explore the discover feed.
                 </p>
                 <button
                   onClick={() => setFeedType('discover')}
@@ -386,10 +623,10 @@ export default function FeedClient() {
             ) : (
               <>
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-                  No photos to discover
+                  No content to discover
                 </h3>
                 <p className="text-gray-600 dark:text-gray-400 mb-4">
-                  Be the first to share your park photos!
+                  Be the first to share your park photos or track a trip!
                 </p>
                 <Link
                   href="/parks"
@@ -403,21 +640,35 @@ export default function FeedClient() {
         )}
 
         {/* Feed Items */}
-        {media.length > 0 && (
+        {feedItems.length > 0 && (
           <div className="space-y-6">
-            {media.map((item) => (
-              <FeedItem
-                key={item.media_id || item.id}
-                item={item}
-                onLikeToggle={handleLikeToggle}
-                currentUserId={user?.id}
-              />
-            ))}
+            {feedItems.map((item) => {
+              // Render track items with TrackFeedItem, media items with FeedItem
+              if (item.item_type === 'track') {
+                return (
+                  <TrackFeedItem
+                    key={`track-${item.track_id}`}
+                    item={item}
+                    onLikeToggle={handleTrackLikeToggle}
+                    currentUserId={user?.id}
+                    accessToken={accessToken}
+                  />
+                );
+              }
+              return (
+                <FeedItem
+                  key={`media-${item.media_id || item.id}`}
+                  item={item}
+                  onLikeToggle={handleMediaLikeToggle}
+                  currentUserId={user?.id}
+                />
+              );
+            })}
           </div>
         )}
 
         {/* Load More */}
-        {hasMore && media.length > 0 && (
+        {hasMore && feedItems.length > 0 && (
           <div className="text-center mt-8">
             <button
               onClick={handleLoadMore}
