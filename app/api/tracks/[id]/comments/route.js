@@ -61,10 +61,13 @@ export async function GET(request, { params }) {
       return NextResponse.json({ error: 'Track not found' }, { status: 404 });
     }
 
-    // Check access
+    // Check access - comments are viewable if:
+    // 1. User is the owner
+    // 2. Track is public (is_public = true) - regardless of status
+    // This allows viewing comments on shared tracks even if status is 'completed'
     const user = await getAuthenticatedUser(request);
     const isOwner = user?.id === track.user_id;
-    const isPublic = track.is_public && track.status === 'shared';
+    const isPublic = track.is_public;
 
     if (!isOwner && !isPublic) {
       return NextResponse.json({ error: 'Track not found' }, { status: 404 });
@@ -216,8 +219,9 @@ export async function POST(request, { params }) {
       return NextResponse.json({ error: 'Track not found' }, { status: 404 });
     }
 
+    // Allow commenting if user is owner OR track is public
     const isOwner = user.id === track.user_id;
-    const isPublic = track.is_public && track.status === 'shared';
+    const isPublic = track.is_public;
 
     if (!isOwner && !isPublic) {
       return NextResponse.json({ error: 'Track not found' }, { status: 404 });

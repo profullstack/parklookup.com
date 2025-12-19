@@ -121,9 +121,10 @@ export async function GET(request, { params }) {
     }
 
     // Check access - track must be public or owned by user
+    // Note: is_public alone is sufficient for viewing (status doesn't matter for read access)
     const user = await getAuthenticatedUser(request);
     const isOwner = user?.id === track.user_id;
-    const isPublic = track.is_public && track.status === 'shared';
+    const isPublic = track.is_public;
 
     if (!isOwner && !isPublic) {
       return NextResponse.json({ error: 'Track not found' }, { status: 404 });

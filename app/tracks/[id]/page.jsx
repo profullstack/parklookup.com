@@ -1,5 +1,32 @@
+import { cookies } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
 import TrackDetailClient from './TrackDetailClient';
+
+/**
+ * Get user ID from session cookie if available
+ * @returns {Promise<string|null>} User ID or null
+ */
+async function getUserIdFromCookie() {
+  try {
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('sb-access-token')?.value;
+    
+    if (!accessToken) {
+      return null;
+    }
+    
+    const supabase = createServiceClient();
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    
+    if (error || !user) {
+      return null;
+    }
+    
+    return user.id;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Generate metadata for track detail page
@@ -10,14 +37,27 @@ export async function generateMetadata({ params }) {
 
   const { data: track } = await supabase
     .from('user_tracks')
-    .select('title, activity_type, distance_meters, duration_seconds')
+    .select('title, activity_type, distance_meters, duration_seconds, is_public, user_id')
     .eq('id', id)
+    .neq('status', 'deleted')
     .single();
 
   if (!track) {
     return {
       title: 'Track Not Found | ParkLookup',
     };
+  }
+
+  // Check access for metadata - only show details for public tracks
+  // Private track metadata is hidden from search engines
+  if (!track.is_public) {
+    const userId = await getUserIdFromCookie();
+    if (userId !== track.user_id) {
+      return {
+        title: 'Track Not Found | ParkLookup',
+        robots: 'noindex',
+      };
+    }
   }
 
   const title = track.title || `${track.activity_type} Track`;
@@ -35,6 +75,39 @@ export async function generateMetadata({ params }) {
 }
 
 /**
+ * Not Found component for tracks
+ */
+function TrackNotFound() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center py-12">
+          <svg
+            className="w-16 h-16 mx-auto text-gray-400 mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Track Not Found
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            This track may have been deleted or you don&apos;t have permission to view it.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Track Detail Page
  * Server component that fetches track data and renders client component
  */
@@ -47,38 +120,24 @@ export default async function TrackDetailPage({ params }) {
     .from('user_tracks')
     .select('*')
     .eq('id', id)
+    .neq('status', 'deleted')
     .single();
 
   // If base track doesn't exist, show not found
   if (baseError || !baseTrack) {
     console.error('Track not found:', baseError);
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
-        <div className="max-w-4xl mx-auto px-4">
-          <div className="text-center py-12">
-            <svg
-              className="w-16 h-16 mx-auto text-gray-400 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-              Track Not Found
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400">
-              This track may have been deleted or you don&apos;t have permission to view it.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
+    return <TrackNotFound />;
+  }
+
+  // Check access control - track must be public or owned by current user
+  const isPublic = baseTrack.is_public;
+  const userId = await getUserIdFromCookie();
+  const isOwner = userId && userId === baseTrack.user_id;
+
+  // If track is not public and user is not the owner, show not found
+  if (!isPublic && !isOwner) {
+    console.log('Access denied: track is private and user is not owner');
+    return <TrackNotFound />;
   }
 
   // Fetch related data separately (profiles, parks, trails)

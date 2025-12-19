@@ -210,6 +210,98 @@ describe('Track Comments API', () => {
       expect(data.commentsCount).toBe(1);
     });
 
+    it('should return comments for public track without authentication (is_public=true, any status)', async () => {
+      // This tests that unauthenticated users can view comments on public tracks
+      // even if the status is not 'shared' (e.g., 'completed')
+      const request = createMockRequest(); // No token - unauthenticated
+      const { params } = createMockParams('public-completed-track');
+
+      const mockComments = [
+        {
+          id: 'comment-1',
+          content: 'Nice hike!',
+          parent_id: null,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z',
+          profiles: {
+            id: 'user-1',
+            display_name: 'Hiker Jane',
+            avatar_url: 'https://example.com/jane.jpg',
+            username: 'hikerjane',
+          },
+        },
+      ];
+
+      // Track query - public but status is 'completed' not 'shared'
+      const trackQuery = {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            neq: vi.fn().mockReturnValue({
+              single: vi.fn().mockResolvedValue({
+                data: {
+                  id: 'public-completed-track',
+                  user_id: 'owner-id',
+                  is_public: true,
+                  status: 'completed', // Not 'shared'
+                },
+                error: null,
+              }),
+            }),
+          }),
+        }),
+      };
+
+      // Comments query
+      const commentsQuery = {
+        select: vi.fn().mockReturnValue({
+          eq: vi.fn().mockReturnValue({
+            is: vi.fn().mockReturnValue({
+              order: vi.fn().mockReturnValue({
+                range: vi.fn().mockResolvedValue({
+                  data: mockComments,
+                  error: null,
+                  count: 1,
+                }),
+              }),
+            }),
+          }),
+        }),
+      };
+
+      // Replies query
+      const repliesQuery = {
+        select: vi.fn().mockReturnValue({
+          in: vi.fn().mockReturnValue({
+            order: vi.fn().mockResolvedValue({
+              data: [],
+              error: null,
+            }),
+          }),
+        }),
+      };
+
+      let callCount = 0;
+      mockSupabase.from.mockImplementation((table) => {
+        if (table === 'user_tracks') {
+          return trackQuery;
+        }
+        if (table === 'track_comments') {
+          callCount++;
+          return callCount === 1 ? commentsQuery : repliesQuery;
+        }
+        return {};
+      });
+
+      const response = await GET(request, { params });
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.comments).toHaveLength(1);
+      expect(data.comments[0].content).toBe('Nice hike!');
+      expect(data.comments[0].user.displayName).toBe('Hiker Jane');
+      expect(data.commentsCount).toBe(1);
+    });
+
     it('should return comments with replies', async () => {
       const request = createMockRequest();
       const { params } = createMockParams('public-track');
