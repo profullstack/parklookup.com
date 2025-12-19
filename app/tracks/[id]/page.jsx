@@ -1,32 +1,5 @@
-import { cookies } from 'next/headers';
 import { createServiceClient } from '@/lib/supabase/server';
 import TrackDetailClient from './TrackDetailClient';
-
-/**
- * Get user ID from session cookie if available
- * @returns {Promise<string|null>} User ID or null
- */
-async function getUserIdFromCookie() {
-  try {
-    const cookieStore = await cookies();
-    const accessToken = cookieStore.get('sb-access-token')?.value;
-    
-    if (!accessToken) {
-      return null;
-    }
-    
-    const supabase = createServiceClient();
-    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
-    
-    if (error || !user) {
-      return null;
-    }
-    
-    return user.id;
-  } catch {
-    return null;
-  }
-}
 
 /**
  * Generate metadata for track detail page
@@ -37,7 +10,7 @@ export async function generateMetadata({ params }) {
 
   const { data: track } = await supabase
     .from('user_tracks')
-    .select('title, activity_type, distance_meters, duration_seconds, is_public, user_id')
+    .select('title, activity_type, distance_meters, duration_seconds, is_public')
     .eq('id', id)
     .neq('status', 'deleted')
     .single();
@@ -48,16 +21,12 @@ export async function generateMetadata({ params }) {
     };
   }
 
-  // Check access for metadata - only show details for public tracks
-  // Private track metadata is hidden from search engines
+  // For private tracks, don't expose details in metadata (SEO protection)
   if (!track.is_public) {
-    const userId = await getUserIdFromCookie();
-    if (userId !== track.user_id) {
-      return {
-        title: 'Track Not Found | ParkLookup',
-        robots: 'noindex',
-      };
-    }
+    return {
+      title: 'Track | ParkLookup',
+      robots: 'noindex',
+    };
   }
 
   const title = track.title || `${track.activity_type} Track`;
@@ -110,6 +79,13 @@ function TrackNotFound() {
 /**
  * Track Detail Page
  * Server component that fetches track data and renders client component
+ *
+ * Access control:
+ * - Public tracks (is_public=true): visible to everyone
+ * - Private tracks (is_public=false): only visible to owner (checked client-side)
+ *
+ * The server renders the page for all existing tracks, but passes the is_public
+ * and user_id to the client component which handles access control for private tracks.
  */
 export default async function TrackDetailPage({ params }) {
   const { id } = await params;
@@ -126,17 +102,6 @@ export default async function TrackDetailPage({ params }) {
   // If base track doesn't exist, show not found
   if (baseError || !baseTrack) {
     console.error('Track not found:', baseError);
-    return <TrackNotFound />;
-  }
-
-  // Check access control - track must be public or owned by current user
-  const isPublic = baseTrack.is_public;
-  const userId = await getUserIdFromCookie();
-  const isOwner = userId && userId === baseTrack.user_id;
-
-  // If track is not public and user is not the owner, show not found
-  if (!isPublic && !isOwner) {
-    console.log('Access denied: track is private and user is not owner');
     return <TrackNotFound />;
   }
 

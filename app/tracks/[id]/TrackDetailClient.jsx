@@ -34,8 +34,41 @@ import {
  * Track Detail Client Component
  * Displays full track details with map, stats, media, and social features
  */
+/**
+ * Not Found component for tracks (client-side)
+ */
+function TrackNotFoundClient() {
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-12">
+      <div className="max-w-4xl mx-auto px-4">
+        <div className="text-center py-12">
+          <svg
+            className="w-16 h-16 mx-auto text-gray-400 mb-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+            />
+          </svg>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Track Not Found
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            This track may have been deleted or you don&apos;t have permission to view it.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function TrackDetailClient({ track, points, media }) {
-  const { user, accessToken } = useAuth();
+  const { user, accessToken, loading: authLoading } = useAuth();
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(track.likes_count || 0);
   // Track is shared if is_public is true AND status is 'shared'
@@ -49,6 +82,25 @@ export default function TrackDetailClient({ track, points, media }) {
   const [shareError, setShareError] = useState(null);
 
   const isOwner = user?.id === track.user_id;
+  const isPublic = track.is_public;
+
+  // Access control: private tracks are only visible to their owner
+  // Wait for auth to load before checking access for private tracks
+  if (!isPublic && !authLoading && !isOwner) {
+    return <TrackNotFoundClient />;
+  }
+
+  // Show loading state while auth is loading for private tracks
+  if (!isPublic && authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Sync isShared state with track prop when it changes (e.g., after page refresh)
   useEffect(() => {
