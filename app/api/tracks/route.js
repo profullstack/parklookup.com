@@ -171,22 +171,27 @@ export async function GET(request) {
     // Get likes and comments counts
     const trackIds = tracks.map((t) => t.id);
 
-    const [likesResult, commentsResult] = await Promise.all([
-      supabase.from('track_likes').select('track_id').in('track_id', trackIds),
-      supabase.from('track_comments').select('track_id').in('track_id', trackIds),
-    ]);
-
-    // Count likes and comments per track
+    // Initialize counts
     const likesCounts = {};
     const commentsCounts = {};
 
-    likesResult.data?.forEach((like) => {
-      likesCounts[like.track_id] = (likesCounts[like.track_id] || 0) + 1;
-    });
+    // Only query if there are tracks
+    if (trackIds.length > 0) {
+      const [likesResult, commentsResult] = await Promise.all([
+        supabase.from('track_likes').select('track_id').in('track_id', trackIds),
+        supabase.from('track_comments').select('track_id').in('track_id', trackIds),
+      ]);
 
-    commentsResult.data?.forEach((comment) => {
-      commentsCounts[comment.track_id] = (commentsCounts[comment.track_id] || 0) + 1;
-    });
+      // Count likes per track
+      likesResult.data?.forEach((like) => {
+        likesCounts[like.track_id] = (likesCounts[like.track_id] || 0) + 1;
+      });
+
+      // Count comments per track
+      commentsResult.data?.forEach((comment) => {
+        commentsCounts[comment.track_id] = (commentsCounts[comment.track_id] || 0) + 1;
+      });
+    }
 
     // Transform tracks
     const transformedTracks = tracks.map((track) => ({

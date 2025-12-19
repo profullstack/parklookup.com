@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/hooks/useAuth';
@@ -20,6 +20,7 @@ const LiveTrackMap = dynamic(() => import('@/components/tracking/LiveTrackMap'),
 });
 import { formatDistance, formatDuration, formatSpeed, formatElevation } from '@/lib/tracking/track-stats';
 import {
+  getTrackLikes,
   likeTrack,
   unlikeTrack,
   shareTrack,
@@ -46,6 +47,25 @@ export default function TrackDetailClient({ track, points, media }) {
   const [selectedMedia, setSelectedMedia] = useState(null);
 
   const isOwner = user?.id === track.user_id;
+
+  // Fetch initial like status when component mounts or user changes
+  useEffect(() => {
+    const fetchLikeStatus = async () => {
+      try {
+        const result = await getTrackLikes(accessToken, track.id);
+        if (!result.error) {
+          setIsLiked(result.userHasLiked || false);
+          if (result.likesCount !== undefined) {
+            setLikesCount(result.likesCount);
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch like status:', error);
+      }
+    };
+
+    fetchLikeStatus();
+  }, [accessToken, track.id]);
 
   // Format dates
   const formattedDate = useMemo(() => {
