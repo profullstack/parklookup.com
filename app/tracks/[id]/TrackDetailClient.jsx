@@ -46,6 +46,7 @@ export default function TrackDetailClient({ track, points, media }) {
   const [newComment, setNewComment] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
+  const [shareError, setShareError] = useState(null);
 
   const isOwner = user?.id === track.user_id;
 
@@ -122,6 +123,7 @@ export default function TrackDetailClient({ track, points, media }) {
     if (!accessToken || !isOwner) return;
 
     setIsLoading(true);
+    setShareError(null);
     const previousState = isShared;
     
     try {
@@ -133,6 +135,9 @@ export default function TrackDetailClient({ track, points, media }) {
           // Revert on error
           setIsShared(previousState);
           console.error('Failed to unshare track:', result.error);
+          // Ensure we always set a string error message
+          const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || result.message || 'Failed to unshare track';
+          setShareError(errorMsg);
         }
       } else {
         // Optimistically update UI
@@ -141,13 +146,22 @@ export default function TrackDetailClient({ track, points, media }) {
         if (result.error) {
           // Revert on error
           setIsShared(previousState);
-          console.error('Failed to share track:', result.error);
+          console.error('Failed to share track:', result);
+          // Show user-friendly error message
+          if (result.error === 'Cannot share empty track') {
+            setShareError('This track has no GPS points recorded. You need to record a route before sharing.');
+          } else {
+            // Ensure we always set a string error message
+            const errorMsg = typeof result.error === 'string' ? result.error : result.error?.message || result.message || 'Failed to share track';
+            setShareError(errorMsg);
+          }
         }
       }
     } catch (error) {
       // Revert on exception
       setIsShared(previousState);
       console.error('Failed to update share status:', error);
+      setShareError('Failed to update share status. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -499,6 +513,26 @@ export default function TrackDetailClient({ track, points, media }) {
                 </>
               )}
             </div>
+
+            {/* Share Error Message */}
+            {shareError && (
+              <div className="mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <div className="flex-1">
+                    <p className="text-red-700 dark:text-red-300 text-sm">{shareError}</p>
+                    <button
+                      onClick={() => setShareError(null)}
+                      className="mt-2 text-sm text-red-600 dark:text-red-400 hover:underline"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Comments Section */}
