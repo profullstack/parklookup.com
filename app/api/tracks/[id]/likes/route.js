@@ -83,7 +83,7 @@ export async function GET(request, { params }) {
         `
         id,
         created_at,
-        profiles!track_likes_user_id_fkey (
+        profiles!track_likes_user_id_profiles_fkey (
           id,
           display_name,
           avatar_url,
