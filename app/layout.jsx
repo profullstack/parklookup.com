@@ -20,7 +20,25 @@ export const metadata = {
   openGraph: {
     type: 'website',
     siteName: 'ParkLookup',
+    title: 'ParkLookup - Discover State and National Parks',
+    description:
+      'Discover and explore U.S. National and State Parks. Search, save favorites, and plan your next adventure.',
     url: SITE_URL,
+    images: [
+      {
+        url: '/banner.png',
+        width: 1200,
+        height: 630,
+        alt: 'ParkLookup - Discover State and National Parks',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ParkLookup - Discover State and National Parks',
+    description:
+      'Discover and explore U.S. National and State Parks. Search, save favorites, and plan your next adventure.',
+    images: ['/banner.png'],
   },
   other: {
     'mobile-web-app-capable': 'yes',
