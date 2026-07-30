@@ -53,3 +53,7 @@ data/
 # Misc
 *.log
 *.tsbuildinfo
+
+# Claude Code: local-only, machine-specific (keep shared config committed)
+**/.claude/settings.local.json
+**/.claude/worktrees/
