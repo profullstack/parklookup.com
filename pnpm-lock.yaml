@@ -11,6 +11,9 @@ importers:
       '@pdf-lib/fontkit':
         specifier: ^1.1.1
         version: 1.1.1
+      '@profullstack/ai-providers':
+        specifier: 0.1.2
+        version: 0.1.2
       '@react-leaflet/core':
         specifier: 2.1.0
         version: 2.1.0(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
@@ -1156,6 +1159,11 @@ packages:
 
   '@polka/url@1.0.0-next.29':
     resolution: {integrity: sha512-wwQAWhWSuHaag8c4q/KN/vCoeOJYshAIvMQwD4GpSb3OiZklFfvAgmj0VCBBImRpuF/aFgIRzllXlVX93Jevww==}
+
+  '@profullstack/ai-providers@0.1.2':
+    resolution: {integrity: sha512-nOcKaOhfcDM+RNruA4+znva5xXxI4HF77iqUCgieuou2w8yY8LIF2p5ajSVD4kzFtfIUjC7GhGV8eyOrliHg1w==}
+    engines: {node: '>=20'}
+    hasBin: true
 
   '@react-leaflet/core@2.1.0':
     resolution: {integrity: sha512-Qk7Pfu8BSarKGqILj4x7bCSZ1pjuAPZ+qmRwH5S7mDS91VSbVVsJSrW4qA+GPrro8t69gFYVMWb1Zc4yFmPiVg==}
@@ -5548,6 +5556,8 @@ snapshots:
     optional: true
 
   '@polka/url@1.0.0-next.29': {}
+
+  '@profullstack/ai-providers@0.1.2': {}
 
   '@react-leaflet/core@2.1.0(leaflet@1.9.4)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
     dependencies:
