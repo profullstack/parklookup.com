@@ -6,10 +6,13 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@/lib/supabase/client';
 import { geocodeOrigin, milesToMeters } from '@/lib/api/geocode-origin';
-import { generateTripStream, prepareParksForPrompt, TRIP_INTERESTS, DIFFICULTY_LEVELS } from '@/lib/ai/trip-generator';
+import { coarseOrigin, generateTripStream, prepareParksForPrompt, TRIP_INTERESTS, DIFFICULTY_LEVELS } from '@/lib/ai/trip-generator';
 
 // Force dynamic rendering for this route
 export const dynamic = 'force-dynamic';
+
+// c0mpute generations can run for many minutes.
+export const maxDuration = 900;
 
 /**
  * Validate trip request body
@@ -405,9 +408,15 @@ export async function POST(request) {
           };
 
           let tripData;
+          // c0mpute can take minutes with nothing to stream; keep the SSE
+          // connection alive so proxies do not drop it.
+          const heartbeat = setInterval(() => {
+            send('progress', { stage: 'generating', message: 'Still writing your itinerary...' });
+          }, 20_000);
           try {
             tripData = await generateTripStream(
-              tripOptions,
+              // The model only needs the city and state, never a street address.
+              { ...tripOptions, origin: coarseOrigin(originCoords) },
               // onChunk callback
               (chunk) => {
                 send('chunk', { partial: chunk });
@@ -421,6 +430,8 @@ export async function POST(request) {
             send('error', { message: `AI generation failed: ${aiError.message}` });
             controller.close();
             return;
+          } finally {
+            clearInterval(heartbeat);
           }
 
           // Step 4: Save trip to database
